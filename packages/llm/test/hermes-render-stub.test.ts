@@ -63,6 +63,101 @@ describe("brokered neko_ui render MCP server", () => {
     });
   });
 
+  it("returns a corrective error when Table data is supplied through unsupported dataPath", async () => {
+    await withRenderServer(async (client, emit) => {
+      const result = await client.callTool({
+        name: "render_cards",
+        arguments: {
+          messages: [{
+            version: "v1.0",
+            createSurface: {
+              surfaceId: "shortfall-report",
+              catalogId: "urn:openneko:catalog:work:v2",
+              dataModel: { shortfall_rows: [{ matcode: "ABC", shortfall_qty: 10 }] },
+              components: [
+                { id: "root", component: "Column", children: ["shortfalls"] },
+                {
+                  id: "shortfalls",
+                  component: "Table",
+                  columns: [{ key: "matcode", label: "Material code" }],
+                  dataPath: "/shortfall_rows",
+                },
+              ],
+            },
+          }],
+        },
+      });
+
+      expect(result.isError).toBe(true);
+      const response = JSON.parse((result.content[0] as { text: string }).text);
+      expect(response.issues).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          path: "messages.0.createSurface.components.1.rows",
+          code: "invalid_table_rows",
+          message: expect.stringContaining('rows: {path:"/shortfall_rows"}'),
+        }),
+      ]));
+      expect(emit).not.toHaveBeenCalled();
+
+      const corrected = await client.callTool({
+        name: "render_cards",
+        arguments: {
+          messages: [{
+            version: "v1.0",
+            createSurface: {
+              surfaceId: "shortfall-report",
+              catalogId: "urn:openneko:catalog:work:v2",
+              dataModel: { shortfall_rows: [{ matcode: "ABC", shortfall_qty: 10 }] },
+              components: [
+                { id: "root", component: "Column", children: ["shortfalls"] },
+                {
+                  id: "shortfalls",
+                  component: "Table",
+                  columns: [{ key: "matcode", label: "Material code" }],
+                  rows: { path: "/shortfall_rows" },
+                },
+              ],
+            },
+          }],
+        },
+      });
+      expect(corrected.isError).not.toBe(true);
+      expect(emit).toHaveBeenCalledOnce();
+    });
+  });
+
+  it("rejects malformed Table data sent in updateComponents", async () => {
+    await withRenderServer(async (client, emit) => {
+      const result = await client.callTool({
+        name: "render_cards",
+        arguments: {
+          messages: [{
+            version: "v1.0",
+            updateComponents: {
+              surfaceId: "shortfall-report",
+              components: [{
+                id: "shortfalls",
+                component: "Table",
+                columns: [{ key: "matcode", label: "Material code" }],
+                dataPath: "/shortfall_rows",
+              }],
+            },
+          }],
+        },
+      });
+
+      expect(result.isError).toBe(true);
+      const response = JSON.parse((result.content[0] as { text: string }).text);
+      expect(response.issues).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          path: "messages.0.updateComponents.components.0.rows",
+          code: "invalid_table_rows",
+        }),
+      ]));
+      expect(emit).not.toHaveBeenCalled();
+    });
+  });
+
   it("emits a valid A2UI v1.0 surface from the one canonical server", async () => {
     const messages = [
       {
