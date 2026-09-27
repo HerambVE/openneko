@@ -112,9 +112,54 @@ function generatedSurfaceGraphIssues(
 ): Array<{ path: string; code: string; message: string }> {
   const issues: Array<{ path: string; code: string; message: string }> = [];
   messages.forEach((message, index) => {
-    if (!("createSurface" in message)) return;
-    const components = message.createSurface.components;
+    let location: "createSurface" | "updateComponents";
+    let components: z.infer<typeof a2uiComponentSchema>[] | undefined;
+    if ("createSurface" in message) {
+      location = "createSurface";
+      components = message.createSurface.components;
+    } else if ("updateComponents" in message) {
+      location = "updateComponents";
+      components = message.updateComponents.components;
+    } else {
+      return;
+    }
     if (!components) return;
+    components.forEach((component, componentIndex) => {
+      if (component.component !== "Table") return;
+      const path = `messages.${index}.${location}.components.${componentIndex}`;
+      if (!Array.isArray(component.columns) || component.columns.length === 0 ||
+        component.columns.some((column) =>
+          !column || typeof column !== "object" || Array.isArray(column) ||
+          typeof column.key !== "string" || !column.key ||
+          typeof column.label !== "string" || !column.label
+        )) {
+        issues.push({
+          path: `${path}.columns`,
+          code: "invalid_table_columns",
+          message: 'Table requires columns: [{key:"matcode",label:"Material code"}, ...].',
+        });
+      }
+      const rows = component.rows;
+      const boundRows = rows !== null && typeof rows === "object" &&
+        !Array.isArray(rows) && "path" in rows && typeof rows.path === "string" &&
+        rows.path.startsWith("/");
+      if (!Array.isArray(rows) && !boundRows) {
+        issues.push({
+          path: `${path}.rows`,
+          code: "invalid_table_rows",
+          message: 'Table requires rows: [{matcode:"ABC", ...}] or rows: {path:"/shortfall_rows"} with an array in dataModel. dataPath is not a Table property.',
+        });
+      } else if (Array.isArray(rows) && rows.some((row) =>
+        !row || typeof row !== "object" || Array.isArray(row)
+      )) {
+        issues.push({
+          path: `${path}.rows`,
+          code: "invalid_table_rows",
+          message: "Table rows must be an array of objects keyed by the column keys.",
+        });
+      }
+    });
+    if (location !== "createSurface") return;
     const root = components.find((component) => component.id === "root");
     if (!root) {
       issues.push({
