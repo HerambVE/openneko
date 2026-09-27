@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, FileText, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { ArrowUpRight, FileText, Trash2, Upload } from "lucide-react";
 import { confirmDialog } from "@/components/ConfirmModal";
 import PageHeading from "@/components/PageHeading";
 import { Button } from "@/components/ui/button";
 import { MenuItem, OverflowMenu } from "@/components/ui/overflow-menu";
 import { EmptyState } from "@/components/ui/empty";
 import { SearchInput } from "@/components/ui/search-input";
+import { Input } from "@/components/ui/input";
 import { matchesListSearch } from "@/lib/list-search";
 
 type SkillSummary = {
@@ -18,18 +21,22 @@ type SkillSummary = {
   updatedAt: string;
 };
 
-async function fetchSkills(signal?: AbortSignal): Promise<SkillSummary[]> {
+async function fetchSkills(signal?: AbortSignal): Promise<{ skills: SkillSummary[]; canImport: boolean }> {
   const response = await fetch("/api/work/skills", {
     cache: "no-store",
     signal,
   });
   if (!response.ok) throw new Error("Skills could not be loaded.");
-  const data = (await response.json()) as { skills?: SkillSummary[] };
-  return data.skills ?? [];
+  const data = (await response.json()) as { skills?: SkillSummary[]; canImport?: boolean };
+  return { skills: data.skills ?? [], canImport: data.canImport === true };
 }
 
 export default function SkillsPage() {
+  const router = useRouter();
+  const archiveInput = useRef<HTMLInputElement>(null);
   const [skills, setSkills] = useState<SkillSummary[]>([]);
+  const [canImport, setCanImport] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyName, setBusyName] = useState<string | null>(null);
@@ -38,7 +45,9 @@ export default function SkillsPage() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      setSkills(await fetchSkills());
+      const data = await fetchSkills();
+      setSkills(data.skills);
+      setCanImport(data.canImport);
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Skills could not be loaded.");
@@ -51,7 +60,8 @@ export default function SkillsPage() {
     const controller = new AbortController();
     void fetchSkills(controller.signal)
       .then((data) => {
-        setSkills(data);
+        setSkills(data.skills);
+        setCanImport(data.canImport);
         setError(null);
       })
       .catch((cause: unknown) => {
@@ -63,6 +73,30 @@ export default function SkillsPage() {
       });
     return () => controller.abort();
   }, []);
+
+  const importArchive = useCallback(async (file: File | undefined) => {
+    if (!file) return;
+    if (file.size > 16 * 1024 * 1024) {
+      toast.error("Skill archive must be at most 16 MB.");
+      if (archiveInput.current) archiveInput.current.value = "";
+      return;
+    }
+    setImporting(true);
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      const response = await fetch("/api/work/skills", { method: "POST", body: form });
+      const data = await response.json() as { name?: string; error?: string };
+      if (!response.ok || !data.name) throw new Error(data.error ?? "Skill could not be imported.");
+      toast.success(`Imported ${data.name}.`);
+      router.push(`/skills/${encodeURIComponent(data.name)}`);
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Skill could not be imported.");
+    } finally {
+      setImporting(false);
+      if (archiveInput.current) archiveInput.current.value = "";
+    }
+  }, [router]);
 
   const remove = useCallback(
     async (skillName: string) => {
@@ -110,20 +144,39 @@ export default function SkillsPage() {
         title="Skills"
         description="Capabilities your agents can call while they work a run."
         actions={
-          <div className="library-head-stats" aria-label="Skill inventory">
-            <div>
-              <strong>{String(skills.length).padStart(2, "0")}</strong>
-              <span>installed</span>
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="library-head-stats" aria-label="Skill inventory">
+              <div>
+                <strong>{String(skills.length).padStart(2, "0")}</strong>
+                <span>installed</span>
+              </div>
+              <div>
+                <strong>{String(totalFiles).padStart(2, "0")}</strong>
+                <span>files</span>
+              </div>
             </div>
-            <div>
-              <strong>{String(totalFiles).padStart(2, "0")}</strong>
-              <span>files</span>
-            </div>
+            {canImport ? (
+              <Button variant="primary" disabled={importing} onClick={() => archiveInput.current?.click()}>
+                <Upload aria-hidden="true" />{importing ? "Importing…" : "Import skill"}
+              </Button>
+            ) : null}
           </div>
         }
       />
 
+      <Input
+        ref={archiveInput}
+        type="file"
+        accept=".skill,.zip,application/zip"
+        hidden
+        aria-label="Choose a skill archive"
+        onChange={(event) => void importArchive(event.target.files?.[0])}
+      />
+
       <main className="library-main">
+        {canImport ? (
+          <p className="text-ui-caption text-text2">Import a .skill or ZIP archive containing one skill directory with SKILL.md and its supporting files.</p>
+        ) : null}
         <SearchInput
           label="Search skills"
           value={query}
@@ -170,7 +223,7 @@ export default function SkillsPage() {
               body={
                 query
                   ? "Try another skill name or trigger phrase."
-                  : "Skills appear here when OpenNeko saves a reusable capability or one is installed into the organization workspace."
+                  : "Skills appear here when OpenNeko saves a reusable capability or an administrator imports one."
               }
             />
           ) : (
