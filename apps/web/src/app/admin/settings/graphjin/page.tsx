@@ -6,6 +6,8 @@ import { getCurrentActor } from "@/lib/actor";
 import { getOrgId } from "@/lib/db";
 import { getGraphjinConfigSettingsPayload } from "@/lib/graphjin-config-settings";
 import { AdminDenied, AdminShell } from "../../AdminShell";
+import { Button, buttonClassName } from "@/components/ui/button";
+import { StatCard, StatGrid } from "@/components/ui/stat-card";
 import GraphjinConfigControls from "./GraphjinConfigControls";
 import SourceSecretsPanel from "./SourceSecretsPanel";
 
@@ -51,25 +53,24 @@ export default async function AdminGraphjinPage() {
 
   return (
     <AdminShell
-      title="GraphJin Config"
+      title="GraphJin config"
       subtitle="Source-mode endpoints and RBAC token claims passed to GraphJin."
       back={{ href: "/admin/settings", label: "Settings" }}
-      wide
     >
-      <div className="grid gap-3 md:grid-cols-4">
-        <Stat label="Sources" value={sources.length} />
-        <Stat label="Enabled" value={enabled.length} />
-        <Stat
+      <StatGrid label="GraphJin status">
+        <StatCard label="Sources" value={sources.length} />
+        <StatCard label="Enabled" value={enabled.length} />
+        <StatCard
           label="JWT RBAC"
           value={enabled.length > 0 ? `${jwtCount}/${enabled.length}` : "0"}
-          warn={enabled.length === 0 || jwtCount !== enabled.length}
+          tone={enabled.length === 0 || jwtCount !== enabled.length ? "warn" : "ok"}
         />
-        <Stat
+        <StatCard
           label="MCP config"
           value={sourceConfigEnabled ? "On" : "Off"}
-          warn={!sourceConfigEnabled}
+          tone={sourceConfigEnabled ? "ok" : "neutral"}
         />
-      </div>
+      </StatGrid>
 
       <GraphjinConfigControls initial={graphjinConfig.settings} />
 
@@ -82,6 +83,11 @@ export default async function AdminGraphjinPage() {
             </p>
           </div>
         </div>
+        {!sourceConfigEnabled ? (
+          <p className="mb-3 text-ui-body-sm text-text2">
+            Turn on Ask-based config above to use these actions.
+          </p>
+        ) : null}
         <div className="flex flex-wrap gap-2">
           <ActionLink
             href={workSeedHref(INSPECT_SOURCE_GRAPH_SEED)}
@@ -132,7 +138,10 @@ export default async function AdminGraphjinPage() {
               Data sources registered for GraphJin-backed reads and writes.
             </p>
           </div>
-          <Link href="/admin/settings/data" className="settings-backlink">
+          <Link
+            href="/admin/settings/data"
+            className={buttonClassName({ size: "sm" })}
+          >
             Edit sources
           </Link>
         </div>
@@ -145,14 +154,14 @@ export default async function AdminGraphjinPage() {
               className="w-full border-collapse text-left text-sm"
               style={{ minWidth: 1040 }}
             >
-              <thead className="text-ui-label uppercase tracking-[0.12em] text-text3">
+              <thead className="text-ui-caption text-text2">
                 <tr>
-                  <th className="whitespace-nowrap border-b border-border px-3 py-2 font-bold">Source</th>
-                  <th className="whitespace-nowrap border-b border-border px-3 py-2 font-bold">Auth</th>
-                  <th className="border-b border-border px-3 py-2 font-bold">GraphQL</th>
-                  <th className="border-b border-border px-3 py-2 font-bold">MCP</th>
-                  <th className="whitespace-nowrap border-b border-border px-3 py-2 font-bold">Updated</th>
-                  <th className="whitespace-nowrap border-b border-border px-3 py-2 font-bold">Ask</th>
+                  <th className="whitespace-nowrap border-b border-border px-3 py-2 font-semibold">Source</th>
+                  <th className="whitespace-nowrap border-b border-border px-3 py-2 font-semibold">Auth</th>
+                  <th className="border-b border-border px-3 py-2 font-semibold">GraphQL</th>
+                  <th className="border-b border-border px-3 py-2 font-semibold">MCP</th>
+                  <th className="whitespace-nowrap border-b border-border px-3 py-2 font-semibold">Updated</th>
+                  <th className="whitespace-nowrap border-b border-border px-3 py-2 font-semibold">Ask</th>
                 </tr>
               </thead>
               <tbody>
@@ -189,7 +198,7 @@ export default async function AdminGraphjinPage() {
                       {formatDate(source.updatedAt)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 align-top">
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex gap-2">
                         <ActionLink
                           href={workSeedHref(inspectSourceSeed(source.name))}
                           disabled={!sourceConfigEnabled}
@@ -271,43 +280,15 @@ function ActionLink({
 }) {
   if (disabled) {
     return (
-      <span
-        className="settings-backlink cursor-not-allowed opacity-50"
-        aria-disabled="true"
-      >
+      <Button size="sm" disabled>
         {children}
-      </span>
+      </Button>
     );
   }
   return (
-    <Link href={href} className="settings-backlink">
+    <Link href={href} className={buttonClassName({ size: "sm" })}>
       {children}
     </Link>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  warn = false,
-}: {
-  label: string;
-  value: number | string;
-  warn?: boolean;
-}) {
-  return (
-    <div className="rounded-[14px] border border-border bg-card px-4 py-3 shadow-soft">
-      <div className="text-ui-label font-bold uppercase tracking-[0.12em] text-text3">
-        {label}
-      </div>
-      <div
-        className={`mt-2 font-display text-2xl font-bold ${
-          warn ? "text-danger" : "text-text"
-        }`}
-      >
-        {value}
-      </div>
-    </div>
   );
 }
 

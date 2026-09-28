@@ -24,7 +24,7 @@
   margin-left: 6px;
   padding: 0 6px;
   border-radius: 100px;
-  background: var(--danger);
+  background: var(--accent);
   color: var(--on-accent);
   font-size: var(--type-label);
   font-weight: 700;

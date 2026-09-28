@@ -11,6 +11,15 @@ import ActCard, {
   type ActRowData,
   type ActRowTone,
 } from "@/components/ActCard";
+import { ActionChanges } from "@/components/ActionChanges";
+import { Disclosure } from "@/components/ui/disclosure";
+import { useApprovalDecisions } from "@/hooks/useApprovalDecisions";
+import {
+  actionOutcome,
+  describeOutcome,
+  systemForActionKind,
+  type ActionOutcome,
+} from "@/lib/action-outcome";
 import { cn } from "@/lib/cn";
 import { formatSavedShort } from "@/lib/hours-saved";
 import { workflowDisplayName } from "@/lib/workflow-label";
@@ -21,10 +30,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty";
 import { SearchInput } from "@/components/ui/search-input";
+import { SkeletonList } from "@/components/ui/skeleton";
 import { Tab, Tabs } from "@/components/ui/tabs";
 import { matchesListSearch } from "@/lib/list-search";
 
-type Filter = "awaiting" | "fired" | "rejected" | "all";
+type Filter = "awaiting" | "fired" | "failed" | "rejected" | "all";
 
 type ActionRow = {
   id: string;
@@ -43,6 +53,8 @@ type ActionRow = {
   approverKind: "operator" | "policy" | "auto" | null;
   approverLabel: string | null;
   rejectionReason: string | null;
+  outcome: ActionOutcome;
+  executionError: string | null;
   runAt: string;
   createdAt: string;
 };
@@ -54,8 +66,9 @@ type ActionsPayload = {
 };
 
 const TABS: Array<{ key: Filter; label: string }> = [
-  { key: "fired", label: "Fired" },
-  { key: "awaiting", label: "Awaiting you" },
+  { key: "awaiting", label: "Waiting for you" },
+  { key: "fired", label: "Completed" },
+  { key: "failed", label: "Failed" },
   { key: "rejected", label: "Rejected" },
   { key: "all", label: "All" },
 ];
@@ -70,8 +83,14 @@ function approverPhrase(
   return null;
 }
 
+function outcomeOf(row: ActionRow): ActionOutcome {
+  return row.outcome ?? actionOutcome(row.status);
+}
+
 function rowToneFor(row: ActionRow): ActRowTone {
-  if (row.status === "rejected" || row.status === "failed") return "action";
+  const outcome = outcomeOf(row);
+  if (outcome === "rejected" || outcome === "failed") return "action";
+  if (outcome === "needs_check" || outcome === "partial") return "watch";
   if (row.status === "pending_approval") {
     if (row.riskLevel === "high" || row.riskLevel === "critical") return "action";
     return "watch";
@@ -81,7 +100,10 @@ function rowToneFor(row: ActionRow): ActRowTone {
 
 function stateFor(row: ActionRow): ActCardData["state"] {
   if (row.status === "pending_approval") return "awaiting";
-  if (row.status === "rejected" || row.status === "failed") return "rejected";
+  const outcome = outcomeOf(row);
+  if (outcome === "rejected") return "rejected";
+  if (outcome === "failed") return "failed";
+  if (outcome === "needs_check" || outcome === "partial") return "needs_check";
   return "live";
 }
 
@@ -89,6 +111,7 @@ function isFilter(value: string | null): value is Filter {
   return (
     value === "awaiting" ||
     value === "fired" ||
+    value === "failed" ||
     value === "rejected" ||
     value === "all"
   );
@@ -145,10 +168,7 @@ function ActionsPageInner() {
   const [filter, setFilter] = useState<Filter>(isFilter(initial) ? initial : "awaiting");
   const [data, setData] = useState<ActionsPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
   const [query, setQuery] = useState("");
   const rowRefs = useRef<Record<string, HTMLLIElement | null>>({});
 
@@ -171,6 +191,16 @@ function ActionsPageInner() {
     }
   }, [filter, focusedId]);
 
+  const {
+    hiddenIds,
+    rejectingId,
+    rejectReason,
+    setRejectReason,
+    approve,
+    beginReject,
+    cancelReject,
+    submitReject,
+  } = useApprovalDecisions(load);
   useEffect(() => {
     const initialLoadId = window.setTimeout(() => {
       void load();
@@ -181,48 +211,17 @@ function ActionsPageInner() {
   const switchFilter = useCallback((next: Filter) => {
     setFilter(next);
     setFocusedId(null);
-    setRejectingId(null);
+    cancelReject();
     const url = new URL(window.location.href);
     if (next === "awaiting") url.searchParams.delete("filter");
     else url.searchParams.set("filter", next);
     window.history.replaceState({}, "", url.toString());
-  }, []);
+  }, [cancelReject]);
 
-  const act = useCallback(
-    async (id: string, decision: "approve" | "reject", reason?: string) => {
-      setBusyId(id);
-      try {
-        await fetch(`/api/action-requests/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ decision, reason }),
-        });
-        await load();
-      } finally {
-        setBusyId(null);
-      }
-    },
-    [load],
+  const labelFor = useCallback(
+    (id: string) => data?.actions.find((a) => a.id === id)?.summary ?? "",
+    [data?.actions],
   );
-
-  const beginReject = useCallback((id: string) => {
-    setRejectingId(id);
-    setRejectReason("");
-  }, []);
-
-  const cancelReject = useCallback(() => {
-    setRejectingId(null);
-    setRejectReason("");
-  }, []);
-
-  const submitReject = useCallback(async () => {
-    if (!rejectingId) return;
-    const id = rejectingId;
-    const reason = rejectReason.trim() || undefined;
-    setRejectingId(null);
-    setRejectReason("");
-    await act(id, "reject", reason);
-  }, [rejectingId, rejectReason, act]);
 
   useEffect(() => {
     if (!focusedId) return;
@@ -235,6 +234,7 @@ function ActionsPageInner() {
   const visibleActions = useMemo(
     () =>
       (data?.actions ?? []).filter((action) =>
+        !hiddenIds.has(action.id) &&
         matchesListSearch(
           query,
           action.summary,
@@ -246,7 +246,7 @@ function ActionsPageInner() {
           action.triggeredByObservation?.title,
         ),
       ),
-    [data?.actions, query],
+    [data?.actions, hiddenIds, query],
   );
   const groups = useMemo(() => groupActions(visibleActions), [visibleActions]);
   const visibleFocusedId = visibleActions.some(
@@ -263,8 +263,8 @@ function ActionsPageInner() {
         </AppHeader>
 
         <PageHeading
-          title="Review queue"
-          description="Approve, reject, and inspect the external actions proposed by your agents."
+          title="Approvals"
+          description="Changes OpenNeko wants to make in your systems. Nothing runs until you approve it."
           meta={
             data && filter === "awaiting"
               ? `${data.count} pending`
@@ -281,7 +281,7 @@ function ActionsPageInner() {
           />
         </div>
 
-        <Tabs aria-label="Review queue filter" className="mb-[18px]">
+        <Tabs aria-label="Approvals filter" className="mb-[18px]">
           {TABS.map((t) => {
             const active = filter === t.key;
             return (
@@ -299,7 +299,7 @@ function ActionsPageInner() {
         {error ? (
           <div className="py-[60px] text-center text-danger text-ui-body">{error}</div>
         ) : data === null ? (
-          <div className="py-[60px] text-center text-text3 text-ui-body">Loading…</div>
+          <SkeletonList rows={3} label="Loading approvals" className="max-w-[620px]" />
         ) : data.actions.length === 0 ? (
           <ActionsEmptyState filter={filter} onBack={() => router.push("/")} />
         ) : visibleActions.length === 0 ? (
@@ -321,7 +321,7 @@ function ActionsPageInner() {
                   id: r.id,
                   tone: rowToneFor(r),
                   headline: r.summary || r.kind,
-                  detail: null,
+                  detail: describeOutcome(outcomeOf(r), r.executionError, systemForActionKind(r.kind)),
                   target: r.target,
                   kind: r.kind,
                   payload: r.payload,
@@ -339,14 +339,13 @@ function ActionsPageInner() {
                   data={cardData}
                   index={i}
                   focusedRowId={visibleFocusedId}
-                  busyRowId={busyId}
                   rejectingRowId={rejectingId}
                   rejectReason={rejectReason}
                   onRejectReasonChange={setRejectReason}
                   onCancelReject={cancelReject}
-                  onSubmitReject={submitReject}
+                  onSubmitReject={() => submitReject(rejectingId ? labelFor(rejectingId) : "")}
                   onFocusRow={setFocusedId}
-                  onApproveRow={(id) => act(id, "approve")}
+                  onApproveRow={(id) => approve(id, labelFor(id))}
                   onBeginRejectRow={beginReject}
                   rowRef={(id, el) => {
                     rowRefs.current[id] = el;
@@ -360,9 +359,9 @@ function ActionsPageInner() {
                 action={
                   visibleActions.find((a) => a.id === visibleFocusedId) ?? null
                 }
-                busy={busyId !== null && busyId === visibleFocusedId}
+                busy={false}
                 onApprove={() => {
-                  if (visibleFocusedId) void act(visibleFocusedId, "approve");
+                  if (visibleFocusedId) approve(visibleFocusedId, labelFor(visibleFocusedId));
                 }}
                 onReject={() => {
                   if (visibleFocusedId) beginReject(visibleFocusedId);
@@ -408,21 +407,14 @@ function ActionReadingPane({
     );
   }
   const recordUpdate = parseRecordUpdatePayload(action.kind, action.payload);
-  const payloadEntries =
-    action.payload && typeof action.payload === "object" && !Array.isArray(action.payload)
-      ? Object.entries(action.payload as Record<string, unknown>)
-          .filter(([key]) => !recordUpdate || (key !== "fields" && key !== "expected"))
-          .slice(0, 8)
-      : [];
   const risk = action.riskLevel ?? "low";
   return (
     <aside className="triage-pane">
       <div className="bg-card border border-border rounded-2xl px-5 py-[18px] shadow-soft">
         <div className="flex items-center gap-2.5 mb-2.5">
-          <span className={cn("font-display text-ui-label font-extrabold tracking-[0.08em] uppercase px-2 py-0.5 rounded-full", RISK_PILL[risk] ?? RISK_PILL.low)}>
-            {risk} risk
+          <span className={cn("font-display text-ui-caption font-semibold px-2 py-0.5 rounded-full", RISK_PILL[risk] ?? RISK_PILL.low)}>
+            {risk.charAt(0).toUpperCase() + risk.slice(1)} risk
           </span>
-          <code className="ml-auto font-mono text-ui-label text-text3">{action.kind}</code>
         </div>
         <h2 className="font-display text-ui-section font-extrabold tracking-[-0.02em] leading-[1.2] text-text">
           {action.summary || action.kind}
@@ -434,7 +426,7 @@ function ActionReadingPane({
 
         {action.target && (
           <div className="mt-4">
-            <div className="text-ui-label font-bold tracking-[0.12em] uppercase text-text3 mb-1.5">Target</div>
+            <div className="text-ui-caption font-semibold text-text3 mb-1.5">Target</div>
             <code className="font-mono text-ui-caption text-text2 break-all">{action.target}</code>
           </div>
         )}
@@ -449,25 +441,22 @@ function ActionReadingPane({
           }
         />
 
-        {payloadEntries.length > 0 && (
-          <div className="mt-4">
-            <div className="text-ui-label font-bold tracking-[0.12em] uppercase text-text3 mb-1.5">Payload</div>
-            <div className="bg-bg border border-border rounded-xl px-3 py-2.5 grid gap-1.5">
-              {payloadEntries.map(([k, v]) => (
-                <div key={k} className="flex gap-3 text-ui-caption">
-                  <span className="text-text3 min-w-[88px] flex-none">{k}</span>
-                  <span className="font-mono text-text break-all">
-                    {typeof v === "object" ? JSON.stringify(v) : String(v)}
-                  </span>
-                </div>
-              ))}
+        {recordUpdate ? null : <ActionChanges payload={action.payload} className="mt-4" />}
+
+        <Disclosure title="Technical details" className="mt-4">
+          <div className="grid gap-2 text-ui-caption text-text2">
+            <div>
+              Action <code className="font-mono text-text">{action.kind}</code>
             </div>
+            <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-[8px] bg-bg px-3 py-2.5 font-mono text-ui-caption text-text2">
+              {JSON.stringify(action.payload, null, 2)}
+            </pre>
           </div>
-        )}
+        </Disclosure>
 
         {(action.minutesSaved ?? 0) > 0 && (
           <div className="mt-4 text-ui-body-sm text-text2">
-            Saves <span className="font-mono text-success-ink">{formatSavedShort(action.minutesSaved as number)}</span> of manual effort.
+            Saves <span className="font-semibold text-success-ink">{formatSavedShort(action.minutesSaved as number)}</span> of manual effort.
           </div>
         )}
 
@@ -497,17 +486,22 @@ function ActionsEmptyState({ filter, onBack }: { filter: Filter; onBack: () => v
     filter === "awaiting"
       ? {
           line: "Nothing's waiting.",
-          sub: "The loop is humming. Anything that needs your judgment will show up here automatically.",
+          sub: "Anything that needs your decision will appear here.",
         }
       : filter === "fired"
         ? {
-            line: "No actions have fired yet.",
-            sub: "When a workflow proposes an action and your rules approve it, it'll land here.",
+            line: "No completed actions yet.",
+            sub: "Changes that ran and were confirmed in your systems appear here.",
           }
+        : filter === "failed"
+          ? {
+              line: "Nothing failed.",
+              sub: "Approved changes that did not run, or that OpenNeko could not confirm, appear here.",
+            }
         : filter === "rejected"
           ? {
               line: "Nothing rejected.",
-              sub: "Rejected and failed actions land here so you have an audit trail.",
+              sub: "Changes that someone declined appear here with the reason.",
             }
           : {
               line: "No actions yet.",
@@ -520,7 +514,7 @@ function ActionsEmptyState({ filter, onBack }: { filter: Filter; onBack: () => v
       className="py-20"
       action={
         <Button variant="ghost" size="sm" onClick={onBack}>
-          ← Back to briefing
+          Back to Briefing
         </Button>
       }
     />

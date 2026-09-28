@@ -53,7 +53,7 @@ export default function WorkflowOrgLimitsForm({ initial }: { initial: Limits }) 
         </Field>
       </div>
       {error ? <p role="alert" className="text-danger">{error}</p> : null}
-      <Button type="submit" variant="primary" disabled={saving} className="justify-self-start">{saving ? "Saving…" : "Save organization budget"}</Button>
+      <Button type="submit" variant="primary" disabled={saving} className="justify-self-end">{saving ? "Saving…" : "Save organization budget"}</Button>
     </form>
   );
 }

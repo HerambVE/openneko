@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { SkeletonList } from "@/components/ui/skeleton";
 import { useParams, useRouter } from "next/navigation";
 import { Check, Download, MessageCircle, Pin, TriangleAlert } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -156,10 +157,10 @@ function formatRunTimestamp(iso: string): string {
 }
 
 const ACTION_STATUS_LABEL: Record<string, string> = {
-  pending_approval: "Awaiting you",
+  pending_approval: "Waiting for you",
   approved: "Approved",
   rejected: "Rejected",
-  executed: "Fired",
+  executed: "Completed",
   failed: "Failed",
 };
 
@@ -406,7 +407,7 @@ export default function RunPage() {
         <AppHeader>
           <SectionNav current="workflows" />
         </AppHeader>
-        <div className="py-[60px] text-center text-sm text-text3">Loading…</div>
+        <SkeletonList rows={3} variant="row" label="Loading run" className="mt-10" />
       </div>
     );
   }
@@ -423,7 +424,7 @@ export default function RunPage() {
         <AppHeader
           back={{
             href: workflow ? `/workflows?id=${encodeURIComponent(workflow.id)}` : "/workflows",
-            label: workflow?.name ?? "Agent workflows",
+            label: workflow?.name ?? "Workflows",
           }}
         >
           <SectionNav current="workflows" />
@@ -722,7 +723,7 @@ export default function RunPage() {
                         router.push(`/runs/${lineage.upstream!.workflowRunId}`)
                       }
                     >
-                      open upstream run →
+                      Open the run that started this
                     </Button>
                   )}
                 </div>

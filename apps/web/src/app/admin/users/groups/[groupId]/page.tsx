@@ -48,7 +48,6 @@ export default async function GroupPage({ params }: { params: Promise<{ groupId:
       title={group.name}
       subtitle={group.description ?? (group.kind === "builtin" ? "Built-in group" : "Custom group")}
       back={{ href: "/admin/users?tab=groups", label: "Groups" }}
-      wide
     >
       <GroupDetailClient
         group={group}

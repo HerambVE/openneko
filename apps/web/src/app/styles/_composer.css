@@ -83,10 +83,8 @@
   padding: 7px 10px 6px;
   border-bottom: 1px solid var(--border);
   color: var(--text3);
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 .work-mention-layout {
   display: grid;
@@ -444,6 +442,7 @@
   .work-composer-hint kbd,
   .work-composer-hint-sep { display: none; }
   .work-composer-hint { font-size: var(--type-label); }
+  .work-composer-keys { display: none; }
 }
 /* Touch devices: hover styles are misleading (sticky tap = sticky hover).
    Strip the lift/glow on hover for anything that can't truly hover. */
@@ -481,14 +480,10 @@
    headline — the goal is to feel like the assistant's invitation to
    talk, not a marketing landing hero. The text and prompts share the
    transcript's column width so the empty state and a populated thread
-   read as the same container, just differently filled. */
-.work-empty-prompt:hover {
+   read as the same container {
   border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
   background: var(--card);
   transform: translateY(-1px);
-}
-@media (hover: none) {
-  .work-empty-prompt:hover { transform: none; }
 }
 
 .iactions {
@@ -533,12 +528,10 @@
   color: var(--text2);
   line-height: 1.6;
   margin-bottom: 14px;
-  padding-left: 54px;
 }
 .dchart {
   background: color-mix(in srgb, var(--mood-tint, var(--bg)) 50%, var(--bg));
   border: 1px solid color-mix(in srgb, var(--mood-color, var(--border)) 18%, var(--border));
   border-radius: 14px;
   padding: 14px 12px 8px 12px;
-  margin-left: 54px;
 }

@@ -108,10 +108,7 @@ export default function PolicyDetailClient({ policyId }: { policyId: string }) {
 
   return (
     <>
-      <div
-        className="root"
-        style={{ "--page-width": "min(900px, 100%)" } as React.CSSProperties}
-      >
+      <div className="root is-narrow">
         <AppHeader back={{ href: "/admin/rules", label: "Rules" }}>
           <SectionNav current="admin" />
         </AppHeader>
@@ -227,7 +224,7 @@ export default function PolicyDetailClient({ policyId }: { policyId: string }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="mb-4 last:mb-0">
-      <div className="text-ui-label font-bold tracking-[0.13em] uppercase text-text3 mb-1">
+      <div className="text-ui-caption font-semibold text-text3 mb-1">
         {label}
       </div>
       <div className="text-text">{children}</div>

@@ -71,10 +71,10 @@
 
 .library-page {
   width: 100%;
-  max-width: none;
+  max-width: var(--content-max);
   min-width: 0;
   min-height: 100svh;
-  margin: 0;
+  margin: 0 auto;
   padding: 0 0 112px;
   background: var(--bg);
   color: var(--text);
@@ -107,11 +107,9 @@
 .library-head-title > p {
   margin: 0;
   color: color-mix(in srgb, var(--bg) 58%, var(--text));
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.15em;
   line-height: 1.35;
-  text-transform: uppercase;
 }
 
 .library-head-title > span {
@@ -159,11 +157,9 @@
 .library-head-stats span {
   margin-top: 7px;
   color: color-mix(in srgb, var(--bg) 56%, var(--text));
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.14em;
   line-height: 1;
-  text-transform: uppercase;
 }
 
 .library-head-stats [data-state="attention"] strong {
@@ -229,7 +225,7 @@
 
 .library-section-head > strong {
   color: var(--text3);
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-caption);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -389,11 +385,9 @@ section.library-empty [data-ui-empty-state-body] {
 
 .memory-review-meta span {
   color: var(--warn-ink);
-  font-family: var(--font-mono);
-  font-size: var(--type-label);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--type-caption);
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .memory-review-copy p {
@@ -507,6 +501,10 @@ section.library-empty [data-ui-empty-state-body] {
   white-space: nowrap;
 }
 
+.memory-usage > span {
+  text-transform: none;
+}
+
 .memory-kind small,
 .memory-scope small,
 .memory-usage small {
@@ -524,7 +522,6 @@ section.library-empty [data-ui-empty-state-body] {
 
 .memory-kind small {
   color: var(--accent);
-  text-transform: uppercase;
 }
 
 .memory-kind svg {
@@ -606,7 +603,7 @@ section.library-empty [data-ui-empty-state-body] {
   align-items: center;
   gap: 6px;
   color: var(--text2);
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-caption);
   font-variant-numeric: tabular-nums;
 }
@@ -618,11 +615,9 @@ section.library-empty [data-ui-empty-state-body] {
 
 .skill-updated {
   color: var(--text3);
-  font-family: var(--font-mono);
-  font-size: var(--type-label);
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  font-size: var(--type-caption);
+  font-variant-numeric: tabular-nums;
 }
 
 .skill-row-arrow {
@@ -679,11 +674,9 @@ section.library-empty [data-ui-empty-state-body] {
   gap: 7px;
   margin-bottom: 5px;
   color: var(--success);
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.13em;
   text-decoration: none;
-  text-transform: uppercase;
 }
 
 .skill-back-link svg {
@@ -776,7 +769,7 @@ section.library-empty [data-ui-empty-state-body] {
 
 .skill-file-btn small {
   color: var(--text3);
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-label);
   font-variant-numeric: tabular-nums;
 }
@@ -806,10 +799,8 @@ section.library-empty [data-ui-empty-state-body] {
   flex-basis: 100%;
   color: var(--text3);
   font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 
 .skill-file-id > strong {
@@ -824,7 +815,7 @@ section.library-empty [data-ui-empty-state-body] {
 
 .skill-file-id > small {
   color: var(--text3);
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-label);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -930,7 +921,10 @@ section.library-empty [data-ui-empty-state-body] {
   line-height: 1.15;
 }
 
-.library-markdown h1 {
+.library-markdown h1,
+.library-markdown h2.library-markdown-title {
+  padding-bottom: 0;
+  border-bottom: 0;
   font-size: var(--type-page);
 }
 
@@ -1028,10 +1022,8 @@ section.library-empty [data-ui-empty-state-body] {
 
 .library-markdown th {
   color: var(--text2);
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -1352,6 +1344,10 @@ section.library-empty [data-ui-empty-state-body] {
 }
 
 /* Knowledge pages share the unboxed page heading and content gutters. */
+.library-page > [data-item-access-panel] {
+  margin: 24px var(--page-gutter) 0;
+}
+
 .library-page > .page-heading {
   margin: 0;
   padding: 28px var(--page-gutter) 24px;

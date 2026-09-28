@@ -217,10 +217,8 @@
 .dash-role-control > span {
   color: var(--text3);
   font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
 }
 
 .dash-role-list {
@@ -295,7 +293,8 @@
   width: 100%;
   min-height: 48px;
   max-height: 160px;
-  resize: vertical;
+  resize: none;
+  field-sizing: content;
   border: 0;
   outline: 0;
   background: transparent;

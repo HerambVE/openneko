@@ -9,10 +9,12 @@ import {
   inArray,
   ne,
   observation,
+  or,
   sql,
   workflow_definition,
   workflow_run,
 } from "@neko/db";
+import { actionOutcome } from "@/lib/action-outcome";
 import { getCurrentActor } from "@/lib/actor";
 import { getOrgId } from "@/lib/db";
 import { actionRequestVisibility } from "@/lib/entitlements";
@@ -28,18 +30,41 @@ const RISK_ORDER: Record<string, number> = {
   low: 3,
 };
 
-type Filter = "awaiting" | "fired" | "rejected" | "all";
+type Filter = "awaiting" | "fired" | "failed" | "rejected" | "all";
 
 function parseFilter(value: string | null): Filter {
-  if (value === "fired" || value === "rejected" || value === "all") return value;
+  if (value === "fired" || value === "failed" || value === "rejected" || value === "all") return value;
   return "awaiting";
 }
 
-function statusesForFilter(filter: Filter): string[] | null {
-  if (filter === "awaiting") return ["pending_approval"];
-  if (filter === "fired") return ["executed", "approved"];
-  if (filter === "rejected") return ["rejected", "failed"];
-  return null; // all
+// An executed request whose change-set Magento accepted but OpenNeko could
+// not confirm belongs with the failures, not with the completed work.
+const unconfirmedExecution = sql`exists (
+  select 1 from action_execution e
+  where e.action_request_id = ${action_request.id}
+    and e.result->>'status' in ('reconcile_required', 'partially_applied')
+    and e.created_at = (
+      select max(e2.created_at) from action_execution e2
+      where e2.action_request_id = ${action_request.id}
+    )
+)`;
+
+function conditionForFilter(filter: Filter) {
+  if (filter === "awaiting") return eq(action_request.status, "pending_approval");
+  if (filter === "fired") {
+    return and(
+      inArray(action_request.status, ["executed", "approved"]),
+      sql`not ${unconfirmedExecution}`,
+    );
+  }
+  if (filter === "failed") {
+    return or(
+      eq(action_request.status, "failed"),
+      and(eq(action_request.status, "executed"), unconfirmedExecution),
+    );
+  }
+  if (filter === "rejected") return eq(action_request.status, "rejected");
+  return undefined;
 }
 
 export async function GET(request: NextRequest) {
@@ -68,12 +93,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ count: row?.count ?? 0 });
   }
 
-  const statuses = statusesForFilter(filter);
-  const statusCondition = statuses
-    ? statuses.length === 1
-      ? eq(action_request.status, statuses[0])
-      : inArray(action_request.status, statuses)
-    : undefined;
+  const statusCondition = conditionForFilter(filter);
 
   const rows = await db()
     .select({
@@ -99,6 +119,20 @@ export async function GET(request: NextRequest) {
       workflowName: workflow_definition.name,
       observationTitle: observation.title,
       policyName: action_policy.name,
+      executionResultStatus: sql<string | null>`(
+        select coalesce(e.result->>'status', e.status)
+        from action_execution e
+        where e.action_request_id = ${action_request.id}
+        order by e.created_at desc
+        limit 1
+      )`,
+      executionError: sql<string | null>`(
+        select e.error
+        from action_execution e
+        where e.action_request_id = ${action_request.id}
+        order by e.created_at desc
+        limit 1
+      )`,
     })
     .from(action_request)
     // LEFT joins: chat-proposed admin actions (plugin/user/channel/data-source/
@@ -168,6 +202,8 @@ export async function GET(request: NextRequest) {
             : null,
       approverLabel: r.approvedByUserId ?? r.policyName ?? null,
       rejectionReason: r.rejectionReason,
+      outcome: actionOutcome(r.status, r.executionResultStatus),
+      executionError: r.executionError,
       runAt: (r.runStartedAt ?? r.runCreatedAt ?? r.createdAt).toISOString(),
       createdAt: r.createdAt.toISOString(),
     })),

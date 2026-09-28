@@ -37,6 +37,7 @@ import {
   type AwaitingPayload,
 } from "@/lib/dashboard-actions";
 import { readBriefingMessages } from "@/lib/briefing-messages";
+import { useApprovalDecisions } from "@/hooks/useApprovalDecisions";
 
 type ElevatedCard = {
   id: string;
@@ -226,7 +227,7 @@ export default function Dashboard() {
           return;
         }
         if (status.state === "processing") {
-          router.replace("/business-profile");
+          router.replace("/business-profile?from=setup");
           return;
         }
         const isPersonal = status.mode === "personal";
@@ -291,6 +292,11 @@ export default function Dashboard() {
       // best-effort
     }
   }, []);
+
+  const decisions = useApprovalDecisions(fetchAwaiting);
+  const awaitingRows = (awaiting?.actions ?? []).filter((a) => !decisions.hiddenIds.has(a.id));
+  const pendingCount = Math.max(0, (awaiting?.count ?? 0) - decisions.hiddenIds.size);
+  const decisionLabel = (id: string) => awaitingRows.find((a) => a.id === id)?.summary ?? "";
 
   const fetchHoursSaved = useCallback(async () => {
     try {
@@ -536,7 +542,7 @@ export default function Dashboard() {
                 className="example-banner"
                 style={{ animation: "fadeUp 0.5s ease both" }}
               >
-                Example metrics · set up your own →
+                Example metrics · Set up your own
               </Link>
             )}
             {!personalMode && roles.length > 0 ? (
@@ -581,12 +587,12 @@ export default function Dashboard() {
                 )}
               </div>
               <h1 className="dash-command-head">
-                {awaiting && awaiting.count > 0 ? (
+                {pendingCount > 0 ? (
                   <>
                     <span className="dash-command-n">
-                      {awaiting.count} decision{awaiting.count === 1 ? "" : "s"}
+                      {pendingCount} decision{pendingCount === 1 ? "" : "s"}
                     </span>{" "}
-                    need you.
+                    {pendingCount === 1 ? "needs" : "need"} you.
                   </>
                 ) : (
                   greeting || "You are all caught up."
@@ -614,7 +620,7 @@ export default function Dashboard() {
               />
             )}
 
-            {awaiting && awaiting.actions.length > 0 && (
+            {awaitingRows.length > 0 && (
               <section
                 className="dash-call"
                 style={{ animation: "fadeUp 0.5s ease 0.2s both" }}
@@ -622,17 +628,32 @@ export default function Dashboard() {
               >
                 <div className="dash-call-eyebrow">
                   <span className="dash-call-dot" aria-hidden="true" />
-                  <span className="dash-call-label">Needs your call</span>
-                  <span className="font-mono dash-call-count">
-                    {awaiting.count}
+                  <span className="dash-call-label">Waiting for your decision</span>
+                  <span className="dash-call-count tabular-nums">
+                    {pendingCount}
                   </span>
                   <Link className="dash-call-skim" href="/actions?filter=awaiting">
-                    open all →
+                    Open all
                   </Link>
                 </div>
                 <div className="act-list">
-                  {groupAwaiting(awaiting.actions).map((group, i) => (
-                    <ActCard key={group.key} data={group.card} index={i} />
+                  {groupAwaiting(awaitingRows).map((group, i) => (
+                    <ActCard
+                      key={group.key}
+                      data={group.card}
+                      index={i}
+                      rejectingRowId={decisions.rejectingId}
+                      rejectReason={decisions.rejectReason}
+                      onRejectReasonChange={decisions.setRejectReason}
+                      onCancelReject={decisions.cancelReject}
+                      onSubmitReject={() =>
+                        decisions.submitReject(
+                          decisions.rejectingId ? decisionLabel(decisions.rejectingId) : "",
+                        )
+                      }
+                      onApproveRow={(id) => decisions.approve(id, decisionLabel(id))}
+                      onBeginRejectRow={decisions.beginReject}
+                    />
                   ))}
                 </div>
               </section>
@@ -643,8 +664,8 @@ export default function Dashboard() {
                 className="mb-7"
                 style={{ animation: "fadeUp 0.5s ease 0.21s both" }}
               >
-                <div className="text-ui-label font-bold tracking-[0.13em] uppercase text-text3 mb-3">
-                  Worth your read
+                <div className="mb-3 text-ui-body font-semibold text-text2">
+                  Needs your attention
                 </div>
                 <ProgressiveList
                   count={findings.awaitingYou.actFindings.length}
@@ -668,7 +689,7 @@ export default function Dashboard() {
                 className="mb-7"
                 style={{ animation: "fadeUp 0.5s ease 0.22s both" }}
               >
-                <div className="text-ui-label font-bold tracking-[0.13em] uppercase text-text3 mb-3">
+                <div className="mb-3 text-ui-body font-semibold text-text2">
                   Pinned
                 </div>
                 <ProgressiveList
@@ -698,7 +719,7 @@ export default function Dashboard() {
                 className="mb-7"
                 style={{ animation: "fadeUp 0.5s ease 0.25s both" }}
               >
-                <div className="text-ui-label font-bold tracking-[0.13em] uppercase text-text3 mb-3">
+                <div className="mb-3 text-ui-body font-semibold text-text2">
                   Worth knowing
                 </div>
                 <ProgressiveList
@@ -723,7 +744,7 @@ export default function Dashboard() {
                 className="mb-7"
                 style={{ animation: "fadeUp 0.5s ease 0.27s both" }}
               >
-                <div className="text-ui-label font-bold tracking-[0.13em] uppercase text-text3 mb-3">
+                <div className="mb-3 text-ui-body font-semibold text-text2">
                   Elevated
                 </div>
                 <ProgressiveList
@@ -773,7 +794,7 @@ export default function Dashboard() {
               )}
 
             <div className="mb-6">
-              <div className="label">Today&apos;s Briefing</div>
+              <div className="label">Today&apos;s briefing</div>
               <ProgressiveList
                 count={briefingCards.length}
                 label="cards"
@@ -800,7 +821,7 @@ export default function Dashboard() {
                 style={{ animation: "fadeUp 0.5s ease 0.35s both" }}
               >
                 <summary data-ui-bespoke-reason="briefing proof expander" className="dash-proof-summary">
-                  <span className="font-mono dash-proof-tick" aria-hidden="true">↳</span>
+                  <span className="dash-proof-tick" aria-hidden="true">↳</span>
                   <span className="dash-proof-count">
                     {recentActions.receipts.length}
                   </span>

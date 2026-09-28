@@ -4,6 +4,7 @@ import { DensityProvider } from "@/components/DensityProvider";
 import AppRail, { type RailIdentity } from "@/components/AppRail";
 import { railIdentity } from "@/lib/rail-identity";
 import CommandDock from "@/components/CommandDock";
+import CommandBar from "@/components/CommandBar";
 import { THEME_COLOR } from "@/lib/theme-color";
 import "@fontsource-variable/archivo/wght.css";
 import "@fontsource-variable/manrope/wght.css";
@@ -46,6 +47,7 @@ export default async function RootLayout({
           <AppRail initial={initial} />
           <div id="main-content">{children}</div>
           <CommandDock />
+          <CommandBar />
         </DensityProvider>
         <Toaster
           position="bottom-right"

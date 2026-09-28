@@ -147,7 +147,7 @@ export default function OnboardingWizard({
             : "Workspace setup could not start. Please try again.",
         );
       }
-      router.push("/business-profile");
+      router.push("/business-profile?from=setup");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setSubmitting(false);

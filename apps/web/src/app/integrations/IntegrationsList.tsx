@@ -169,7 +169,7 @@ export default function IntegrationsList({ initial, isAdmin = true, preview = fa
   }
 
   return (
-    <div className="root">
+    <div className="root is-narrow">
       <AppHeader />
       <PageHeading
         title="Integrations"

@@ -20,7 +20,7 @@ export const CheckboxControl = forwardRef<
       data-slot="checkbox"
       data-ui-checkbox-control=""
       className={cn(
-        "mt-0.5 grid size-4 shrink-0 place-items-center rounded-[4px] border border-border bg-card text-white outline-none",
+        "mt-0.5 grid size-4 shrink-0 place-items-center rounded-[4px] border-[1.5px] border-text3 bg-card text-white outline-none hover:border-accent",
         "data-[state=checked]:border-accent data-[state=checked]:bg-accent",
         "focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-card",
         "disabled:cursor-not-allowed",

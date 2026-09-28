@@ -123,15 +123,15 @@ export default function AgentForm({
   }
 
   return (
-    <div className="root">
-      <AppHeader back={{ href: "/admin/settings", label: "All settings" }} />
+    <div className="root is-narrow">
+      <AppHeader back={{ href: "/admin/settings", label: "Settings" }} />
       <PageHeading
         title="Agent"
         description="Configure the model provider and worker concurrency used by the Hermes agent runtime."
       />
 
       <section className="settings-card">
-        <div className="grid gap-4 mt-4">
+        <div className="grid gap-4">
           <div className="settings-grid">
             <Field label="Provider">
               <Select

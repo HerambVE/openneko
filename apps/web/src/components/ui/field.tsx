@@ -20,7 +20,7 @@ export function Field({
   children,
 }: FieldProps) {
   return (
-    <div data-slot="field" className={cn("grid min-w-0 gap-1.5", className)}>
+    <div data-slot="field" className={cn("grid min-w-0 content-start gap-1.5", className)}>
       <label
         data-slot="field-label"
         htmlFor={htmlFor}

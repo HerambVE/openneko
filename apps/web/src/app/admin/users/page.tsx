@@ -102,7 +102,6 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
           : "Solo mode uses your local admin account."
       }
       back={{ href: "/admin", label: "Admin" }}
-      wide
     >
       <UsersAdminTabs
         tab={identitySetup ? "users" : tab}

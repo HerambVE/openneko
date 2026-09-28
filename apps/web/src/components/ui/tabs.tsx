@@ -77,7 +77,7 @@ export function Tab({
         typeof props.children === "string" ? props.children : undefined
       }
       className={cn(
-        "inline-flex min-h-8 shrink-0 items-center justify-center rounded-[8px] border border-transparent bg-transparent px-3 py-1.5 font-body text-ui-body-sm font-semibold text-text2 hover:bg-transparent hover:text-text focus-visible:ring-2 focus-visible:ring-accent data-[state=on]:border-border data-[state=on]:bg-card data-[state=on]:text-text data-[state=on]:shadow-soft",
+        "inline-flex min-h-[30px] shrink-0 items-center justify-center rounded-[8px] border border-transparent bg-transparent px-3 py-1.5 font-body text-ui-body-sm font-semibold text-text2 hover:bg-transparent hover:text-text focus-visible:ring-2 focus-visible:ring-accent data-[state=on]:border-border data-[state=on]:bg-card data-[state=on]:text-text data-[state=on]:shadow-soft",
         className,
       )}
       {...props}
@@ -109,7 +109,7 @@ export function Segment({
       data-selected={selected || undefined}
       value={value}
       className={cn(
-        "inline-flex min-h-8 shrink-0 items-center justify-center rounded-full border-0 bg-transparent px-3 py-1.5 font-body text-ui-body-sm font-semibold text-text2 hover:bg-transparent hover:text-text focus-visible:ring-2 focus-visible:ring-accent data-[state=on]:bg-card data-[state=on]:text-text data-[state=on]:shadow-soft",
+        "inline-flex min-h-[30px] shrink-0 items-center justify-center rounded-full border-0 bg-transparent px-3 py-1.5 font-body text-ui-body-sm font-semibold text-text2 hover:bg-transparent hover:text-text focus-visible:ring-2 focus-visible:ring-accent data-[state=on]:bg-card data-[state=on]:text-text data-[state=on]:shadow-soft",
         className,
       )}
       {...props}

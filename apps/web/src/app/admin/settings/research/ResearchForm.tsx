@@ -126,15 +126,15 @@ export default function ResearchForm({
   }
 
   return (
-    <div className="root">
-      <AppHeader back={{ href: "/admin/settings", label: "All settings" }} />
+    <div className="root is-narrow">
+      <AppHeader back={{ href: "/admin/settings", label: "Settings" }} />
       <PageHeading
         title="Industry research"
         description="Optionally enrich the business profile with current industry context during onboarding."
       />
 
       <section className="settings-card">
-        <div className="mt-[18px]">
+        <div>
           <Checkbox
             label="Enable industry research"
             checked={enabled}

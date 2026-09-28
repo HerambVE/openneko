@@ -311,17 +311,19 @@ export default function WorkflowsPage() {
         actions={
           <div className="workflows-ops-status" aria-label="Workflow status">
             <div>
-              <strong>{String(grouped.active.length).padStart(2, "0")}</strong>
+              <strong>{grouped.active.length}</strong>
               <span>active</span>
             </div>
             <div>
-              <strong>{String(grouped.paused.length).padStart(2, "0")}</strong>
+              <strong>{grouped.paused.length}</strong>
               <span>paused</span>
             </div>
-            <div data-state={grouped.broken.length > 0 ? "attention" : "clear"}>
-              <strong>{String(grouped.broken.length).padStart(2, "0")}</strong>
-              <span>attention</span>
-            </div>
+            {grouped.broken.length > 0 ? (
+              <div data-state="attention">
+                <strong>{grouped.broken.length}</strong>
+                <span>need attention</span>
+              </div>
+            ) : null}
             <Button
               variant="primary"
               onClick={() =>
@@ -402,7 +404,6 @@ export default function WorkflowsPage() {
                 onDelete={deleteWorkflow}
                 sparklines={sparklines}
                 onSparkline={recordSparkline}
-                startIndex={0}
               />
             )}
             {grouped.paused.length > 0 && (
@@ -415,7 +416,6 @@ export default function WorkflowsPage() {
                 onDelete={deleteWorkflow}
                 sparklines={sparklines}
                 onSparkline={recordSparkline}
-                startIndex={grouped.active.length}
               />
             )}
             {grouped.broken.length > 0 && (
@@ -428,7 +428,6 @@ export default function WorkflowsPage() {
                 onDelete={deleteWorkflow}
                 sparklines={sparklines}
                 onSparkline={recordSparkline}
-                startIndex={grouped.active.length + grouped.paused.length}
               />
             )}
           </div>
@@ -518,7 +517,6 @@ function WorkflowGroup({
   onDelete,
   sparklines,
   onSparkline,
-  startIndex,
 }: {
   title: string;
   count: number;
@@ -528,7 +526,6 @@ function WorkflowGroup({
   onDelete: (id: string, name: string) => void;
   sparklines: Record<string, number[]>;
   onSparkline: (id: string, values: number[]) => void;
-  startIndex: number;
 }) {
   return (
     <section className="workflow-group">
@@ -536,7 +533,7 @@ function WorkflowGroup({
         {title} <span>{count}</span>
       </div>
       <ul className="wf-grid">
-        {items.map((w, index) => (
+        {items.map((w) => (
           <WorkflowRow
             key={w.id}
             w={w}
@@ -545,7 +542,6 @@ function WorkflowGroup({
             onDelete={() => onDelete(w.id, w.name)}
             sparkline={sparklines[w.id]}
             onSparkline={(values) => onSparkline(w.id, values)}
-            position={startIndex + index + 1}
           />
         ))}
       </ul>
@@ -560,7 +556,6 @@ function WorkflowRow({
   onDelete,
   sparkline,
   onSparkline,
-  position,
 }: {
   w: WorkflowListItem;
   active: boolean;
@@ -568,7 +563,6 @@ function WorkflowRow({
   onDelete: () => void;
   sparkline: number[] | undefined;
   onSparkline: (values: number[]) => void;
-  position: number;
 }) {
   // Lazy-load the per-workflow sparkline once when first rendered.
   useEffect(() => {
@@ -609,9 +603,6 @@ function WorkflowRow({
           aria-pressed={active}
           aria-controls={active ? "workflow-inspector" : undefined}
         >
-          <span className="workflows-row-index">
-            {String(position).padStart(2, "0")}
-          </span>
           <div className="workflows-row-copy">
             <div className="workflows-row-title">
               <span>{w.name}</span>
@@ -978,7 +969,7 @@ function WorkflowDetail({
           className="inline-block mt-1 text-xs text-accent no-underline hover:underline hover:underline-offset-2"
           href="/admin/rules"
         >
-          see all rules →
+          See all rules
         </Link>
       </Section>
 
@@ -1000,13 +991,13 @@ function WorkflowDetail({
                 >
                   <span
                     className={cn(
-                      "inline-block w-3.5 text-center font-mono",
+                      "inline-block w-3.5 text-center",
                       runStatusColor(r.status),
                     )}
                   >
                     {statusGlyph(r.status)}
                   </span>
-                  <span className="workflow-drawer-run-meta font-mono text-xs text-text2">
+                  <span className="workflow-drawer-run-meta text-xs tabular-nums text-text2">
                     {formatRelative(r.createdAt)} · {r.triggerKind}
                     {r.executionMode ? ` ${r.executionMode}` : ""} ·{" "}
                     {formatDuration(r.durationMs)}
@@ -1022,7 +1013,7 @@ function WorkflowDetail({
                     </Badge>
                   ) : null}
                   <span
-                    className="workflow-drawer-run-arrow ml-auto text-text3 font-mono text-ui-caption transition-[color,transform] duration-[0.18s]"
+                    className="workflow-drawer-run-arrow ml-auto text-text3 text-ui-caption transition-[color,transform] duration-[0.18s]"
                     aria-hidden="true"
                   >
                     →

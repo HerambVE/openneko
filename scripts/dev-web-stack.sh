@@ -63,7 +63,27 @@ container_ip() {
 }
 
 published_port() {
-  docker port "$1" "$2/tcp" | sed -n '1s/.*://p'
+  docker port "$1" "$2/tcp" 2>/dev/null | sed -n '1s/.*://p'
+}
+
+# A stack started by the CLI publishes only the web port. When a service
+# port is unpublished, reach the container by IP and its internal port;
+# OrbStack routes container IPs to macOS, Docker Desktop does not.
+endpoint_host=""
+endpoint_port=""
+resolve_endpoint() {
+  endpoint_port="$(published_port "$1" "$2")"
+  if [ -n "$endpoint_port" ]; then
+    endpoint_host=127.0.0.1
+    return
+  fi
+  endpoint_host="$(container_ip "$1")"
+  endpoint_port="$2"
+  if ! nc -z -w 2 "$endpoint_host" "$endpoint_port" >/dev/null 2>&1; then
+    echo "$1 publishes no port $2, and its container IP $endpoint_host is not reachable." >&2
+    echo "Publish the port, or use a Docker runtime that routes container IPs (OrbStack)." >&2
+    exit 1
+  fi
 }
 
 worker_container="${container_prefix}-worker-1"
@@ -89,6 +109,20 @@ do
   fi
 done
 
+web_container="${container_prefix}-web-1"
+if [ ! -f "$state_root/config/openneko/secret-key" ] || \
+   [ ! -f "$state_root/config/openshell/gateways/openneko/metadata.json" ]; then
+  # Seed the state from the stack's web container. The copy holds the
+  # secret key that decrypts the database passwords in config.json.
+  if docker inspect "$web_container" >/dev/null 2>&1; then
+    echo "Copying stack config from $web_container to $state_root/config"
+    (umask 077 && mkdir -p "$state_root/config")
+    for config_dir in openneko openshell graphjin; do
+      docker cp -q "$web_container:/config/$config_dir" "$state_root/config/"
+    done
+  fi
+fi
+
 if [ ! -f "$state_root/config/openneko/secret-key" ] || \
    [ ! -f "$state_root/config/openshell/gateways/openneko/metadata.json" ]; then
   echo "Host web state is missing at $state_root." >&2
@@ -107,17 +141,20 @@ export XDG_CACHE_HOME="$state_root/home/.cache"
 export XDG_DATA_HOME="$state_root/home/.local/share"
 export XDG_STATE_HOME="$state_root/home/.local/state"
 
-export NEKO_PG_HOST=127.0.0.1
-export NEKO_PG_PORT="$(published_port "$metadata_db_container" 5432)"
+resolve_endpoint "$metadata_db_container" 5432
+export NEKO_PG_HOST="$endpoint_host"
+export NEKO_PG_PORT="$endpoint_port"
 
-export RECORDS_PG_HOST=127.0.0.1
-export RECORDS_PG_PORT="$(published_port "$records_db_container" 5432)"
+resolve_endpoint "$records_db_container" 5432
+export RECORDS_PG_HOST="$endpoint_host"
+export RECORDS_PG_PORT="$endpoint_port"
 export OPENNEKO_PG_ENV_OVERRIDE=1
 
 export NEKO_EMBEDDING_URL="http://$(container_ip "$embedding_container"):5003"
 export WORKER_ADMIN_URL="http://$(container_ip "$worker_container"):4100"
 export OPENNEKO_RECORDS_GRAPHJIN_URL="http://$(container_ip "$records_graphjin_container"):8090"
-export OPENNEKO_GRAPHJIN_URL="http://127.0.0.1:$(published_port "$metadata_graphjin_container" 8089)"
+resolve_endpoint "$metadata_graphjin_container" 8089
+export OPENNEKO_GRAPHJIN_URL="http://${endpoint_host}:${endpoint_port}"
 export OPENNEKO_GRAPHJIN_CONFIG="$state_root/config/graphjin/agentic.yml"
 
 export OPENSHELL_STATE_DIR="${OPENSHELL_STATE_DIR:-$PWD/.openneko/openshell}"

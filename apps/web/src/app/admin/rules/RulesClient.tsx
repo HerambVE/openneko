@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SkeletonList } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import CreatorCredit from "@/components/CreatorCredit";
 import PageHeading from "@/components/PageHeading";
@@ -189,9 +191,8 @@ export default function RulesClient() {
     <>
       <div
         className="root"
-        style={{ "--page-width": "min(1000px, 100%)" } as React.CSSProperties}
       >
-        <AppHeader back={{ href: "/admin", label: "Administration" }}>
+        <AppHeader back={{ href: "/admin", label: "Admin" }}>
           <SectionNav current="admin" />
         </AppHeader>
 
@@ -207,7 +208,8 @@ export default function RulesClient() {
               )
             }
           >
-            + New rule
+            <Plus aria-hidden="true" />
+            New rule
           </Button>
           }
         />
@@ -226,7 +228,7 @@ export default function RulesClient() {
         {error ? (
           <div className="py-14 text-center text-sm text-danger">{error}</div>
         ) : policies === null ? (
-          <div className="py-14 text-center text-sm text-text3">Loading…</div>
+          <SkeletonList rows={3} variant="row" label="Loading rules" />
         ) : (
           <>
             {pluginDescriptors.length > 0 ? (
@@ -254,6 +256,10 @@ export default function RulesClient() {
                 No rules match “{query}”.
               </div>
             ) : (
+              <section className="mt-8">
+              <h2 className="mb-2.5 font-display text-ui-section font-bold tracking-[-0.01em] text-text">
+                Rules
+              </h2>
               <ul className="list-none p-0 m-0 flex flex-col gap-2">
                 {filteredPolicies?.map((p) => (
                   <PolicyCard
@@ -268,6 +274,7 @@ export default function RulesClient() {
                   />
                 ))}
               </ul>
+              </section>
             )}
           </>
         )}
@@ -363,7 +370,7 @@ function Row({
 }) {
   return (
     <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-2.5 items-baseline max-[480px]:grid-cols-1 max-[480px]:gap-0.5">
-      <dt className="text-ui-label font-bold tracking-[0.13em] uppercase text-text3">
+      <dt className="text-ui-caption font-semibold text-text3">
         {label}
       </dt>
       <dd className="m-0 text-text break-words">{children}</dd>
@@ -425,7 +432,7 @@ function InstalledPluginsSection({
   }
 
   return (
-    <section className="mb-6">
+    <section className="mt-8 mb-6">
       <div className="flex items-baseline justify-between mb-2.5">
         <h2 className="font-display text-ui-section font-bold tracking-[-0.01em] text-text">
           Installed plugins
@@ -490,7 +497,7 @@ function InstalledPluginsSection({
                               size="sm"
                               onClick={() => onEditPolicy(policyId)}
                             >
-                              edit rule →
+                              Edit rule
                             </Button>
                           ) : null}
                         </div>

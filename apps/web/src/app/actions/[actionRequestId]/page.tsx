@@ -3,15 +3,24 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
+import { ActionChanges, hasActionChanges } from "@/components/ActionChanges";
 import CreatorCredit from "@/components/CreatorCredit";
 import PageHeading from "@/components/PageHeading";
 import SectionNav from "@/components/SectionNav";
+import {
+  OUTCOME_LABEL,
+  actionOutcome,
+  describeOutcome,
+  type ActionOutcome,
+  systemForActionKind,
+} from "@/lib/action-outcome";
 import { cn } from "@/lib/cn";
 import {
   parseRecordUpdatePayload,
   RecordActionDiff,
 } from "@/components/records/RecordActionDiff";
 import { Button } from "@/components/ui/button";
+import { SkeletonList } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 
 function actionStatusClasses(status: string): string {
@@ -71,32 +80,20 @@ type ActionDetailPayload = {
   approverKind: "operator" | "policy" | "auto" | null;
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  pending_approval: "Awaiting you",
-  approved: "Approved",
-  rejected: "Rejected",
-  executed: "Fired",
-  failed: "Failed",
-};
-
-function statusLabel(s: string): string {
-  return STATUS_LABEL[s] ?? s.replace(/_/g, " ");
-}
-
-function backToActionsHref(status: string): string {
-  if (status === "pending_approval") return "/actions?filter=awaiting";
-  if (status === "rejected" || status === "failed")
-    return "/actions?filter=rejected";
-  if (status === "executed" || status === "approved")
-    return "/actions?filter=fired";
+function backToActionsHref(outcome: ActionOutcome): string {
+  if (outcome === "waiting") return "/actions?filter=awaiting";
+  if (outcome === "rejected") return "/actions?filter=rejected";
+  if (outcome === "failed" || outcome === "needs_check" || outcome === "partial")
+    return "/actions?filter=failed";
+  if (outcome === "completed" || outcome === "approved") return "/actions?filter=fired";
   return "/actions";
 }
 
-function backToActionsLabel(status: string): string {
-  if (status === "pending_approval") return "Awaiting";
-  if (status === "rejected" || status === "failed") return "Rejected";
-  if (status === "executed" || status === "approved") return "Fired";
-  return "Actions";
+function backToActionsLabel(outcome: ActionOutcome): string {
+  if (outcome === "waiting") return "Waiting for you";
+  if (outcome === "rejected") return "Rejected";
+  if (outcome === "failed" || outcome === "needs_check" || outcome === "partial") return "Failed";
+  return "Completed";
 }
 
 function formatTime(iso: string | null): string {
@@ -230,7 +227,7 @@ export default function ActionPage() {
         <AppHeader>
           <SectionNav current="actions" />
         </AppHeader>
-        <div className="py-[60px] text-center text-sm text-text3">Loading…</div>
+        <SkeletonList rows={2} variant="row" label="Loading action" className="mt-10" />
       </div>
     );
   }
@@ -245,6 +242,16 @@ export default function ActionPage() {
   } = data;
   const isPending = ar.status === "pending_approval";
   const latestExecution = executions[0] ?? null;
+  const resultStatus =
+    latestExecution?.result && typeof latestExecution.result === "object"
+      ? ((latestExecution.result as { status?: unknown }).status as string | undefined)
+      : undefined;
+  const outcome = actionOutcome(ar.status, resultStatus ?? latestExecution?.status);
+  const outcomeSentence = describeOutcome(
+    outcome,
+    latestExecution?.error ?? ar.rejectionReason,
+    systemForActionKind(ar.kind),
+  );
   const recordUpdate = parseRecordUpdatePayload(ar.kind, ar.payload);
 
   return (
@@ -252,8 +259,8 @@ export default function ActionPage() {
       <div className="root run-root">
         <AppHeader
           back={{
-            href: backToActionsHref(ar.status),
-            label: backToActionsLabel(ar.status),
+            href: backToActionsHref(outcome),
+            label: backToActionsLabel(outcome),
           }}
         >
           <SectionNav current="actions" />
@@ -261,11 +268,11 @@ export default function ActionPage() {
 
         <PageHeading
           title={ar.summary || ar.kind}
-          meta={statusLabel(ar.status)}
+          meta={OUTCOME_LABEL[outcome]}
           description={[
             ar.kind,
             ar.target,
-            ar.riskLevel ? `risk ${ar.riskLevel}` : null,
+            ar.riskLevel ? `${ar.riskLevel.charAt(0).toUpperCase()}${ar.riskLevel.slice(1)} risk` : null,
             formatRelative(ar.createdAt),
           ]
             .filter(Boolean)
@@ -277,7 +284,7 @@ export default function ActionPage() {
               onClick={askFollowUp}
               title="Open an Ask thread pre-loaded with this action's context"
             >
-              Ask a follow-up →
+              Ask a follow-up
             </Button>
           }
         />
@@ -297,7 +304,7 @@ export default function ActionPage() {
         <Section title="Receipt">
           <dl className="grid gap-3.5 m-0">
             <Field label="Proposed">
-              <span className="font-mono">{formatTime(ar.createdAt)}</span>
+              <span className="tabular-nums">{formatTime(ar.createdAt)}</span>
               {workflow && (
                 <>
                   <span className="text-text3/70"> · </span>
@@ -322,13 +329,10 @@ export default function ActionPage() {
             <Field label="Approved">
               {ar.approvedAt ? (
                 <>
-                  <span className="font-mono">{formatTime(ar.approvedAt)}</span>
+                  <span className="tabular-nums">{formatTime(ar.approvedAt)}</span>
                   <span className="text-text3/70"> · </span>
                   {approverKind === "operator" && (
-                    <span>
-                      by operator{" "}
-                      <span className="font-mono">{ar.approvedByUserId}</span>
-                    </span>
+                    <span title={ar.approvedByUserId ?? undefined}>by an operator</span>
                   )}
                   {approverKind === "policy" && policy && (
                     <span>
@@ -354,11 +358,15 @@ export default function ActionPage() {
                   <span className="text-text3/70"> · </span>
                   <span
                     className={cn(
-                      "inline-block px-2 py-0.5 rounded-full text-ui-caption font-semibold tracking-[0.04em] uppercase",
-                      actionStatusClasses(latestExecution.status),
+                      "inline-block px-2 py-0.5 rounded-full text-ui-caption font-semibold",
+                      outcome === "needs_check" || outcome === "partial"
+                        ? "bg-watch-soft text-warn-ink"
+                        : actionStatusClasses(latestExecution.status),
                     )}
                   >
-                    {latestExecution.status}
+                    {outcome === "completed" || outcome === "approved"
+                      ? "Succeeded"
+                      : OUTCOME_LABEL[outcome]}
                   </span>
                   {latestExecution.finishedAt && (
                     <>
@@ -368,9 +376,21 @@ export default function ActionPage() {
                       </span>
                     </>
                   )}
-                  {latestExecution.error && (
-                    <div className="mt-1.5 px-2.5 py-2 bg-danger-soft text-danger rounded-lg font-mono text-ui-body-sm">
-                      {latestExecution.error}
+                  {outcomeSentence && (
+                    <div
+                      className={cn(
+                        "mt-2 rounded-lg px-3 py-2.5 text-ui-body-sm leading-[1.5]",
+                        outcome === "failed"
+                          ? "bg-danger-soft text-danger"
+                          : "bg-watch-soft text-warn-ink",
+                      )}
+                    >
+                      {outcomeSentence}
+                      {latestExecution.error ? (
+                        <span className="mt-1 block font-mono text-ui-caption opacity-75">
+                          {latestExecution.error}
+                        </span>
+                      ) : null}
                     </div>
                   )}
                 </>
@@ -379,14 +399,20 @@ export default function ActionPage() {
               )}
             </Field>
 
-            <Field label="Payload">
+            {ar.kind !== "record_update" && hasActionChanges(ar.payload) ? (
+              <Field label="Changes">
+                <ActionChanges payload={ar.payload} className="mt-1" />
+              </Field>
+            ) : null}
+
+            <Field label="Technical details">
               <Button
                 variant="ghost"
                 type="button"
                 className="bg-transparent border-0 p-0 font-inherit text-accent underline underline-offset-2 cursor-pointer"
                 onClick={() => setShowPayload((s) => !s)}
               >
-                {showPayload ? "hide" : "show"} JSON
+                {showPayload ? "Hide" : "Show"} the raw payload
               </Button>
               {showPayload && (
                 <pre className="mt-2 px-3.5 py-3 bg-card border border-border rounded-[10px] font-mono text-ui-body-sm text-text2 whitespace-pre-wrap break-words overflow-x-auto">
@@ -409,8 +435,8 @@ export default function ActionPage() {
                   onClick={() => router.push(`/runs/${ar.workflowRunId}`)}
                 >
                   {workflow.name}
-                </Button>{" "}
-                — open the run →
+                </Button>
+                .
               </p>
             )}
             {upstreamOutput && (
@@ -441,7 +467,7 @@ export default function ActionPage() {
           <Section title="Decide">
             {rejecting ? (
               <div className="pt-3 border-t border-border mt-2.5 flex flex-col gap-2">
-                <label className="text-ui-label font-bold tracking-[0.13em] uppercase text-text3">
+                <label className="text-ui-caption font-semibold text-text3">
                   Why are you rejecting this? (optional)
                 </label>
                 <Textarea
@@ -511,7 +537,7 @@ function Section({
 }) {
   return (
     <div className="mb-7">
-      <div className="text-ui-label font-bold tracking-[0.13em] uppercase text-text3 mb-2.5">
+      <div className="text-ui-caption font-semibold text-text3 mb-2.5">
         {title}
       </div>
       {children}
@@ -528,7 +554,7 @@ function Field({
 }) {
   return (
     <div className="grid grid-cols-[110px_1fr] gap-x-4 gap-y-2.5 items-baseline">
-      <dt className="text-ui-caption font-bold tracking-[0.13em] uppercase text-text3 m-0">
+      <dt className="text-ui-caption font-semibold text-text3 m-0">
         {label}
       </dt>
       <dd className="m-0 text-ui-body text-text2 leading-[1.55]">{children}</dd>

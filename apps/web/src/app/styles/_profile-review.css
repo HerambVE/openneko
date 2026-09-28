@@ -48,10 +48,8 @@
   display: block;
   margin-bottom: 7px;
   font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
   color: var(--accent);
 }
 .settings-group-title {
@@ -109,9 +107,22 @@
   gap: 16px;
 }
 
+.settings-index-group + .settings-index-group {
+  margin-top: 32px;
+}
+
+.settings-index-group-title {
+  margin: 0 0 12px;
+  color: var(--text2);
+  font-family: var(--font-body), "Manrope", sans-serif;
+  font-size: var(--type-body);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
 .settings-index-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   align-items: stretch;
   gap: 16px;
 }

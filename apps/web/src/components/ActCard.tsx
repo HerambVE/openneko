@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/field";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
 import { formatSavedShort } from "@/lib/hours-saved";
+import { ActionChanges } from "@/components/ActionChanges";
 import { RecordActionDiff } from "@/components/records/RecordActionDiff";
 import { actionApprovalAttribution } from "@/lib/action-copy";
 
@@ -31,7 +32,7 @@ export type ActCardData = {
   runId: string | null;
   runAt: string;
   trigger?: string | null;
-  state: "live" | "awaiting" | "rejected";
+  state: "live" | "awaiting" | "rejected" | "failed" | "needs_check";
   workflowName?: string | null;
   rows: ActRowData[];
 };
@@ -46,14 +47,18 @@ function formatTime(iso: string): string {
 
 const STATE_LABEL: Record<ActCardData["state"], string> = {
   live: "Auto-response live",
-  awaiting: "Awaiting you",
+  awaiting: "Waiting for you",
   rejected: "Rejected",
+  failed: "Failed",
+  needs_check: "Needs checking",
 };
 
 const STATE_PILL_VARIANT: Record<ActCardData["state"], BadgeVariant> = {
   live: "live",
   awaiting: "watch",
   rejected: "muted",
+  failed: "danger",
+  needs_check: "watch",
 };
 
 const TONE_DOT: Record<ActRowTone, string> = {
@@ -105,7 +110,7 @@ export default function ActCard({
         <Badge variant={STATE_PILL_VARIANT[data.state]}>
           {STATE_LABEL[data.state]}
         </Badge>
-        <span className="font-mono text-ui-label font-bold uppercase tracking-[0.08em] text-text3">
+        <span className="text-ui-caption tabular-nums text-text3">
           {formatTime(data.runAt)}
         </span>
       </header>
@@ -132,7 +137,7 @@ export default function ActCard({
                 "transition-[border-color,box-shadow] duration-150",
                 "hover:border-text3",
                 "focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2",
-                isFocused && "border-accent shadow-[0_0_0_3px_var(--color-accent-soft)]",
+                isFocused && "border-text3 bg-neutral-soft",
               )}
               onClick={() => {
                 if (isPending) onFocusRow?.(row.id);
@@ -174,6 +179,9 @@ export default function ActCard({
                   compact
                   policyContext={isPending ? row.approverPhrase : null}
                 />
+                {isPending && row.kind !== "record_update" ? (
+                  <ActionChanges payload={row.payload} limit={3} className="mt-1.5" />
+                ) : null}
                 {row.rejectionReason && (
                   <p className="m-0 text-ui-body-sm leading-[1.55] text-text2 italic">
                     {row.rejectionReason}
@@ -190,7 +198,7 @@ export default function ActCard({
                     )}
                     {(row.minutesSaved ?? 0) > 0 && (
                       <span
-                        className="font-mono text-success-ink bg-success-soft border border-success-mid/30 rounded-full px-1.5 py-px"
+                        className="tabular-nums text-success-ink bg-success-soft border border-success-mid/30 rounded-full px-1.5 py-px"
                         title="Estimated human time saved"
                       >
                         {formatSavedShort(row.minutesSaved as number)} saved
@@ -248,7 +256,7 @@ export default function ActCard({
                       onClick={(e) => e.stopPropagation()}
                       title="Open the full lineage: trigger, workflow, payload"
                     >
-                      why →
+                      Why
                     </a>
                   </div>
                 ) : null}

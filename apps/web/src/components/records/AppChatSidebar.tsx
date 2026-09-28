@@ -182,8 +182,13 @@ export function AppChatSidebar({
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      const stored = window.localStorage.getItem("openneko:app-chat:collapsed");
+      // Below 1180px the open panel overlays the app, so it starts collapsed
+      // until the person opens it.
       setCollapsed(
-        window.localStorage.getItem("openneko:app-chat:collapsed") === "1",
+        stored === null
+          ? window.matchMedia("(max-width: 1180px)").matches
+          : stored === "1",
       );
     }, 0);
     return () => window.clearTimeout(timer);

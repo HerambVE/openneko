@@ -10,6 +10,7 @@ export default async function SettingsSignInPage() {
 
   return (
     <AdminShell
+      narrow
       title="Email-link sign-in"
       subtitle="Passwordless magic-link sign-in for provisioned users."
       back={{ href: "/admin/settings", label: "Settings" }}

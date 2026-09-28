@@ -1,7 +1,7 @@
 "use client";
 
 import { ItemAccessPanel } from "@/components/admin/ItemAccessPanel";
-import { use as usePromise, useCallback, useEffect, useState } from "react";
+import { use as usePromise, useCallback, useEffect, useState, type ComponentPropsWithoutRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, FileText, Pencil } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -150,7 +150,7 @@ export default function SkillDetailPage({ params }: PageProps) {
         actions={
           <div className="library-head-stats" aria-label="Skill details">
             <div>
-              <strong>{String(skill.fileCount).padStart(2, "0")}</strong>
+              <strong>{skill.fileCount}</strong>
               <span>{skill.fileCount === 1 ? "file" : "files"}</span>
             </div>
             <div>
@@ -166,6 +166,15 @@ export default function SkillDetailPage({ params }: PageProps) {
     </div>
   );
 }
+
+// The page already owns the h1; a document title renders one level down.
+const SKILL_MARKDOWN_COMPONENTS = {
+  h1: (props: ComponentPropsWithoutRef<"h1"> & { node?: unknown }) => {
+    const { node, ...rest } = props;
+    void node;
+    return <h2 className="library-markdown-title" {...rest} />;
+  },
+};
 
 function SkillWorkspace({
   skill,
@@ -289,7 +298,7 @@ function SkillWorkspace({
                   onClick={() => selectFile(f.path)}
                 >
                   <span className="library-index">
-                    {String(index + 1).padStart(2, "0")}
+                    {index + 1}
                   </span>
                   <FileText aria-hidden="true" strokeWidth={1.9} />
                   <span>{f.path}</span>
@@ -381,7 +390,9 @@ function SkillWorkspace({
               <p className="skill-detail-summary">{skill.description}</p>
             ) : null}
             <div className="library-markdown">
-              <ReactMarkdown>{stripFrontmatter(file.text ?? "")}</ReactMarkdown>
+              <ReactMarkdown components={SKILL_MARKDOWN_COMPONENTS}>
+                {stripFrontmatter(file.text ?? "")}
+              </ReactMarkdown>
             </div>
             {file.truncated ? (
               <p className="skill-file-note">

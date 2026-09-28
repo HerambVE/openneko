@@ -58,7 +58,7 @@ export function GroupsPanel({ groups }: { groups: UserGroupRow[] }) {
       </form>
       <div className="overflow-x-auto">
         <Table className="w-full border-collapse text-left text-sm">
-          <TableHeader className="text-ui-label uppercase tracking-[0.12em] text-text3">
+          <TableHeader>
             <TableRow>
               <TableHead className="border-b border-border px-3 py-2 font-bold">Group</TableHead>
               <TableHead className="border-b border-border px-3 py-2 font-bold">Members</TableHead>

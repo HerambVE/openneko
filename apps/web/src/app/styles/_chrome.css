@@ -1,5 +1,8 @@
 /* ─── LAYOUT ─── */
-.root { --page-width: 740px; max-width: var(--page-width); margin: 0 auto; padding: 0 var(--page-gutter) 130px; min-height: 100vh; padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)); }
+.root { --page-width: var(--content-max); max-width: var(--page-width); margin: 0 auto; padding: 0 var(--page-gutter) 130px; min-height: 100vh; padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)); }
+
+/* Forms and reading pages keep the shared left edge but a narrower column. */
+.root.is-narrow > :not(.app-header) { max-width: var(--form-max); }
 
 /* ─── APP HEADER ─── */
 /* AppHeader escapes its parent's max-width (each page's .root variant) by

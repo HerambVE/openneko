@@ -293,6 +293,17 @@ function assertOrderUpdateIdentity(path: Record<string, unknown>, body: unknown)
   }
 }
 
+function errorWithCause(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const cause = error.cause as { code?: unknown; message?: unknown } | undefined;
+  const detail = typeof cause?.code === "string"
+    ? cause.code
+    : typeof cause?.message === "string"
+      ? cause.message
+      : null;
+  return detail && !error.message.includes(detail) ? `${error.message} (${detail})` : error.message;
+}
+
 export async function readMagentoEntity(input: {
   runtime: MagentoRuntime;
   operation: MagentoOperation;
@@ -1182,6 +1193,7 @@ async function executeChangeset(request: ActionRequestRecord) {
   let applied = 0;
   let failed = 0;
   let reconcileRequired = 0;
+  let firstRowError: string | null = null;
   const terminalBulkOperations = bulkOperations(sharedBulkStatus);
   for (const [rowIndex, row] of rows.entries()) {
     let writeAttempted = operation.resultMode === "async_bulk";
@@ -1286,11 +1298,13 @@ async function executeChangeset(request: ActionRequestRecord) {
     } catch (error) {
       if (writeAttempted) reconcileRequired += 1;
       else failed += 1;
+      const message = errorWithCause(error);
+      firstRowError ??= message;
       await db().update(action_changeset_row).set({
         status: writeAttempted ? "reconcile_required" : "failed",
         error: writeAttempted
-          ? `Magento write outcome needs reconciliation: ${error instanceof Error ? error.message : String(error)}`
-          : error instanceof Error ? error.message : String(error),
+          ? `Magento write outcome needs reconciliation: ${message}`
+          : message,
         finished_at: new Date(),
         updated_at: new Date(),
       }).where(eq(action_changeset_row.id, row.id));
@@ -1336,7 +1350,13 @@ async function executeChangeset(request: ActionRequestRecord) {
       ),
     );
   }
-  if (status === "failed") throw new Error("Every Magento change-set row failed");
+  if (status === "failed") {
+    throw new Error(
+      firstRowError
+        ? `Every Magento change-set row failed: ${firstRowError}`
+        : "Every Magento change-set row failed",
+    );
+  }
   return {
     commandOrOperation: changeset.operation_id,
     externalRef: sharedBulkUuid ?? changeset.id,

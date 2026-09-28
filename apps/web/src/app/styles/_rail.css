@@ -29,10 +29,8 @@ body {
 .ask-history-title {
   color: var(--text2);
   font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 
 .ask-history-count {
@@ -232,7 +230,6 @@ body {
   .app-rail-version,
   .app-rail-label,
   .app-rail-heading,
-  .app-rail-density,
   .app-rail-user-copy {
     display: none;
   }
@@ -402,7 +399,7 @@ body {
     border-radius: 999px;
     display: grid;
     place-items: center;
-    background: var(--danger);
+    background: var(--accent);
     color: var(--on-accent);
     border: 1.5px solid var(--card);
     font-size: var(--type-label);
@@ -614,16 +611,20 @@ body {
     display: block;
     margin: 12px 10px 2px;
     font-family: var(--font-display), "Archivo", sans-serif;
-    font-size: var(--type-label);
+    font-size: var(--type-caption);
     font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
     color: var(--text3);
   }
 
   .app-rail-group {
     align-items: stretch;
     gap: 2px;
+  }
+
+  .app-rail-group-quiet {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
   }
 
   .app-rail-records-heading {
@@ -674,6 +675,7 @@ body {
     background: transparent;
     color: var(--text);
     font: 700 var(--type-body-sm)/1.2 var(--font-body), "Manrope", sans-serif;
+    text-overflow: ellipsis;
     cursor: pointer;
   }
 
@@ -684,14 +686,14 @@ body {
 
   .app-rail-record-search {
     width: 100%;
-    min-height: 34px;
+    min-height: 38px;
     display: flex;
     align-items: center;
-    gap: 7px;
-    padding: 6px 9px;
+    gap: 8px;
+    padding: 7px 9px;
     border: 1px solid var(--border);
-    border-radius: 9px;
-    background: var(--neutral-soft);
+    border-radius: 10px;
+    background: var(--card);
     color: var(--text3);
   }
 
@@ -741,11 +743,9 @@ body {
 
   .app-rail-record-section-label {
     display: block;
-    padding: 2px 8px 4px;
+    padding: 2px 11px 4px;
     color: var(--text3);
     font: 800 var(--type-label)/1.2 var(--font-display), "Archivo", sans-serif;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
   }
 
   .app-rail-record-object-wrap {
@@ -757,19 +757,19 @@ body {
 
   .app-rail-record-object {
     width: auto;
-    min-height: 34px;
+    min-height: 40px;
     min-width: 0;
     flex: 1;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 7px 8px;
-    border-radius: 8px;
+    gap: 11px;
+    padding: 9px 11px;
+    border-radius: 10px;
   }
 
   .app-rail-record-object svg {
-    width: 15px;
-    height: 15px;
+    width: 18px;
+    height: 18px;
     flex: 0 0 auto;
   }
 
@@ -779,7 +779,7 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: var(--type-body-sm);
+    font-size: var(--type-body);
     font-weight: 600;
   }
 
@@ -936,10 +936,8 @@ body {
   .ask-history-title {
     color: var(--text2);
     font-family: var(--font-display), "Archivo", sans-serif;
-    font-size: var(--type-label);
+    font-size: var(--type-caption);
     font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
   }
 
   .ask-history-count {
@@ -1088,33 +1086,10 @@ body {
     border-top: 1px solid var(--border);
   }
 
-  .app-rail-density {
-    display: grid;
-    gap: 7px;
-  }
 
-  .app-rail-foot-label {
-    font-family: var(--font-display), "Archivo", sans-serif;
-    font-size: var(--type-label);
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--text3);
-  }
 
-  .app-rail-density .density-seg {
-    width: 100%;
-  }
 
-  .app-rail-density .density-seg button {
-    flex: 1;
-    justify-content: center;
-    padding-inline: 8px;
-  }
 
-  .app-rail-density .density-seg button span {
-    display: none;
-  }
 
   .app-rail-user {
     justify-content: flex-start;
@@ -1163,5 +1138,67 @@ body {
 @media (hover: none) {
   .ask-history-delete {
     opacity: 1;
+  }
+}
+
+.app-rail-search {
+  display: none;
+}
+
+@media (min-width: 721px) {
+  .app-rail-search {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    min-height: 40px;
+    margin: 0 auto 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--card);
+    color: var(--text3);
+  }
+
+  .app-rail-search svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .app-rail-search .app-rail-label,
+  .app-rail-kbd {
+    display: none;
+  }
+}
+
+@media (min-width: 1025px) {
+  .app-rail-search {
+    width: auto;
+    justify-content: flex-start;
+    gap: 10px;
+    margin: 0 0 12px;
+    padding: 0 10px 0 12px;
+    font-size: var(--type-body-sm);
+    font-weight: 500;
+  }
+
+  .app-rail-search .app-rail-label {
+    display: inline;
+  }
+
+  .app-rail-kbd {
+    display: inline-flex;
+    margin-left: auto;
+    padding: 1px 6px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--neutral-soft);
+    color: var(--text3);
+    font-family: var(--font-body), "Manrope", sans-serif;
+    font-size: var(--type-caption);
+  }
+
+  .app-rail-search:hover {
+    border-color: var(--text3);
+    color: var(--text2);
   }
 }

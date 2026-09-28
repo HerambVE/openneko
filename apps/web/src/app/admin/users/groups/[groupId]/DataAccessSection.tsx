@@ -168,7 +168,7 @@ export function DataAccessSection({
       {rules.length > 0 && (
         <div className="mb-5 overflow-x-auto">
           <Table className="w-full border-collapse text-left text-sm">
-            <TableHeader className="text-ui-label uppercase tracking-[0.12em] text-text3">
+            <TableHeader>
               <TableRow>
                 <TableHead className="border-b border-border px-3 py-2 font-bold">Table</TableHead>
                 <TableHead className="border-b border-border px-3 py-2 font-bold">Columns</TableHead>
