@@ -219,6 +219,17 @@ type SnapshotPayload = {
   chartData?: Array<{ d: string; v: number; t?: number }>;
 } | null;
 
+function describeRefreshError(error: string | null | undefined): string {
+  const text = error ?? "";
+  if (/ECONNREFUSED|connection refused|dial tcp|ENOTFOUND|getaddrinfo/i.test(text)) {
+    return "OpenNeko could not reach the data source. It tries again at the next refresh.";
+  }
+  if (/timeout|timed out|ETIMEDOUT/i.test(text)) {
+    return "The data source did not answer in time. OpenNeko tries again at the next refresh.";
+  }
+  return "This metric did not refresh. OpenNeko tries again at the next refresh.";
+}
+
 export async function GET(request: NextRequest) {
   const requestedRole = request.nextUrl.searchParams.get("role") ?? "CEO";
   const isOverview = requestedRole === "__overview__";
@@ -286,7 +297,7 @@ export async function GET(request: NextRequest) {
       label: state === "ok" ? (p?.headlineLabel ?? "") : "",
       detail:
         state === "failed"
-          ? (m.last_refresh_error ?? "Unknown error")
+          ? describeRefreshError(m.last_refresh_error)
           : state === "ok"
             ? [p?.insightText, p?.detailText].filter(Boolean).join(" ")
             : (m.why ?? ""),

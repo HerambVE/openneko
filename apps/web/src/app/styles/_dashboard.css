@@ -321,22 +321,15 @@
 /* ─── DASH: THE CALL (Act 1 — Awaiting alert) ─── */
 .dash-call {
   margin: 0 0 36px;
-  padding: 18px 18px 16px;
-  border: 1px solid color-mix(in srgb, var(--watch) 32%, transparent);
-  border-radius: var(--radius);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--watch) 7%, transparent), color-mix(in srgb, var(--watch) 2%, transparent));
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--watch) 6%, transparent), 0 12px 28px -16px color-mix(in srgb, var(--watch) 18%, transparent);
 }
 .dash-call-eyebrow {
   display: flex;
   align-items: center;
   gap: 10px;
   margin: 0 0 12px;
-  font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-caption);
-  font-weight: 700;
-  color: var(--warn-ink);
+  font-size: var(--type-body);
+  font-weight: 600;
+  color: var(--text2);
 }
 .dash-call-dot {
   width: 8px;
@@ -350,7 +343,7 @@
   0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--watch) 18%, transparent); }
   50%      { box-shadow: 0 0 0 7px color-mix(in srgb, var(--watch) 8%, transparent); }
 }
-.dash-call-label { color: var(--warn-ink); }
+.dash-call-label { color: var(--text2); }
 .dash-call-count {
   margin-left: 2px;
   padding: 1px 8px;
@@ -365,22 +358,17 @@
 .dash-call-skim {
   margin-left: auto;
   font-family: var(--font-body), 'Manrope', sans-serif;
-  font-size: var(--type-caption);
+  font-size: var(--type-body-sm);
   font-weight: 600;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--warn-ink);
+  color: var(--accent);
   text-decoration: none;
   opacity: 0.75;
   transition: opacity 0.15s;
 }
 .dash-call-skim:hover { opacity: 1; text-decoration: underline; text-underline-offset: 3px; }
 
-/* Inside the call, give the inner act-cards an opaque background so the
-   amber wash doesn't seep through and muddy the contents. */
 .dash-call .act-card {
-  background: var(--card);
-  border-color: color-mix(in srgb, var(--watch) 22%, transparent);
+  border-color: color-mix(in srgb, var(--watch) 40%, var(--border));
 }
 
 /* ─── DASH: THE PROOF (Act 3 — Fired disclosure) ─── */

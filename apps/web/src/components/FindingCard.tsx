@@ -3,6 +3,7 @@
 // Lean briefing card tuned for findings (workflow_outputs) and approvals.
 // Distinct from the existing BriefingCard which is heavy/KPI-shaped.
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -17,6 +18,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { cn } from "@/lib/cn";
+import { summarizeFinding } from "@/lib/finding-summary";
 import { workflowDisplayName } from "@/lib/workflow-label";
 
 const MUTE_DURATIONS = ["1h", "24h", "7d"] as const;
@@ -66,6 +68,12 @@ function moodVariant(mood?: string | null): BadgeVariant {
   }
 }
 
+const MOOD_LABEL: Record<string, string> = {
+  good: "Good",
+  watch: "Watch",
+  act: "Needs action",
+};
+
 function riskVariant(risk?: string | null): BadgeVariant {
   switch (risk) {
     case "low":
@@ -93,7 +101,9 @@ export default function FindingCard({
   onMuted?: () => void;
 }) {
   const router = useRouter();
+  const [expanded, setExpanded] = useState(false);
   const isApproval = data.kind === "approval";
+  const summary = data.body ? summarizeFinding(data.body) : null;
 
   const muteScope = async (duration: (typeof MUTE_DURATIONS)[number]) => {
     if (!data.scope) return;
@@ -109,8 +119,10 @@ export default function FindingCard({
     }
   };
   const pillLabel = isApproval
-    ? (data.riskLevel ?? "pending")
-    : (data.mood ?? "watch");
+    ? data.riskLevel
+      ? `${data.riskLevel.charAt(0).toUpperCase()}${data.riskLevel.slice(1)} risk`
+      : "Pending"
+    : (MOOD_LABEL[data.mood ?? "watch"] ?? "Watch");
   const pillVariant = isApproval
     ? riskVariant(data.riskLevel)
     : moodVariant(data.mood);
@@ -153,11 +165,28 @@ export default function FindingCard({
             </Badge>
           </div>
 
-          {data.body && (
-            <div className="work-markdown mb-2.5 text-sm leading-[1.55] text-text">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {data.body}
-              </ReactMarkdown>
+          {data.body && summary && (
+            <div className="mb-3">
+              <div className="work-markdown text-sm leading-[1.55] text-text2">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {expanded || !summary.truncated ? data.body : summary.excerpt}
+                </ReactMarkdown>
+              </div>
+              {summary.truncated ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  className="mt-1 -ml-2 text-accent"
+                  aria-expanded={expanded}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExpanded((open) => !open);
+                  }}
+                >
+                  {expanded ? "Show less" : "Read the full report"}
+                </Button>
+              ) : null}
             </div>
           )}
 
@@ -171,7 +200,7 @@ export default function FindingCard({
 
           <div className="flex items-center gap-1.5 text-xs text-text3 flex-wrap">
             <span>
-              from{" "}
+              From{" "}
               <span className="text-text2 font-medium">
                 {workflowDisplayName(data.workflow)}
               </span>
@@ -206,7 +235,7 @@ export default function FindingCard({
                 }}
                 title="Unpin from briefing"
               >
-                unpin
+                Unpin
               </Button>
             )}
             <span className="ml-auto text-xs text-accent group-hover:underline underline-offset-2">

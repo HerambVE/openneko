@@ -11,6 +11,8 @@ import ActCard, {
   type ActRowData,
   type ActRowTone,
 } from "@/components/ActCard";
+import { ActionChanges } from "@/components/ActionChanges";
+import { Disclosure } from "@/components/ui/disclosure";
 import { cn } from "@/lib/cn";
 import { formatSavedShort } from "@/lib/hours-saved";
 import { workflowDisplayName } from "@/lib/workflow-label";
@@ -408,21 +410,14 @@ function ActionReadingPane({
     );
   }
   const recordUpdate = parseRecordUpdatePayload(action.kind, action.payload);
-  const payloadEntries =
-    action.payload && typeof action.payload === "object" && !Array.isArray(action.payload)
-      ? Object.entries(action.payload as Record<string, unknown>)
-          .filter(([key]) => !recordUpdate || (key !== "fields" && key !== "expected"))
-          .slice(0, 8)
-      : [];
   const risk = action.riskLevel ?? "low";
   return (
     <aside className="triage-pane">
       <div className="bg-card border border-border rounded-2xl px-5 py-[18px] shadow-soft">
         <div className="flex items-center gap-2.5 mb-2.5">
           <span className={cn("font-display text-ui-caption font-semibold px-2 py-0.5 rounded-full", RISK_PILL[risk] ?? RISK_PILL.low)}>
-            {risk} risk
+            {risk.charAt(0).toUpperCase() + risk.slice(1)} risk
           </span>
-          <code className="ml-auto font-mono text-ui-label text-text3">{action.kind}</code>
         </div>
         <h2 className="font-display text-ui-section font-extrabold tracking-[-0.02em] leading-[1.2] text-text">
           {action.summary || action.kind}
@@ -449,21 +444,18 @@ function ActionReadingPane({
           }
         />
 
-        {payloadEntries.length > 0 && (
-          <div className="mt-4">
-            <div className="text-ui-caption font-semibold text-text3 mb-1.5">Payload</div>
-            <div className="bg-bg border border-border rounded-xl px-3 py-2.5 grid gap-1.5">
-              {payloadEntries.map(([k, v]) => (
-                <div key={k} className="flex gap-3 text-ui-caption">
-                  <span className="text-text3 min-w-[88px] flex-none">{k}</span>
-                  <span className="font-mono text-text break-all">
-                    {typeof v === "object" ? JSON.stringify(v) : String(v)}
-                  </span>
-                </div>
-              ))}
+        {recordUpdate ? null : <ActionChanges payload={action.payload} className="mt-4" />}
+
+        <Disclosure title="Technical details" className="mt-4">
+          <div className="grid gap-2 text-ui-caption text-text2">
+            <div>
+              Action <code className="font-mono text-text">{action.kind}</code>
             </div>
+            <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-[8px] bg-bg px-3 py-2.5 font-mono text-ui-caption text-text2">
+              {JSON.stringify(action.payload, null, 2)}
+            </pre>
           </div>
-        )}
+        </Disclosure>
 
         {(action.minutesSaved ?? 0) > 0 && (
           <div className="mt-4 text-ui-body-sm text-text2">

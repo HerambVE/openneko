@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
+import { ActionChanges, hasActionChanges } from "@/components/ActionChanges";
 import CreatorCredit from "@/components/CreatorCredit";
 import PageHeading from "@/components/PageHeading";
 import SectionNav from "@/components/SectionNav";
@@ -379,14 +380,20 @@ export default function ActionPage() {
               )}
             </Field>
 
-            <Field label="Payload">
+            {ar.kind !== "record_update" && hasActionChanges(ar.payload) ? (
+              <Field label="Changes">
+                <ActionChanges payload={ar.payload} className="mt-1" />
+              </Field>
+            ) : null}
+
+            <Field label="Technical details">
               <Button
                 variant="ghost"
                 type="button"
                 className="bg-transparent border-0 p-0 font-inherit text-accent underline underline-offset-2 cursor-pointer"
                 onClick={() => setShowPayload((s) => !s)}
               >
-                {showPayload ? "hide" : "show"} JSON
+                {showPayload ? "Hide" : "Show"} the raw payload
               </Button>
               {showPayload && (
                 <pre className="mt-2 px-3.5 py-3 bg-card border border-border rounded-[10px] font-mono text-ui-body-sm text-text2 whitespace-pre-wrap break-words overflow-x-auto">

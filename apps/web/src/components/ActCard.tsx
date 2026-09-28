@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/field";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
 import { formatSavedShort } from "@/lib/hours-saved";
+import { ActionChanges } from "@/components/ActionChanges";
 import { RecordActionDiff } from "@/components/records/RecordActionDiff";
 import { actionApprovalAttribution } from "@/lib/action-copy";
 
@@ -132,7 +133,7 @@ export default function ActCard({
                 "transition-[border-color,box-shadow] duration-150",
                 "hover:border-text3",
                 "focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2",
-                isFocused && "border-accent shadow-[0_0_0_3px_var(--color-accent-soft)]",
+                isFocused && "border-text3 bg-neutral-soft",
               )}
               onClick={() => {
                 if (isPending) onFocusRow?.(row.id);
@@ -174,6 +175,9 @@ export default function ActCard({
                   compact
                   policyContext={isPending ? row.approverPhrase : null}
                 />
+                {isPending && row.kind !== "record_update" ? (
+                  <ActionChanges payload={row.payload} limit={3} className="mt-1.5" />
+                ) : null}
                 {row.rejectionReason && (
                   <p className="m-0 text-ui-body-sm leading-[1.55] text-text2 italic">
                     {row.rejectionReason}

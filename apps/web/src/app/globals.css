@@ -194,7 +194,7 @@ html[data-density="comfortable"] {
 .triage-pane { display: none; }
 html[data-density="compact"] .triage-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 372px;
+  grid-template-columns: minmax(0, 1fr) minmax(372px, 0.8fr);
   gap: 16px;
   align-items: start;
 }
@@ -202,6 +202,7 @@ html[data-density="compact"] .triage-pane {
   display: block; position: sticky; top: 18px;
   max-height: calc(100vh - 36px); overflow-y: auto;
 }
+html[data-density="compact"] .triage-queue [data-slot="action-changes"] { display: none; }
 @media (max-width: 768px) {
   html[data-density="compact"] .triage-layout { grid-template-columns: minmax(0, 1fr); }
   html[data-density="compact"] .triage-pane { position: static; max-height: none; }
