@@ -169,9 +169,11 @@ export default function SkillDetailPage({ params }: PageProps) {
 
 // The page already owns the h1; a document title renders one level down.
 const SKILL_MARKDOWN_COMPONENTS = {
-  h1: ({ node: _node, ...props }: ComponentPropsWithoutRef<"h1"> & { node?: unknown }) => (
-    <h2 className="library-markdown-title" {...props} />
-  ),
+  h1: (props: ComponentPropsWithoutRef<"h1"> & { node?: unknown }) => {
+    const { node, ...rest } = props;
+    void node;
+    return <h2 className="library-markdown-title" {...rest} />;
+  },
 };
 
 function SkillWorkspace({
