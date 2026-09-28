@@ -46,7 +46,7 @@ export default function SectionNav({
       >
         Actions
         {pendingApprovals > 0 && (
-          <span className="font-mono nav-link-badge">{pendingApprovals}</span>
+          <span className="nav-link-badge tabular-nums">{pendingApprovals}</span>
         )}
       </Link>
       <Link

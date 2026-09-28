@@ -1153,12 +1153,12 @@ export default function WorkScreen() {
       ? "OpenNeko is working"
       : workPhase === "result"
         ? "Answer available"
-        : "Waiting for your prompt";
+        : "Ready";
   const threadTitle =
     !bundle?.messages.length ||
     !bundle.thread.title.trim() ||
     /^untitled thread$/i.test(bundle.thread.title.trim())
-      ? "New work"
+      ? "Ask"
       : bundle.thread.title;
 
   if (!gateChecked) {
@@ -1198,27 +1198,6 @@ export default function WorkScreen() {
           </div>
           <h1 title={threadTitle}>{threadTitle}</h1>
         </div>
-        <ol className="work-phase-rail" aria-label={`Current stage: ${workStateLabel}`}>
-          {(["Prompt", "Agent", "Result"] as const).map((label, index) => {
-            const activeIndex =
-              workPhase === "prompt" ? 0 : workPhase === "running" ? 1 : 2;
-            return (
-              <li
-                key={label}
-                className={
-                  index === activeIndex
-                    ? "is-current"
-                    : index < activeIndex
-                      ? "is-complete"
-                      : ""
-                }
-              >
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                {label}
-              </li>
-            );
-          })}
-        </ol>
         <div className="work-command-actions">
           <Button
             variant="secondary"
@@ -1237,7 +1216,7 @@ export default function WorkScreen() {
               onClick={() => router.push("/work")}
             >
               <Plus aria-hidden="true" strokeWidth={2} />
-              <span>New work</span>
+              <span>New question</span>
             </Button>
           ) : null}
         </div>
@@ -1323,7 +1302,7 @@ export default function WorkScreen() {
               <div key={`${message.id}-${index}`} className="flex flex-col gap-2.5">
                 {briefingCardCtx ? (
                   <div className="flex flex-col gap-2 mb-1">
-                    <div className="inline-flex items-center gap-2.5 font-display text-ui-label font-bold tracking-[0.14em] uppercase text-text3">
+                    <div className="inline-flex items-center gap-2.5 font-display text-ui-caption font-semibold text-text3">
                       <span aria-hidden="true" className="w-6 h-px bg-border" />
                       From your briefing
                     </div>
@@ -1615,7 +1594,7 @@ export default function WorkScreen() {
                 ) : files.length > 0 ? (
                   <>{files.length} of {MAX_ATTACHMENTS} attached</>
                 ) : (
-                  <span className="work-composer-keys">Enter to dispatch · Shift + Enter for a new line</span>
+                  <span className="work-composer-keys">Enter to send · Shift + Enter for a new line</span>
                 )}
               </span>
             </div>
@@ -1637,9 +1616,9 @@ export default function WorkScreen() {
                 className="work-send-btn"
                 onClick={() => void sendMessage()}
                 disabled={!draft.trim() && files.length === 0}
-                aria-label="Dispatch to OpenNeko"
+                aria-label="Send to OpenNeko"
               >
-                <span>Dispatch</span>
+                <span>Send</span>
                 <ArrowUp size={14} strokeWidth={2.5} aria-hidden />
               </Button>
             )}
@@ -1715,7 +1694,7 @@ function EmptyAsk({ onPick }: { onPick: (text: string) => void }) {
             onClick={() => onPick(prompt.text)}
           >
             <span className="work-empty-prompt-no">
-              {String(index + 1).padStart(2, "0")}
+              {index + 1}
             </span>
             <span className="work-empty-prompt-copy">
               <strong>{prompt.label}</strong>
@@ -1747,7 +1726,7 @@ function PendingMemoryPanel({
   return (
     <div className="flex items-center justify-between gap-3 border border-border bg-white/80 rounded-2xl px-3 py-2.5 shadow-soft max-[560px]:items-stretch max-[560px]:flex-col">
       <div className="min-w-0 text-ui-body-sm leading-[1.45] text-text2">
-        <div className="text-ui-label font-bold tracking-[0.13em] uppercase text-text3 mb-0.5">Memory suggestion</div>
+        <div className="text-ui-caption font-semibold text-text3 mb-0.5">Memory suggestion</div>
         <div>{item.draftText}</div>
         {pending.length > 1 ? (
           <div className="mt-1 text-text3 text-ui-label">+{pending.length - 1} more</div>
@@ -1886,7 +1865,7 @@ function MessageBubble({
       <div className="work-bubble is-user">
         {clarificationReply ? (
           <div className="work-markdown user-copy">
-            <div className="text-ui-label font-bold uppercase tracking-[0.12em] opacity-60 mb-2">Your answers</div>
+            <div className="text-ui-caption font-semibold opacity-60 mb-2">Your answers</div>
             <div className="space-y-3">
               {clarificationReply.map(({ question, answer }, index) => (
                 <div key={index}>
@@ -3109,7 +3088,7 @@ function CapabilityDeniedNotice({
             </p>
           )}
           <Link href={canAdminister ? "/admin/plugins" : "/integrations"}>
-            {canAdminister ? "Review plugins" : "View integrations"} →
+            {canAdminister ? "Review plugins" : "View integrations"}
           </Link>
         </div>
       </div>

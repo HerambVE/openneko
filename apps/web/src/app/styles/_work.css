@@ -270,10 +270,8 @@
   display: block;
   margin-bottom: 2px;
   color: var(--text3);
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 .work-progress-summary .work-markdown {
   font-size: var(--type-body-sm);
@@ -295,10 +293,8 @@
   padding: 10px 14px 8px;
   color: var(--warn-ink);
   font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
 }
 .work-capability-grid {
   display: grid;
@@ -338,10 +334,8 @@
 .work-capability-recovery > span {
   color: var(--text3);
   font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
 }
 .work-capability-recovery button,
 .work-capability-recovery a {
@@ -408,10 +402,8 @@
   display: block;
   color: var(--text3);
   font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 .work-answer-evidence strong {
   display: block;
@@ -623,10 +615,8 @@
   border-top: 1px solid var(--border);
 }
 .work-tool-row-section-label {
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--text3);
   margin-top: 6px;
 }
@@ -716,10 +706,8 @@
 }
 .work-confirm-label {
   font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 700;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
   color: var(--success-mid);
 }
 .work-confirm-title {
@@ -743,10 +731,8 @@
   align-items: center;
   gap: 8px;
   font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
   color: var(--text3);
   margin: 4px 0 8px;
 }
@@ -794,10 +780,8 @@
   padding: 9px 0 8px;
   color: var(--text3);
   font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 750;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
 }
 .work-key-figures-grid {
   display: grid;
@@ -815,11 +799,9 @@
 }
 .work-key-figure dt {
   color: var(--text3);
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 700;
-  letter-spacing: 0.08em;
   line-height: 1.35;
-  text-transform: uppercase;
 }
 .work-key-figure dd {
   margin: 7px 0 0;
@@ -841,11 +823,9 @@
 .work-key-figure-proof {
   margin-top: 8px;
   color: var(--text3);
-  font-family: var(--font-mono);
-  font-size: var(--type-label);
-  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--type-caption);
   line-height: 1.4;
-  text-transform: uppercase;
 }
 
 /* In-thread KPI card. The dashboard's .icard is a standalone grid tile —
@@ -886,10 +866,8 @@
 .work-table thead th {
   text-align: left;
   font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: var(--text3);
   border-bottom: 1px solid var(--border);
   padding: 6px 14px 6px 0;
@@ -913,10 +891,8 @@
 .work-section-title,
 .work-section-summary {
   font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   color: var(--text3);
 }
 .work-section-summary {
@@ -970,10 +946,8 @@
 }
 .work-callout-title {
   font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 700;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
   color: var(--mood-color, var(--accent));
   margin-bottom: 5px;
 }
@@ -1036,10 +1010,8 @@
   border: none;
   color: var(--text3);
   font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 .work-divider.is-labeled::before,
 .work-divider.is-labeled::after {
@@ -1126,10 +1098,8 @@
 .work-a2ui-label {
   color: var(--text3);
   font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
 }
 .work-a2ui-input {
   width: 100%;

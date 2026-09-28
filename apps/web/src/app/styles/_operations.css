@@ -109,7 +109,7 @@ html[data-density="compact"] .operations-root .operations-layout {
   top: 20px;
   right: 28px;
   color: var(--text3);
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-label);
   font-weight: 700;
   letter-spacing: 0.17em;
@@ -126,10 +126,8 @@ html[data-density="compact"] .operations-root .operations-layout {
   margin-bottom: 15px;
   color: var(--text2);
   font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
 }
 
 .work-command-eyebrow > span:last-child {
@@ -190,94 +188,27 @@ html[data-density="compact"] .operations-root .operations-layout {
   line-height: var(--leading-body);
 }
 
-.work-phase-rail {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
-  margin: 0 0 9px;
-  padding: 0;
-  list-style: none;
-}
 
-.work-phase-rail::before,
-.work-phase-rail::after {
-  content: "";
-  position: absolute;
-  top: 8px;
-  right: 16.66%;
-  left: 16.66%;
-  height: 1px;
-  background: var(--border);
-}
 
-.work-phase-rail::after {
-  right: auto;
-  width: 33.33%;
-  background: var(--accent);
-  transform-origin: left;
-  animation: operations-rail-draw 0.7s 0.18s ease both;
-}
 
-.work-phase-rail:has(.is-current:nth-child(1))::after {
-  width: 0;
-}
 
-.work-phase-rail:has(.is-current:nth-child(3))::after {
-  width: 66.66%;
-}
 
-.work-phase-rail li {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  justify-items: center;
-  gap: 10px;
-  color: var(--text3);
-  font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
 
-.work-phase-rail li > span {
-  width: 17px;
-  height: 17px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--bg);
-  color: transparent;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0;
-}
 
-.work-phase-rail li.is-complete,
-.work-phase-rail li.is-current {
-  color: var(--text);
-}
 
-.work-phase-rail li.is-complete > span {
-  border-color: var(--accent);
-  background: var(--accent);
-}
 
-.work-phase-rail li.is-complete > span::after {
-  content: "";
-  width: 5px;
-  height: 3px;
-  border-bottom: 1.5px solid var(--on-accent);
-  border-left: 1.5px solid var(--on-accent);
-  transform: rotate(-45deg) translateY(-1px);
-}
 
-.work-phase-rail li.is-current > span {
-  border: 5px solid var(--text);
-  background: var(--success);
-  box-shadow: 0 0 0 3px var(--bg);
-}
+
+
+
+
+
+
+
+
+
+
+
 
 .work-transcript {
   width: min(850px, calc(100% - 56px));
@@ -343,7 +274,7 @@ html[data-density="compact"] .operations-root .operations-layout {
   display: block;
   margin-bottom: 15px;
   color: var(--accent);
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-label);
   font-weight: 800;
   letter-spacing: 0.12em;
@@ -604,10 +535,8 @@ html[data-density="compact"] .operations-root .operations-layout {
   align-self: center;
   color: var(--text3);
   font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -995,16 +924,14 @@ html[data-density="compact"] .operations-root .operations-layout {
   margin-bottom: 17px;
   color: var(--text3);
   font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
 }
 
 .workflows-ops-eyebrow > span:last-child {
   margin-left: 5px;
   color: var(--success);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
   letter-spacing: 0.08em;
 }
 
@@ -1081,10 +1008,8 @@ html[data-density="compact"] .operations-root .operations-layout {
 .workflows-ops-status > div span {
   color: var(--text3);
   font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
 }
 
 .workflows-ops-status .workflows-new-btn {
@@ -1228,9 +1153,9 @@ html[data-density="compact"] .operations-root .operations-layout {
 }
 
 .operations-root.is-workflows .workflows-row-main {
-  min-height: 122px;
+  min-height: 104px;
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   padding: 22px 46px 21px 12px;
   border-radius: 0;
@@ -1255,17 +1180,7 @@ html[data-density="compact"] .operations-root .operations-layout {
   background: var(--accent-soft);
 }
 
-.workflows-row-index {
-  padding-top: 2px;
-  color: var(--text3);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: var(--type-caption);
-  font-weight: 700;
-}
 
-.workflows-row.is-active .workflows-row-index {
-  color: var(--accent);
-}
 
 .workflows-row-copy {
   min-width: 0;
@@ -1335,7 +1250,7 @@ html[data-density="compact"] .operations-root .operations-layout {
 .workflow-inspector-index {
   padding-top: 3px;
   color: var(--success);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-label);
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -1573,7 +1488,7 @@ html[data-density="compact"] .operations-root .operations-layout {
 
 .workflow-budget-copy strong {
   color: var(--text2);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-caption);
 }
 
@@ -1668,9 +1583,7 @@ html[data-density="compact"] .operations-root .operations-layout {
     gap: 34px;
   }
 
-  .work-phase-rail {
-    max-width: 520px;
-  }
+
 
   .workflows-ops-head {
     grid-template-columns: minmax(0, 1fr);
@@ -1907,8 +1820,8 @@ html[data-density="compact"] .operations-root .operations-layout {
   }
 
   .operations-root.is-workflows .workflows-row-main {
-    min-height: 114px;
-    grid-template-columns: 30px minmax(0, 1fr);
+    min-height: 96px;
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
     padding: 19px 42px 18px 8px;
   }
@@ -1956,9 +1869,7 @@ html[data-density="compact"] .operations-root .operations-layout {
     font-size: var(--type-body);
   }
 
-  .work-phase-rail li {
-    font-size: var(--type-label);
-  }
+
 
   .work-empty h2 {
     font-size: 40px;
@@ -2013,7 +1924,6 @@ html[data-density="compact"] .operations-root .operations-layout {
   .work-command-head,
   .workflows-ops-head,
   .operations-root.is-workflows .workflow-inspector,
-  .work-phase-rail::after,
   .work-command-eyebrow > span:last-child[data-phase="running"]::before,
   .work-loading-state > span::after {
     animation: none;
@@ -2092,7 +2002,7 @@ html[data-density="compact"] .operations-root .operations-layout {
   top: 0;
   z-index: 45;
   min-height: 68px;
-  grid-template-columns: minmax(220px, 1fr) minmax(220px, 300px) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: clamp(20px, 3vw, 42px);
   padding: 16px var(--page-gutter);
@@ -2147,16 +2057,9 @@ html[data-density="compact"] .operations-root .operations-layout {
   display: none;
 }
 
-.work-phase-rail {
-  width: 100%;
-  max-width: 300px;
-  margin: 0;
-}
 
-.work-phase-rail li {
-  gap: 6px;
-  font-size: var(--type-label);
-}
+
+
 
 .work-command-actions {
   display: flex;
@@ -2249,11 +2152,9 @@ html[data-density="compact"] .operations-root .operations-layout {
 
 .work-history-drawer-head span {
   color: var(--accent);
-  font-family: var(--font-mono);
-  font-size: var(--type-label);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
 }
 
 .work-history-drawer-head h2 {
@@ -2375,9 +2276,7 @@ html[data-density="compact"] .operations-root .operations-layout {
     gap: 16px;
   }
 
-  .work-phase-rail {
-    display: none;
-  }
+
 }
 
 @media (max-width: 680px) {

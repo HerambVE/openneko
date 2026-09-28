@@ -28,10 +28,8 @@
   margin-bottom: 8px;
   color: var(--accent);
   font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
 }
 
 .apps-overview-header h1 {
@@ -72,10 +70,8 @@
   margin: 0;
   color: var(--text2);
   font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 
 .apps-overview-section-heading span {
@@ -413,10 +409,8 @@
 
 .app-chat-heading small {
   color: var(--text3);
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 
 .app-chat-header-actions {
@@ -518,10 +512,8 @@
 
 .app-chat-action-link span {
   color: var(--warning-ink, var(--accent));
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
 }
 
 .app-chat-thinking { min-height: 20px; display: inline-flex; align-items: center; gap: 4px; }
@@ -537,10 +529,8 @@
   align-items: center;
   justify-content: space-between;
   color: var(--text3);
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
 }
 
 .app-chat-history-title button {
@@ -995,10 +985,8 @@
 
 .records-page-table th {
   color: var(--text3);
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .records-page-table a,
@@ -1182,11 +1170,9 @@
   border-bottom: 1px solid var(--border);
   color: var(--text3);
   font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.11em;
   text-align: left;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -1246,12 +1232,10 @@
   border-radius: 999px;
   background: var(--watch-soft);
   color: var(--warn-ink) !important;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.04em;
   line-height: 1;
   text-decoration: none !important;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -1283,10 +1267,8 @@
 .record-action-diff-target > span,
 .record-action-diff dt {
   color: var(--text3);
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
 }
 
 .record-action-diff-target code {
@@ -1321,7 +1303,7 @@
   gap: 8px;
   overflow-wrap: anywhere;
   color: var(--text2);
-  font-family: var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-body-sm);
 }
 
@@ -1552,10 +1534,8 @@
 .records-substrate-item b {
   color: var(--text3);
   font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 
 .records-degraded {
@@ -1603,10 +1583,8 @@
 .records-eyebrow {
   color: var(--danger);
   font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 
 .records-unavailable-panel h1 {
@@ -1750,10 +1728,8 @@
   margin-bottom: 6px;
   color: var(--text3);
   font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 
 .records-detail-field dd {
@@ -1855,9 +1831,7 @@
 
 .records-related th {
   color: var(--text3);
-  font-size: var(--type-label);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: var(--type-caption);
 }
 
 .records-related td a { color: var(--text); font-weight: 750; text-decoration: none; }
@@ -2051,9 +2025,7 @@
 }
 
 .records-ask.is-list-panel .records-ask-label strong {
-  font-size: var(--type-label);
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
+  font-size: var(--type-caption);
 }
 
 .records-ask.is-list-panel .records-ask-label small {
@@ -2114,10 +2086,8 @@
 .records-ask-action > header span {
   color: var(--text2);
   font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 
 .records-ask-action > header code {
@@ -2251,10 +2221,8 @@
   display: block;
   color: var(--text2);
   font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.055em;
-  text-transform: uppercase;
 }
 
 .records-form-field > label:first-child span {
@@ -2466,9 +2434,7 @@
 
 .records-admin-table th {
   color: var(--text3);
-  font-size: var(--type-label);
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  font-size: var(--type-caption);
 }
 
 .records-admin-table td small {
@@ -2660,11 +2626,9 @@
   background: var(--neutral-soft);
   color: var(--text3);
   font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.09em;
   text-align: left;
-  text-transform: uppercase;
 }
 
 .records-identity-table td {
@@ -2838,10 +2802,8 @@
   gap: 6px;
   color: var(--text2);
   font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.055em;
-  text-transform: uppercase;
 }
 
 .records-import-upload select,
@@ -2919,11 +2881,9 @@
   background: var(--neutral-soft);
   color: var(--text3);
   font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.09em;
   text-align: left;
-  text-transform: uppercase;
 }
 
 .records-import-mapping td {
@@ -3124,10 +3084,8 @@
 
 .records-import-report dt {
   color: var(--text3);
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
 }
 
 .records-import-report dd {

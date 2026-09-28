@@ -89,7 +89,7 @@ export default function AskHistoryPanel({
     <div className={cn("ask-history-panel", className)}>
       <div className="ask-history-head">
         <span className="ask-history-title">History</span>
-        <span className="ask-history-count font-mono">{threads.length}</span>
+        <span className="ask-history-count tabular-nums">{threads.length}</span>
         <Button
           variant="ghost"
           type="button"

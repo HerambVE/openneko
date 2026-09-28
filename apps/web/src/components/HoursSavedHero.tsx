@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Clock } from "lucide-react";
 import { formatHours, formatSavedShort, sinceLabel } from "@/lib/hours-saved";
-import { Sparkline } from "@/components/Sparkline";
 import { Button } from "@/components/ui/button";
 
 export type HoursSavedValue = {
@@ -40,8 +39,6 @@ export default function HoursSavedHero({
   const hero = formatHours(value.totalMinutes);
   const windowLabel = formatSavedShort(value.windowMinutes);
   const detailed = items.filter((i) => i.minutes > 0).slice(0, 6);
-  const daily = value.dailyMinutes ?? [];
-  const hasTrend = daily.some((d) => d > 0);
 
   return (
     <div className="mb-7" style={{ animation: "fadeUp 0.5s ease 0.12s both" }}>
@@ -83,22 +80,14 @@ export default function HoursSavedHero({
           aria-hidden="true"
           className="hidden flex-1 min-w-8 self-center h-px bg-border sm:block"
         />
-        {hasTrend && (
-          <span
-            className="hidden flex-none self-center text-accent/70 sm:block"
-            title="Time saved per day, last 7 days"
-          >
-            <Sparkline values={daily} width={64} height={18} />
-          </span>
-        )}
-        <span className="ml-auto font-mono text-ui-label font-semibold text-accent opacity-70 group-hover:opacity-100 whitespace-nowrap sm:ml-0">
-          how? {open ? "▾" : "→"}
+        <span className="ml-auto text-ui-caption font-semibold text-accent opacity-70 group-hover:opacity-100 whitespace-nowrap sm:ml-0">
+          {open ? "Hide method" : "How we count"}
         </span>
       </Button>
 
       {open && (
         <div className="mt-2.5 bg-card border border-border rounded-2xl px-5 py-4 shadow-soft text-ui-body leading-[1.55] text-text2">
-          <div className="font-display text-ui-label font-bold tracking-[0.13em] uppercase text-text3 mb-2.5">
+          <div className="font-display text-ui-caption font-semibold text-text3 mb-2.5">
             How we estimate hours saved
           </div>
           <p className="m-0 mb-2.5">
@@ -115,7 +104,7 @@ export default function HoursSavedHero({
 
           {detailed.length > 0 && (
             <div className="mt-3.5 pt-3.5 border-t border-border">
-              <div className="font-display text-ui-label font-bold tracking-[0.13em] uppercase text-text3 mb-2">
+              <div className="font-display text-ui-caption font-semibold text-text3 mb-2">
                 Recent
               </div>
               <ul className="list-none m-0 p-0 grid gap-1.5">
@@ -124,7 +113,7 @@ export default function HoursSavedHero({
                     key={i}
                     className="flex items-baseline gap-2.5 text-ui-body-sm"
                   >
-                    <span className="font-mono text-accent tabular-nums flex-none w-[58px]">
+                    <span className="text-accent tabular-nums flex-none w-[58px]">
                       {formatSavedShort(item.minutes)}
                     </span>
                     <span className="text-text2 min-w-0">

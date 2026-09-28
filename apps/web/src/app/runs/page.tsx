@@ -208,7 +208,7 @@ function RunsPageInner() {
   return (
     <>
       <div className="root">
-        <AppHeader back={{ href: "/workflows", label: "Agent workflows" }}>
+        <AppHeader back={{ href: "/workflows", label: "Workflows" }}>
           <SectionNav current="workflows" />
         </AppHeader>
 
@@ -298,11 +298,11 @@ function RunsPageInner() {
                       </Badge>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 text-ui-caption text-text3">
-                      <span className="font-mono">
+                      <span className="tabular-nums">
                         {formatRelative(run.createdAt)}
                       </span>
                       <span className="text-text3/70">·</span>
-                      <span className="font-mono">
+                      <span className="tabular-nums">
                         {formatDuration(run.durationMs)}
                       </span>
                       <span className="text-text3/70">·</span>
@@ -323,7 +323,7 @@ function RunsPageInner() {
                           </span>
                         </>
                       )}
-                      <span className="ml-auto font-mono text-ui-caption text-text3">
+                      <span className="ml-auto text-ui-caption text-text3">
                         →
                       </span>
                     </div>

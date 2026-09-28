@@ -54,8 +54,8 @@ type ActionsPayload = {
 };
 
 const TABS: Array<{ key: Filter; label: string }> = [
-  { key: "fired", label: "Fired" },
-  { key: "awaiting", label: "Awaiting you" },
+  { key: "awaiting", label: "Waiting for you" },
+  { key: "fired", label: "Completed" },
   { key: "rejected", label: "Rejected" },
   { key: "all", label: "All" },
 ];
@@ -263,8 +263,8 @@ function ActionsPageInner() {
         </AppHeader>
 
         <PageHeading
-          title="Review queue"
-          description="Approve, reject, and inspect the external actions proposed by your agents."
+          title="Approvals"
+          description="Changes OpenNeko wants to make in your systems. Nothing runs until you approve it."
           meta={
             data && filter === "awaiting"
               ? `${data.count} pending`
@@ -281,7 +281,7 @@ function ActionsPageInner() {
           />
         </div>
 
-        <Tabs aria-label="Review queue filter" className="mb-[18px]">
+        <Tabs aria-label="Approvals filter" className="mb-[18px]">
           {TABS.map((t) => {
             const active = filter === t.key;
             return (
@@ -419,7 +419,7 @@ function ActionReadingPane({
     <aside className="triage-pane">
       <div className="bg-card border border-border rounded-2xl px-5 py-[18px] shadow-soft">
         <div className="flex items-center gap-2.5 mb-2.5">
-          <span className={cn("font-display text-ui-label font-extrabold tracking-[0.08em] uppercase px-2 py-0.5 rounded-full", RISK_PILL[risk] ?? RISK_PILL.low)}>
+          <span className={cn("font-display text-ui-caption font-semibold px-2 py-0.5 rounded-full", RISK_PILL[risk] ?? RISK_PILL.low)}>
             {risk} risk
           </span>
           <code className="ml-auto font-mono text-ui-label text-text3">{action.kind}</code>
@@ -434,7 +434,7 @@ function ActionReadingPane({
 
         {action.target && (
           <div className="mt-4">
-            <div className="text-ui-label font-bold tracking-[0.12em] uppercase text-text3 mb-1.5">Target</div>
+            <div className="text-ui-caption font-semibold text-text3 mb-1.5">Target</div>
             <code className="font-mono text-ui-caption text-text2 break-all">{action.target}</code>
           </div>
         )}
@@ -451,7 +451,7 @@ function ActionReadingPane({
 
         {payloadEntries.length > 0 && (
           <div className="mt-4">
-            <div className="text-ui-label font-bold tracking-[0.12em] uppercase text-text3 mb-1.5">Payload</div>
+            <div className="text-ui-caption font-semibold text-text3 mb-1.5">Payload</div>
             <div className="bg-bg border border-border rounded-xl px-3 py-2.5 grid gap-1.5">
               {payloadEntries.map(([k, v]) => (
                 <div key={k} className="flex gap-3 text-ui-caption">
@@ -467,7 +467,7 @@ function ActionReadingPane({
 
         {(action.minutesSaved ?? 0) > 0 && (
           <div className="mt-4 text-ui-body-sm text-text2">
-            Saves <span className="font-mono text-success-ink">{formatSavedShort(action.minutesSaved as number)}</span> of manual effort.
+            Saves <span className="font-semibold text-success-ink">{formatSavedShort(action.minutesSaved as number)}</span> of manual effort.
           </div>
         )}
 
@@ -497,7 +497,7 @@ function ActionsEmptyState({ filter, onBack }: { filter: Filter; onBack: () => v
     filter === "awaiting"
       ? {
           line: "Nothing's waiting.",
-          sub: "The loop is humming. Anything that needs your judgment will show up here automatically.",
+          sub: "Anything that needs your decision will appear here.",
         }
       : filter === "fired"
         ? {

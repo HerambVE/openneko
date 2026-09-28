@@ -210,7 +210,7 @@ export default function FindingCard({
               </Button>
             )}
             <span className="ml-auto text-xs text-accent group-hover:underline underline-offset-2">
-              {isApproval ? "open approvals →" : "drill in →"}
+              {isApproval ? "Open approvals" : "Open"}
             </span>
           </div>
         </Card>

@@ -48,10 +48,8 @@
   display: block;
   margin-bottom: 7px;
   font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
   color: var(--accent);
 }
 .settings-group-title {

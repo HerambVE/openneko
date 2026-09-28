@@ -4,7 +4,7 @@
   align-items: center;
   gap: 8px;
   font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-label); font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  font-size: var(--type-caption); font-weight: 700;
   color: var(--warn-ink); text-decoration: none;
   background: var(--warn-soft); border: 1px solid var(--warn); border-radius: 999px;
   padding: 6px 14px 6px 12px; margin-bottom: 16px;
@@ -32,10 +32,8 @@
   align-items: center;
   gap: 10px;
   font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
   color: var(--text3);
   margin-bottom: 12px;
 }
@@ -117,7 +115,7 @@
 }
 @keyframes dash-command-breathe { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.5); opacity: 0; } }
 .dash-command-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--on-dark-3); flex: none; }
-.dash-command-stamp { font-family: var(--font-mono); font-size: var(--type-caption); color: var(--on-dark-3); }
+.dash-command-stamp { font-variant-numeric: tabular-nums; font-size: var(--type-caption); color: var(--on-dark-3); }
 .dash-command-head {
   margin: 0;
   max-width: 26ch;
@@ -152,7 +150,7 @@
   align-items: baseline;
   gap: 10px;
   font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-label); font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em;
+  font-size: var(--type-caption); font-weight: 700;
   color: var(--text3); margin-bottom: 12px;
 }
 /* ─── INSIGHT CARD ─── */
@@ -207,10 +205,8 @@
   align-items: center;
   gap: 6px;
   font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
   color: var(--mood-color, var(--text3));
   margin-bottom: 8px;
 }
@@ -294,8 +290,6 @@
 .kpi-label {
   font-size: var(--type-caption);
   color: var(--text3);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
   font-weight: 600;
 }
 .kpi-delta {
@@ -340,10 +334,8 @@
   gap: 10px;
   margin: 0 0 12px;
   font-family: var(--font-display), 'Archivo', sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
   color: var(--warn-ink);
 }
 .dash-call-dot {

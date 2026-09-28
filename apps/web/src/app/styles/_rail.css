@@ -29,10 +29,8 @@ body {
 .ask-history-title {
   color: var(--text2);
   font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 
 .ask-history-count {
@@ -614,10 +612,8 @@ body {
     display: block;
     margin: 12px 10px 2px;
     font-family: var(--font-display), "Archivo", sans-serif;
-    font-size: var(--type-label);
+    font-size: var(--type-caption);
     font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
     color: var(--text3);
   }
 
@@ -745,8 +741,6 @@ body {
     padding: 2px 11px 4px;
     color: var(--text3);
     font: 800 var(--type-label)/1.2 var(--font-display), "Archivo", sans-serif;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
   }
 
   .app-rail-record-object-wrap {
@@ -937,10 +931,8 @@ body {
   .ask-history-title {
     color: var(--text2);
     font-family: var(--font-display), "Archivo", sans-serif;
-    font-size: var(--type-label);
+    font-size: var(--type-caption);
     font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
   }
 
   .ask-history-count {
@@ -1096,10 +1088,8 @@ body {
 
   .app-rail-foot-label {
     font-family: var(--font-display), "Archivo", sans-serif;
-    font-size: var(--type-label);
+    font-size: var(--type-caption);
     font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
     color: var(--text3);
   }
 

@@ -46,7 +46,7 @@ function formatTime(iso: string): string {
 
 const STATE_LABEL: Record<ActCardData["state"], string> = {
   live: "Auto-response live",
-  awaiting: "Awaiting you",
+  awaiting: "Waiting for you",
   rejected: "Rejected",
 };
 
@@ -105,7 +105,7 @@ export default function ActCard({
         <Badge variant={STATE_PILL_VARIANT[data.state]}>
           {STATE_LABEL[data.state]}
         </Badge>
-        <span className="font-mono text-ui-label font-bold uppercase tracking-[0.08em] text-text3">
+        <span className="text-ui-caption tabular-nums text-text3">
           {formatTime(data.runAt)}
         </span>
       </header>
@@ -190,7 +190,7 @@ export default function ActCard({
                     )}
                     {(row.minutesSaved ?? 0) > 0 && (
                       <span
-                        className="font-mono text-success-ink bg-success-soft border border-success-mid/30 rounded-full px-1.5 py-px"
+                        className="tabular-nums text-success-ink bg-success-soft border border-success-mid/30 rounded-full px-1.5 py-px"
                         title="Estimated human time saved"
                       >
                         {formatSavedShort(row.minutesSaved as number)} saved
@@ -248,7 +248,7 @@ export default function ActCard({
                       onClick={(e) => e.stopPropagation()}
                       title="Open the full lineage: trigger, workflow, payload"
                     >
-                      why →
+                      Why
                     </a>
                   </div>
                 ) : null}

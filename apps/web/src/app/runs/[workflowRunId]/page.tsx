@@ -156,10 +156,10 @@ function formatRunTimestamp(iso: string): string {
 }
 
 const ACTION_STATUS_LABEL: Record<string, string> = {
-  pending_approval: "Awaiting you",
+  pending_approval: "Waiting for you",
   approved: "Approved",
   rejected: "Rejected",
-  executed: "Fired",
+  executed: "Completed",
   failed: "Failed",
 };
 
@@ -423,7 +423,7 @@ export default function RunPage() {
         <AppHeader
           back={{
             href: workflow ? `/workflows?id=${encodeURIComponent(workflow.id)}` : "/workflows",
-            label: workflow?.name ?? "Agent workflows",
+            label: workflow?.name ?? "Workflows",
           }}
         >
           <SectionNav current="workflows" />
@@ -722,7 +722,7 @@ export default function RunPage() {
                         router.push(`/runs/${lineage.upstream!.workflowRunId}`)
                       }
                     >
-                      open upstream run →
+                      Open the run that started this
                     </Button>
                   )}
                 </div>

@@ -176,7 +176,7 @@ function RecordObjectNavigation({
                       <span className="app-rail-record-custom">__c</span>
                     )}
                     {object.recordCount !== null && (
-                      <span className="app-rail-record-count font-mono">
+                      <span className="app-rail-record-count tabular-nums">
                         {object.recordCount}
                       </span>
                     )}
@@ -286,7 +286,7 @@ function RailLink({
         <span className="app-rail-short">{item.shortLabel}</span>
         {isActions && pending > 0 && (
           <span
-            className="app-rail-badge font-mono"
+            className="app-rail-badge tabular-nums"
             aria-label={`${pending} pending`}
           >
             {pending}

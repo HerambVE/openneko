@@ -160,14 +160,14 @@ function RegistryColumn({
     <div className="border-b border-border py-5 last:border-b-0 md:border-b-0 md:border-l md:px-5 md:first:border-l-0 md:first:pl-0 md:last:pr-0">
       <div className="flex items-center justify-between gap-3">
         <h3
-          className={`text-ui-label font-bold uppercase tracking-[0.12em] ${
+          className={`text-ui-caption font-semibold ${
             warn && values.length > 0 ? "text-danger" : "text-text3"
           }`}
         >
           {label}
         </h3>
-        <span className="font-mono text-xs tabular-nums text-text3">
-          {values.length.toString().padStart(2, "0")}
+        <span className="text-xs tabular-nums text-text3">
+          {values.length}
         </span>
       </div>
       {values.length === 0 ? (
@@ -201,7 +201,7 @@ function Capability({
 }) {
   return (
     <div className="border-b border-border py-4 last:border-b-0 sm:border-b-0 sm:border-l sm:px-5 sm:first:border-l-0 sm:first:pl-0 sm:last:pr-0">
-      <div className="text-ui-label font-bold uppercase tracking-[0.12em] text-text3">
+      <div className="text-ui-caption font-semibold text-text3">
         {label}
       </div>
       <div className="mt-2 text-sm font-semibold leading-6 text-text">
@@ -220,7 +220,7 @@ function DescriptorField({
 }) {
   return (
     <div className="min-w-0">
-      <div className="mb-1 text-ui-label font-bold uppercase tracking-[0.12em] text-text3 md:hidden">
+      <div className="mb-1 text-ui-caption font-semibold text-text3 md:hidden">
         {label}
       </div>
       {children}

@@ -180,11 +180,11 @@ export default function MemoryPage() {
         actions={
           <div className="library-head-stats" aria-label="Memory status">
             <div>
-              <strong>{String(active.length).padStart(2, "0")}</strong>
+              <strong>{active.length}</strong>
               <span>active</span>
             </div>
             <div data-state={pending.length > 0 ? "attention" : "clear"}>
-              <strong>{String(pending.length).padStart(2, "0")}</strong>
+              <strong>{pending.length}</strong>
               <span>pending</span>
             </div>
           </div>
@@ -223,13 +223,13 @@ export default function MemoryPage() {
                 <span>Review queue</span>
                 <h2>Pending suggestions</h2>
               </div>
-              <strong>{String(visiblePending.length).padStart(2, "0")}</strong>
+              <strong>{visiblePending.length}</strong>
             </header>
             <ol className="memory-review-list">
               {visiblePending.map((item, index) => (
                 <li key={item.id} className="memory-review-row">
                   <span className="library-index">
-                    {String(index + 1).padStart(2, "0")}
+                    {index + 1}
                   </span>
                   <div className="memory-review-copy">
                     <div className="memory-review-meta">
@@ -301,7 +301,7 @@ export default function MemoryPage() {
                 {visibleActive.map((memory, index) => (
                   <li key={memory.id} className="memory-index-row">
                     <span className="library-index">
-                      {String(index + 1).padStart(2, "0")}
+                      {index + 1}
                     </span>
                     <div className="memory-kind">
                       <span>{humanize(memory.kind)}</span>

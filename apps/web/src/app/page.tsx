@@ -536,7 +536,7 @@ export default function Dashboard() {
                 className="example-banner"
                 style={{ animation: "fadeUp 0.5s ease both" }}
               >
-                Example metrics · set up your own →
+                Example metrics · Set up your own
               </Link>
             )}
             {!personalMode && roles.length > 0 ? (
@@ -586,7 +586,7 @@ export default function Dashboard() {
                     <span className="dash-command-n">
                       {awaiting.count} decision{awaiting.count === 1 ? "" : "s"}
                     </span>{" "}
-                    need you.
+                    {awaiting.count === 1 ? "needs" : "need"} you.
                   </>
                 ) : (
                   greeting || "You are all caught up."
@@ -622,12 +622,12 @@ export default function Dashboard() {
               >
                 <div className="dash-call-eyebrow">
                   <span className="dash-call-dot" aria-hidden="true" />
-                  <span className="dash-call-label">Needs your call</span>
-                  <span className="font-mono dash-call-count">
+                  <span className="dash-call-label">Waiting for your decision</span>
+                  <span className="dash-call-count tabular-nums">
                     {awaiting.count}
                   </span>
                   <Link className="dash-call-skim" href="/actions?filter=awaiting">
-                    open all →
+                    Open all
                   </Link>
                 </div>
                 <div className="act-list">
@@ -643,8 +643,8 @@ export default function Dashboard() {
                 className="mb-7"
                 style={{ animation: "fadeUp 0.5s ease 0.21s both" }}
               >
-                <div className="text-ui-label font-bold tracking-[0.13em] uppercase text-text3 mb-3">
-                  Worth your read
+                <div className="mb-3 text-ui-body font-semibold text-text2">
+                  Needs your attention
                 </div>
                 <ProgressiveList
                   count={findings.awaitingYou.actFindings.length}
@@ -668,7 +668,7 @@ export default function Dashboard() {
                 className="mb-7"
                 style={{ animation: "fadeUp 0.5s ease 0.22s both" }}
               >
-                <div className="text-ui-label font-bold tracking-[0.13em] uppercase text-text3 mb-3">
+                <div className="mb-3 text-ui-body font-semibold text-text2">
                   Pinned
                 </div>
                 <ProgressiveList
@@ -698,7 +698,7 @@ export default function Dashboard() {
                 className="mb-7"
                 style={{ animation: "fadeUp 0.5s ease 0.25s both" }}
               >
-                <div className="text-ui-label font-bold tracking-[0.13em] uppercase text-text3 mb-3">
+                <div className="mb-3 text-ui-body font-semibold text-text2">
                   Worth knowing
                 </div>
                 <ProgressiveList
@@ -723,7 +723,7 @@ export default function Dashboard() {
                 className="mb-7"
                 style={{ animation: "fadeUp 0.5s ease 0.27s both" }}
               >
-                <div className="text-ui-label font-bold tracking-[0.13em] uppercase text-text3 mb-3">
+                <div className="mb-3 text-ui-body font-semibold text-text2">
                   Elevated
                 </div>
                 <ProgressiveList
@@ -800,7 +800,7 @@ export default function Dashboard() {
                 style={{ animation: "fadeUp 0.5s ease 0.35s both" }}
               >
                 <summary data-ui-bespoke-reason="briefing proof expander" className="dash-proof-summary">
-                  <span className="font-mono dash-proof-tick" aria-hidden="true">↳</span>
+                  <span className="dash-proof-tick" aria-hidden="true">↳</span>
                   <span className="dash-proof-count">
                     {recentActions.receipts.length}
                   </span>

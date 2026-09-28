@@ -52,17 +52,15 @@
 
 .run-api-metrics dt {
   color: var(--text3);
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 750;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .run-api-metrics dd {
   margin: 0;
   overflow-wrap: anywhere;
   color: var(--text);
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-body-sm);
   font-weight: 700;
 }
@@ -106,7 +104,7 @@
 
 .run-api-progress > div:first-child strong {
   color: var(--text);
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .run-api-progress-track {
@@ -200,7 +198,7 @@
 
 .run-section-head > span {
   color: var(--text3);
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-label);
 }
 
@@ -268,10 +266,8 @@
   gap: 7px;
   min-width: 0;
   color: var(--text3);
-  font-family: var(--font-mono);
-  font-size: var(--type-label);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--type-caption);
 }
 
 .run-finding-status {
@@ -284,11 +280,9 @@
   border-radius: 999px;
   background: var(--neutral);
   color: var(--text2);
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.08em;
   line-height: 1;
-  text-transform: uppercase;
 }
 
 .run-finding-status svg {
@@ -343,7 +337,7 @@
 
 .run-finding-body li::marker {
   color: var(--text3);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
   font-size: 0.85em;
 }
 
@@ -439,7 +433,7 @@
 .run-expander-summary > span {
   margin-left: auto;
   color: var(--text3);
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-label);
   font-weight: 500;
 }

@@ -211,7 +211,7 @@ function AdminCardGroup({
 }) {
   return (
     <section className="mt-7">
-      <h2 className="mb-4 font-display text-ui-label font-bold uppercase tracking-[0.13em] text-text3">
+      <h2 className="mb-4 font-display text-ui-caption font-semibold text-text3">
         {title}
       </h2>
       <div className="grid gap-4 md:grid-cols-2">

@@ -440,7 +440,7 @@ function StageStrip({ current }: { current: StageKind | null }) {
 }
 
 const PM_H2_CLS = "font-display text-ui-section font-bold leading-[1.3] tracking-[-0.3px] mb-4 text-text";
-const PM_H3_CLS = "font-display text-ui-label font-semibold uppercase tracking-[0.8px] text-text3 mt-6 mb-2 first:mt-0";
+const PM_H3_CLS = "font-display text-ui-caption font-semibold text-text3 mt-6 mb-2 first:mt-0";
 const PM_P_CLS = "text-ui-body leading-[1.65] text-text2 mb-1.5";
 const PM_CITE_CLS =
   "text-ui-label font-semibold text-accent no-underline bg-accent-soft rounded-[4px] px-[5px] py-px mx-px align-super leading-none transition-[background-color,color] duration-150 hover:bg-accent hover:text-white";

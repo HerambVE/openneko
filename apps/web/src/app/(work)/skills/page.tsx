@@ -147,11 +147,11 @@ export default function SkillsPage() {
           <div className="flex flex-wrap items-center gap-4">
             <div className="library-head-stats" aria-label="Skill inventory">
               <div>
-                <strong>{String(skills.length).padStart(2, "0")}</strong>
+                <strong>{skills.length}</strong>
                 <span>installed</span>
               </div>
               <div>
-                <strong>{String(totalFiles).padStart(2, "0")}</strong>
+                <strong>{totalFiles}</strong>
                 <span>files</span>
               </div>
             </div>
@@ -201,7 +201,7 @@ export default function SkillsPage() {
         <section className="library-section">
           <header className="library-section-head">
             <div>
-              <span>Runtime inventory</span>
+              <span>Installed skills</span>
               <h2>Installed skills</h2>
             </div>
           </header>
@@ -240,7 +240,7 @@ export default function SkillsPage() {
                       className="skill-index-link"
                     >
                       <span className="library-index">
-                        {String(index + 1).padStart(2, "0")}
+                        {index + 1}
                       </span>
                       <strong>{skill.name}</strong>
                       <p>{skill.description || "No trigger description provided."}</p>

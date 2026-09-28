@@ -62,7 +62,7 @@ function DockLink({
       <span className="cdock-lbl">{item.shortLabel}</span>
       {item.href === "/actions" && pending > 0 ? (
         <span
-          className="cdock-badge font-mono"
+          className="cdock-badge tabular-nums"
           aria-label={`${pending} pending`}
         >
           {pending > 99 ? "99+" : pending}

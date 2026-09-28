@@ -107,11 +107,9 @@
 .library-head-title > p {
   margin: 0;
   color: color-mix(in srgb, var(--bg) 58%, var(--text));
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.15em;
   line-height: 1.35;
-  text-transform: uppercase;
 }
 
 .library-head-title > span {
@@ -159,11 +157,9 @@
 .library-head-stats span {
   margin-top: 7px;
   color: color-mix(in srgb, var(--bg) 56%, var(--text));
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.14em;
   line-height: 1;
-  text-transform: uppercase;
 }
 
 .library-head-stats [data-state="attention"] strong {
@@ -229,7 +225,7 @@
 
 .library-section-head > strong {
   color: var(--text3);
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-caption);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -389,11 +385,9 @@ section.library-empty [data-ui-empty-state-body] {
 
 .memory-review-meta span {
   color: var(--warn-ink);
-  font-family: var(--font-mono);
-  font-size: var(--type-label);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--type-caption);
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .memory-review-copy p {
@@ -528,7 +522,6 @@ section.library-empty [data-ui-empty-state-body] {
 
 .memory-kind small {
   color: var(--accent);
-  text-transform: uppercase;
 }
 
 .memory-kind svg {
@@ -610,7 +603,7 @@ section.library-empty [data-ui-empty-state-body] {
   align-items: center;
   gap: 6px;
   color: var(--text2);
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-caption);
   font-variant-numeric: tabular-nums;
 }
@@ -622,11 +615,9 @@ section.library-empty [data-ui-empty-state-body] {
 
 .skill-updated {
   color: var(--text3);
-  font-family: var(--font-mono);
-  font-size: var(--type-label);
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  font-size: var(--type-caption);
+  font-variant-numeric: tabular-nums;
 }
 
 .skill-row-arrow {
@@ -683,11 +674,9 @@ section.library-empty [data-ui-empty-state-body] {
   gap: 7px;
   margin-bottom: 5px;
   color: var(--success);
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.13em;
   text-decoration: none;
-  text-transform: uppercase;
 }
 
 .skill-back-link svg {
@@ -780,7 +769,7 @@ section.library-empty [data-ui-empty-state-body] {
 
 .skill-file-btn small {
   color: var(--text3);
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-label);
   font-variant-numeric: tabular-nums;
 }
@@ -810,10 +799,8 @@ section.library-empty [data-ui-empty-state-body] {
   flex-basis: 100%;
   color: var(--text3);
   font-family: var(--font-display), "Archivo", sans-serif;
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 
 .skill-file-id > strong {
@@ -828,7 +815,7 @@ section.library-empty [data-ui-empty-state-body] {
 
 .skill-file-id > small {
   color: var(--text3);
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-label);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1035,10 +1022,8 @@ section.library-empty [data-ui-empty-state-body] {
 
 .library-markdown th {
   color: var(--text2);
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 

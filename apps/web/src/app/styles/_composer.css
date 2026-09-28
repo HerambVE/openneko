@@ -83,10 +83,8 @@
   padding: 7px 10px 6px;
   border-bottom: 1px solid var(--border);
   color: var(--text3);
-  font-size: var(--type-label);
+  font-size: var(--type-caption);
   font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 .work-mention-layout {
   display: grid;

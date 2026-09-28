@@ -58,19 +58,19 @@ describe("cronToEnglish", () => {
 });
 
 describe("describeSchedule", () => {
-  it("returns 'manual only' when cron is null", () => {
-    expect(describeSchedule(null, "UTC", true)).toBe("manual only");
+  it("returns 'Runs when you ask' when cron is null", () => {
+    expect(describeSchedule(null, "UTC", true)).toBe("Runs when you ask");
   });
 
-  it("appends 'paused' when cron is set but disabled", () => {
+  it("appends 'Paused' when cron is set but disabled", () => {
     expect(describeSchedule("0 9 * * *", "UTC", false)).toBe(
-      "every day at 9:00 AM UTC · paused",
+      "Every day at 9:00 AM UTC · Paused",
     );
   });
 
   it("returns plain English when enabled and recognized", () => {
     expect(describeSchedule("30 7 * * 1", "UTC", true)).toBe(
-      "every Monday at 7:30 AM UTC",
+      "Every Monday at 7:30 AM UTC",
     );
   });
 

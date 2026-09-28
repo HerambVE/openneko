@@ -102,9 +102,10 @@ export function describeSchedule(
   timezone: string | null | undefined,
   cronEnabled: boolean,
 ): string {
-  if (!cron) return "manual only";
+  if (!cron) return "Runs when you ask";
   const english = cronToEnglish(cron, timezone);
-  const label = english ?? `${cron}${timezone && timezone !== "UTC" ? ` (${timezone})` : ""}`;
-  if (!cronEnabled) return `${label} · paused`;
+  const raw = english ?? `${cron}${timezone && timezone !== "UTC" ? ` (${timezone})` : ""}`;
+  const label = raw.charAt(0).toUpperCase() + raw.slice(1);
+  if (!cronEnabled) return `${label} · Paused`;
   return label;
 }

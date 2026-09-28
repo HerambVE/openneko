@@ -369,7 +369,7 @@ function Row({
 }) {
   return (
     <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-2.5 items-baseline max-[480px]:grid-cols-1 max-[480px]:gap-0.5">
-      <dt className="text-ui-label font-bold tracking-[0.13em] uppercase text-text3">
+      <dt className="text-ui-caption font-semibold text-text3">
         {label}
       </dt>
       <dd className="m-0 text-text break-words">{children}</dd>
@@ -496,7 +496,7 @@ function InstalledPluginsSection({
                               size="sm"
                               onClick={() => onEditPolicy(policyId)}
                             >
-                              edit rule →
+                              Edit rule
                             </Button>
                           ) : null}
                         </div>

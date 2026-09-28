@@ -43,7 +43,7 @@ export default function StatStrip() {
   const item = (label: string, n: number | string, onClick?: () => void) => {
     const content = (
       <>
-        <span className="font-mono font-semibold text-text">{n}</span> {label}
+        <span className="font-semibold tabular-nums text-text">{n}</span> {label}
       </>
     );
 

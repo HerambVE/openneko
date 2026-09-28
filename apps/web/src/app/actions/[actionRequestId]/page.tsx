@@ -72,10 +72,10 @@ type ActionDetailPayload = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  pending_approval: "Awaiting you",
+  pending_approval: "Waiting for you",
   approved: "Approved",
   rejected: "Rejected",
-  executed: "Fired",
+  executed: "Completed",
   failed: "Failed",
 };
 
@@ -95,7 +95,7 @@ function backToActionsHref(status: string): string {
 function backToActionsLabel(status: string): string {
   if (status === "pending_approval") return "Awaiting";
   if (status === "rejected" || status === "failed") return "Rejected";
-  if (status === "executed" || status === "approved") return "Fired";
+  if (status === "executed" || status === "approved") return "Completed";
   return "Actions";
 }
 
@@ -277,7 +277,7 @@ export default function ActionPage() {
               onClick={askFollowUp}
               title="Open an Ask thread pre-loaded with this action's context"
             >
-              Ask a follow-up →
+              Ask a follow-up
             </Button>
           }
         />
@@ -297,7 +297,7 @@ export default function ActionPage() {
         <Section title="Receipt">
           <dl className="grid gap-3.5 m-0">
             <Field label="Proposed">
-              <span className="font-mono">{formatTime(ar.createdAt)}</span>
+              <span className="tabular-nums">{formatTime(ar.createdAt)}</span>
               {workflow && (
                 <>
                   <span className="text-text3/70"> · </span>
@@ -322,7 +322,7 @@ export default function ActionPage() {
             <Field label="Approved">
               {ar.approvedAt ? (
                 <>
-                  <span className="font-mono">{formatTime(ar.approvedAt)}</span>
+                  <span className="tabular-nums">{formatTime(ar.approvedAt)}</span>
                   <span className="text-text3/70"> · </span>
                   {approverKind === "operator" && (
                     <span>
@@ -354,7 +354,7 @@ export default function ActionPage() {
                   <span className="text-text3/70"> · </span>
                   <span
                     className={cn(
-                      "inline-block px-2 py-0.5 rounded-full text-ui-caption font-semibold tracking-[0.04em] uppercase",
+                      "inline-block px-2 py-0.5 rounded-full text-ui-caption font-semibold",
                       actionStatusClasses(latestExecution.status),
                     )}
                   >
@@ -409,8 +409,8 @@ export default function ActionPage() {
                   onClick={() => router.push(`/runs/${ar.workflowRunId}`)}
                 >
                   {workflow.name}
-                </Button>{" "}
-                — open the run →
+                </Button>
+                .
               </p>
             )}
             {upstreamOutput && (
@@ -441,7 +441,7 @@ export default function ActionPage() {
           <Section title="Decide">
             {rejecting ? (
               <div className="pt-3 border-t border-border mt-2.5 flex flex-col gap-2">
-                <label className="text-ui-label font-bold tracking-[0.13em] uppercase text-text3">
+                <label className="text-ui-caption font-semibold text-text3">
                   Why are you rejecting this? (optional)
                 </label>
                 <Textarea
@@ -511,7 +511,7 @@ function Section({
 }) {
   return (
     <div className="mb-7">
-      <div className="text-ui-label font-bold tracking-[0.13em] uppercase text-text3 mb-2.5">
+      <div className="text-ui-caption font-semibold text-text3 mb-2.5">
         {title}
       </div>
       {children}
@@ -528,7 +528,7 @@ function Field({
 }) {
   return (
     <div className="grid grid-cols-[110px_1fr] gap-x-4 gap-y-2.5 items-baseline">
-      <dt className="text-ui-caption font-bold tracking-[0.13em] uppercase text-text3 m-0">
+      <dt className="text-ui-caption font-semibold text-text3 m-0">
         {label}
       </dt>
       <dd className="m-0 text-ui-body text-text2 leading-[1.55]">{children}</dd>

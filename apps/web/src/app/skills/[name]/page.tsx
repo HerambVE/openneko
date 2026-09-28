@@ -150,7 +150,7 @@ export default function SkillDetailPage({ params }: PageProps) {
         actions={
           <div className="library-head-stats" aria-label="Skill details">
             <div>
-              <strong>{String(skill.fileCount).padStart(2, "0")}</strong>
+              <strong>{skill.fileCount}</strong>
               <span>{skill.fileCount === 1 ? "file" : "files"}</span>
             </div>
             <div>
@@ -296,7 +296,7 @@ function SkillWorkspace({
                   onClick={() => selectFile(f.path)}
                 >
                   <span className="library-index">
-                    {String(index + 1).padStart(2, "0")}
+                    {index + 1}
                   </span>
                   <FileText aria-hidden="true" strokeWidth={1.9} />
                   <span>{f.path}</span>
