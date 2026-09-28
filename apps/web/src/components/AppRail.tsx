@@ -14,7 +14,6 @@ import {
   Star,
   Table2,
 } from "lucide-react";
-import DensityToggle from "@/components/DensityToggle";
 import { Button } from "@/components/ui/button";
 import {
   ALL_NAV,
@@ -459,7 +458,8 @@ export default function AppRail({ initial }: { initial?: RailIdentity }) {
           href="https://openneko.app"
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="OpenNeko — open website in a new tab"
+          aria-label={`OpenNeko ${APP_VERSION}: open the website in a new tab`}
+          title={`OpenNeko ${APP_VERSION}`}
         >
           <Image
             className="app-rail-logo"
@@ -470,19 +470,17 @@ export default function AppRail({ initial }: { initial?: RailIdentity }) {
           />
           <span className="app-rail-name">OpenNeko</span>
         </a>
-        {RECORDS_VISUAL_TEST ? null : updateAvailable ? (
+        {!RECORDS_VISUAL_TEST && updateAvailable ? (
           <Button
             variant="ghost"
             type="button"
             className="app-rail-version is-update"
             onClick={() => window.location.reload()}
-            title={`v${latestVersion} available; reload`}
+            title={`Version ${latestVersion} is ready. Reload to update.`}
           >
-            v{latestVersion}
+            Update
           </Button>
-        ) : (
-          <span className="app-rail-version">{APP_VERSION}</span>
-        )}
+        ) : null}
       </div>
 
       <nav ref={navRef} className="app-rail-nav">
@@ -495,24 +493,21 @@ export default function AppRail({ initial }: { initial?: RailIdentity }) {
               pending={pending}
             />
           ))}
+          <div className="app-rail-link-wrap">
+            <Link
+              href="/apps"
+              className={`app-rail-link${isActive(pathname, "/apps") ? " is-active" : ""}`}
+              aria-current={isActive(pathname, "/apps") ? "page" : undefined}
+              title="Apps"
+            >
+              <LayoutGrid aria-hidden="true" strokeWidth={2} />
+              <span className="app-rail-label">Apps</span>
+              <span className="app-rail-short">Apps</span>
+            </Link>
+          </div>
         </div>
 
         <>
-          <div className="app-rail-heading app-rail-records-heading">Apps</div>
-          <div className="app-rail-group">
-            <div className="app-rail-link-wrap">
-              <Link
-                href="/apps"
-                className={`app-rail-link${isActive(pathname, "/apps") ? " is-active" : ""}`}
-                aria-current={isActive(pathname, "/apps") ? "page" : undefined}
-                title="All apps"
-              >
-                <LayoutGrid aria-hidden="true" strokeWidth={2} />
-                <span className="app-rail-label">All apps</span>
-                <span className="app-rail-short">Apps</span>
-              </Link>
-            </div>
-          </div>
           {recordAppsUnavailable ? (
             <span className="app-rail-record-status">
               Temporarily unavailable
@@ -594,8 +589,7 @@ export default function AppRail({ initial }: { initial?: RailIdentity }) {
               ))}
             </div>
 
-            <div className="app-rail-heading">Workspace</div>
-            <div className="app-rail-group">
+            <div className="app-rail-group app-rail-group-quiet">
               {grouped.workspace.map((item) => (
                 <RailLink
                   key={item.href}
@@ -610,12 +604,6 @@ export default function AppRail({ initial }: { initial?: RailIdentity }) {
       </nav>
 
       <div className="app-rail-foot">
-        {!RECORDS_VISUAL_TEST && (
-          <div className="app-rail-density">
-            <span className="app-rail-foot-label">Density</span>
-            <DensityToggle />
-          </div>
-        )}
         {user ? (
           <div className="app-rail-user">
             {/* Two visible controls. Signing out never hides behind a menu. */}

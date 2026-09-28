@@ -125,7 +125,7 @@
     place-items: center;
     border: 1.5px solid var(--card);
     border-radius: 999px;
-    background: var(--danger);
+    background: var(--accent);
     color: var(--on-accent);
     font-size: var(--type-label);
     font-weight: 800;

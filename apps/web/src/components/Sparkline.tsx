@@ -1,5 +1,5 @@
 // Tiny bar sparkline — shared by the workflows list and the hours-saved hero.
-// Pure presentational: bars scaled to the series max, faded for zero days.
+// Pure presentational: bars scaled to the series max over one baseline.
 
 export function Sparkline({
   values,
@@ -21,21 +21,21 @@ export function Sparkline({
       aria-hidden="true"
       style={{ display: "block" }}
     >
-      {values.map((v, i) => {
-        // Zero days keep a 1px baseline so a sparse series still reads as one chart.
-        const h = v === 0 ? 1 : Math.max(2, (v / max) * height);
-        return (
+      <rect x={0} y={height - 1} width={width} height={1} fill="var(--border)" />
+      {values.map((v, i) =>
+        v === 0 ? null : (
           <rect
             key={i}
-            x={i * barW + 0.5}
-            y={height - h}
-            width={Math.max(1, barW - 1)}
-            height={h}
-            fill="var(--text3)"
-            opacity={v === 0 ? 0.35 : 1}
+            x={i * barW + barW * 0.2}
+            y={height - Math.max(2, (v / max) * height)}
+            width={Math.max(1.5, barW * 0.6)}
+            height={Math.max(2, (v / max) * height)}
+            rx={Math.min(1, barW * 0.3)}
+            fill="var(--accent)"
+            opacity={0.7}
           />
-        );
-      })}
+        ),
+      )}
     </svg>
   );
 }

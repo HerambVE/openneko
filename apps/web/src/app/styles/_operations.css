@@ -2641,10 +2641,6 @@ html[data-density="compact"] .operations-root .operations-layout {
     padding-inline: 8px;
   }
 
-  .workflows-ops-status > div span {
-    display: none;
-  }
-
   .workflows-ops-status .workflows-new-btn {
     min-height: 76px;
     padding-inline: 17px;

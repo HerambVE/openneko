@@ -89,9 +89,11 @@ export function ProfileClient({ email, signInEnabled }: { email: string; signInE
             Your agent runs read this. It belongs to your account, so it changes nobody else&apos;s workspace.
           </p>
         </div>
-        <div className="settings-source">
-          <strong className="is-ok">{email}</strong>
-        </div>
+        {email ? (
+          <div className="settings-source">
+            <strong className="is-ok">{email}</strong>
+          </div>
+        ) : null}
       </div>
 
       {error ? (
