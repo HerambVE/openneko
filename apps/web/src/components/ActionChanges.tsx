@@ -1,7 +1,7 @@
 import { cn } from "@/lib/cn";
 import { describeActionChanges, diffWords, trimDiffContext, type ActionChange } from "@/lib/action-changes";
 
-const MAX_FIELDS = 8;
+const MAX_CHANGES = 8;
 
 function wordCount(value: string): number {
   return value.split(/\s+/).filter(Boolean).length;
@@ -47,7 +47,7 @@ function ChangeValue({ change }: { change: ActionChange }) {
 
 export function ActionChanges({
   payload,
-  limit = MAX_FIELDS,
+  limit = MAX_CHANGES,
   className,
 }: {
   payload: unknown;

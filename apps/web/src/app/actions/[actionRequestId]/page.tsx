@@ -20,6 +20,7 @@ import {
   RecordActionDiff,
 } from "@/components/records/RecordActionDiff";
 import { Button } from "@/components/ui/button";
+import { SkeletonList } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 
 function actionStatusClasses(status: string): string {
@@ -226,7 +227,7 @@ export default function ActionPage() {
         <AppHeader>
           <SectionNav current="actions" />
         </AppHeader>
-        <div className="py-[60px] text-center text-sm text-text3">Loading…</div>
+        <SkeletonList rows={2} variant="row" label="Loading action" className="mt-10" />
       </div>
     );
   }

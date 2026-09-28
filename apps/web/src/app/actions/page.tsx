@@ -30,6 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty";
 import { SearchInput } from "@/components/ui/search-input";
+import { SkeletonList } from "@/components/ui/skeleton";
 import { Tab, Tabs } from "@/components/ui/tabs";
 import { matchesListSearch } from "@/lib/list-search";
 
@@ -298,7 +299,7 @@ function ActionsPageInner() {
         {error ? (
           <div className="py-[60px] text-center text-danger text-ui-body">{error}</div>
         ) : data === null ? (
-          <div className="py-[60px] text-center text-text3 text-ui-body">Loading…</div>
+          <SkeletonList rows={3} label="Loading approvals" className="max-w-[620px]" />
         ) : data.actions.length === 0 ? (
           <ActionsEmptyState filter={filter} onBack={() => router.push("/")} />
         ) : visibleActions.length === 0 ? (

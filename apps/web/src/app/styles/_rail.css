@@ -1140,3 +1140,65 @@ body {
     opacity: 1;
   }
 }
+
+.app-rail-search {
+  display: none;
+}
+
+@media (min-width: 721px) {
+  .app-rail-search {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    min-height: 40px;
+    margin: 0 auto 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--card);
+    color: var(--text3);
+  }
+
+  .app-rail-search svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .app-rail-search .app-rail-label,
+  .app-rail-kbd {
+    display: none;
+  }
+}
+
+@media (min-width: 1025px) {
+  .app-rail-search {
+    width: auto;
+    justify-content: flex-start;
+    gap: 10px;
+    margin: 0 0 12px;
+    padding: 0 10px 0 12px;
+    font-size: var(--type-body-sm);
+    font-weight: 500;
+  }
+
+  .app-rail-search .app-rail-label {
+    display: inline;
+  }
+
+  .app-rail-kbd {
+    display: inline-flex;
+    margin-left: auto;
+    padding: 1px 6px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--neutral-soft);
+    color: var(--text3);
+    font-family: var(--font-body), "Manrope", sans-serif;
+    font-size: var(--type-caption);
+  }
+
+  .app-rail-search:hover {
+    border-color: var(--text3);
+    color: var(--text2);
+  }
+}

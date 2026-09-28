@@ -14,6 +14,7 @@ import {
   Star,
   Table2,
 } from "lucide-react";
+import { openCommandBar } from "@/components/CommandBar";
 import { Button } from "@/components/ui/button";
 import {
   ALL_NAV,
@@ -482,6 +483,20 @@ export default function AppRail({ initial }: { initial?: RailIdentity }) {
           </Button>
         ) : null}
       </div>
+
+      {!RECORDS_VISUAL_TEST && (
+        <Button
+          variant="ghost"
+          type="button"
+          className="app-rail-search"
+          onClick={openCommandBar}
+          title="Search or jump to a page (⌘K)"
+        >
+          <Search aria-hidden="true" strokeWidth={2} />
+          <span className="app-rail-label">Search</span>
+          <kbd className="app-rail-kbd">⌘K</kbd>
+        </Button>
+      )}
 
       <nav ref={navRef} className="app-rail-nav">
         <div className="app-rail-group">

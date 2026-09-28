@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { SkeletonList } from "@/components/ui/skeleton";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import CreatorCredit from "@/components/CreatorCredit";
@@ -247,9 +248,7 @@ function RunsPageInner() {
             {error}
           </div>
         ) : !data ? (
-          <div className="py-[50px] text-center text-sm text-text3">
-            Loading…
-          </div>
+          <SkeletonList rows={5} variant="row" label="Loading runs" />
         ) : visibleRuns.length === 0 ? (
           <div className="py-[50px] text-center text-sm text-text3">
             {query ? "No runs match this search." : "No workflow runs yet."}

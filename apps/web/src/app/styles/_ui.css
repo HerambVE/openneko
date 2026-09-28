@@ -4,7 +4,8 @@
 /* Portalled overlays sit above app chrome (rail 130, workflow sheet 150).
    Menus inside those overlays remain above their containing surface. */
 :is([data-slot="alert-dialog-overlay"], [data-slot="alert-dialog-content"],
-    [data-slot="sheet-overlay"], [data-slot="sheet-content"]) {
+    [data-slot="sheet-overlay"], [data-slot="sheet-content"],
+    [data-slot="command-overlay"], [data-slot="command-content"]) {
   z-index: 200;
 }
 
@@ -129,4 +130,19 @@
   [data-ui-action-group][data-mobile="stack"] > :where([data-ui-button], .ui-button) {
     width: 100%;
   }
+}
+
+[data-slot="skeleton"] {
+  background: linear-gradient(90deg, var(--neutral) 0%, var(--neutral-soft) 50%, var(--neutral) 100%);
+  background-size: 200% 100%;
+  animation: skeleton-sheen 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-sheen {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="skeleton"] { animation: none; }
 }

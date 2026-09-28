@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { SkeletonList } from "@/components/ui/skeleton";
 import { useParams, useRouter } from "next/navigation";
 import { Check, Download, MessageCircle, Pin, TriangleAlert } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -406,7 +407,7 @@ export default function RunPage() {
         <AppHeader>
           <SectionNav current="workflows" />
         </AppHeader>
-        <div className="py-[60px] text-center text-sm text-text3">Loading…</div>
+        <SkeletonList rows={3} variant="row" label="Loading run" className="mt-10" />
       </div>
     );
   }

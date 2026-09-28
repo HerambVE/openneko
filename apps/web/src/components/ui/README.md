@@ -34,6 +34,7 @@ Portalled sheets and confirmations own viewport positioning; shared overlay/menu
 - Use `Disclosure` for secondary detail that would otherwise make a page difficult to scan.
 - Use `LocalDateTime` for browser-local timestamps so server rendering and hydration stay consistent.
 - Use `SearchInput` for instant filtering on row-heavy indexes so search geometry and labelling stay consistent.
+- Use `SkeletonList` while a list loads. Match the variant to the final layout so content does not shift when it arrives.
 
 ## Status and density
 

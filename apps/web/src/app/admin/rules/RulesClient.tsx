@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SkeletonList } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
@@ -227,7 +228,7 @@ export default function RulesClient() {
         {error ? (
           <div className="py-14 text-center text-sm text-danger">{error}</div>
         ) : policies === null ? (
-          <div className="py-14 text-center text-sm text-text3">Loading…</div>
+          <SkeletonList rows={3} variant="row" label="Loading rules" />
         ) : (
           <>
             {pluginDescriptors.length > 0 ? (
