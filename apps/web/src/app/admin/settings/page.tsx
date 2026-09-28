@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { connection } from "next/server";
-import { data_source, db, eq, hasCustomPassword } from "@neko/db";
+import { data_source, db, eq, hasCustomPassword, pool } from "@neko/db";
 import { ArrowUpRight } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import PageHeading from "@/components/PageHeading";
@@ -22,6 +22,8 @@ import {
   getAgentSettingsPayload,
 } from "@/lib/agent-backend-settings";
 import { getGraphjinConfigSettingsPayload } from "@/lib/graphjin-config-settings";
+import { getAuthGateStatus } from "@/lib/auth";
+import { getInstallPolicy } from "@/lib/install-policy-settings";
 import { getSpendSettings } from "@neko/llm/spend";
 import SetupWizard from "./SetupWizard";
 
@@ -70,6 +72,9 @@ export default async function SettingsPage() {
     sources,
     graphjinConfig,
     spend,
+    authGate,
+    installPolicy,
+    workflowOrgLimits,
   ] = await Promise.all([
     hasDataSourceSetup(orgId),
     hasPrimaryProviderSetup(orgId),
@@ -84,7 +89,27 @@ export default async function SettingsPage() {
       .where(eq(data_source.org_id, orgId)),
     getGraphjinConfigSettingsPayload(orgId),
     getSpendSettings(orgId),
+    getAuthGateStatus(),
+    getInstallPolicy(orgId),
+    pool().query<{ org_id: string }>(
+      "select org_id from workflow_api_org_limits where org_id = $1",
+      [orgId],
+    ),
   ]);
+  const signInPlugin = authGate.provider?.pluginName ?? null;
+  const pendingPlugin = authGate.pending?.pluginName ?? null;
+  const authStatus = (plugin: string) =>
+    signInPlugin === plugin
+      ? { status: "Live", statusTone: "success" as const }
+      : pendingPlugin === plugin
+        ? { status: "Setup pending", statusTone: "watch" as const }
+        : { status: "Not installed", statusTone: "neutral" as const };
+  const extraMarketplaces = installPolicy.allowedMarketplaces.length;
+  const securityStatus = installPolicy.allowUnverified || installPolicy.allowGitUrlInstalls
+    ? { status: "Exceptions allowed", statusTone: "watch" as const }
+    : extraMarketplaces > 0
+      ? { status: `${extraMarketplaces + 1} marketplaces`, statusTone: "success" as const }
+      : { status: "Official marketplace only", statusTone: "success" as const };
 
   const enabledSources = sources.filter((source) => source.enabled);
   const jwtSources = enabledSources.filter(
@@ -114,7 +139,7 @@ export default async function SettingsPage() {
     },
     {
       href: "/admin/settings/graphjin",
-      title: "GraphJin Config",
+      title: "GraphJin config",
       copy: "Source-mode endpoints and RBAC token claims passed to GraphJin.",
       status:
         graphjinConfig.settings.sourceConfigEnabled
@@ -147,11 +172,13 @@ export default async function SettingsPage() {
     href: "/admin/settings/sso",
     title: "Single sign-on",
     copy: "Connect your IdP (Okta, Entra ID, and others) through Scalekit and map groups to roles.",
+    ...authStatus("@open-neko/plugin-scalekit"),
   });
   cards.push({
     href: "/admin/settings/signin",
     title: "Email-link sign-in",
     copy: "Passwordless magic-link sign-in for provisioned users: email delivery, first admins, and gate status.",
+    ...authStatus("@open-neko/plugin-magic-link"),
   });
   const spentToday = spend.org.day.spentUsd + spend.org.day.heldUsd;
   cards.push({
@@ -171,16 +198,19 @@ export default async function SettingsPage() {
     href: "/admin/settings/workflows",
     title: "Workflow API limits",
     copy: "Organization budgets and per-workflow runtime, call, token, and artifact limits.",
+    status: workflowOrgLimits.rows.length > 0 ? "Custom budget" : "Default budget",
+    statusTone: "neutral",
   });
   cards.push({
     href: "/admin/settings/security",
     title: "Security",
     copy: "Trust floor for plugin and skill installs: which marketplaces are allowed, and whether unverified or community installs are permitted.",
+    ...securityStatus,
   });
 
   return (
     <div className="root">
-      <AppHeader>
+      <AppHeader back={{ href: "/admin", label: "Admin" }}>
         <SectionNav current="admin" />
       </AppHeader>
       <PageHeading

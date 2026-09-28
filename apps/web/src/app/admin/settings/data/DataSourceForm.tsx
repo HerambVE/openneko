@@ -83,15 +83,15 @@ export default function DataSourceForm({ initial }: { initial: DataSourcePayload
   }
 
   return (
-    <div className="root">
-      <AppHeader back={{ href: "/admin/settings", label: "All settings" }} />
+    <div className="root is-narrow">
+      <AppHeader back={{ href: "/admin/settings", label: "Settings" }} />
       <PageHeading
         title="Data source"
         description="Set the GraphJin endpoint OpenNeko uses for business queries and agent tools."
       />
 
       <section className="settings-card">
-        <div className="grid gap-4 mt-4">
+        <div className="grid gap-4">
           <Field
             label="GraphJin URL *"
             htmlFor="graphjin-url"

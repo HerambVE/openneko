@@ -47,10 +47,6 @@ body { overflow-x: hidden; }
     padding: 28px var(--page-gutter) 120px;
     padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
   }
-  /* Wider .root variants must defer to the viewport at this size. */
-  .workflows-root, .builder-root, .run-root,
-  .approvals-root { --page-width: 100%; max-width: 100%; }
-
   .app-header { margin-bottom: 18px; }
 
   /* Work surfaces stay single-column below desktop. Thread history moves
@@ -111,7 +107,6 @@ body { overflow-x: hidden; }
   .icard { padding: 18px 18px 18px 22px; border-radius: 16px; }
   .inum { font-size: 22px; min-width: 32px; }
   .itext { font-size: var(--type-body-lg); }
-  .dtext, .dchart { padding-left: 0; margin-left: 0; }
   .iactions { top: 10px; right: 10px; }
   .ipin { width: 34px; height: 34px; }
 
@@ -176,4 +171,16 @@ body { overflow-x: hidden; }
   .workflows-row-delete { opacity: 1; pointer-events: auto; }
   .workflows-row-arrow { opacity: 0; }
   .ipin:hover:not(:disabled) { background: transparent; border-color: transparent; }
+}
+
+/* Phones: the dock owns navigation, brand, and sign-out, so every page
+   opens on its title. Pages with a back link keep only that link. */
+@media (max-width: 720px) {
+  body:has(> .app-rail-wrap) .app-header.is-nav-only:not(.is-auth-header) {
+    display: none;
+  }
+
+  body:has(> .app-rail-wrap) .app-header.has-context :is(.topbar-brand, .topbar-ver, .topbar-nav, .density-seg, .topbar-credit, .topbar-signout) {
+    display: none;
+  }
 }

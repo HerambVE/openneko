@@ -174,9 +174,6 @@ export default function SkillsPage() {
       />
 
       <main className="library-main">
-        {canImport ? (
-          <p className="text-ui-caption text-text2">Import a .skill or ZIP archive containing one skill directory with SKILL.md and its supporting files.</p>
-        ) : null}
         <SearchInput
           label="Search skills"
           value={query}
@@ -207,7 +204,6 @@ export default function SkillsPage() {
               <span>Runtime inventory</span>
               <h2>Installed skills</h2>
             </div>
-            <strong>{String(visibleSkills.length).padStart(2, "0")}</strong>
           </header>
 
           {loading ? (
@@ -274,6 +270,11 @@ export default function SkillsPage() {
             </>
           )}
         </section>
+        {canImport ? (
+          <p className="text-ui-caption text-text3">
+            Import a .skill or ZIP archive that holds one skill directory with SKILL.md and its supporting files.
+          </p>
+        ) : null}
       </main>
     </div>
   );

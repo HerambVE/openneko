@@ -18,6 +18,7 @@ import { getSetupCompleteAt } from "@/lib/org-state";
 import { getPluginStatus } from "@/lib/auth";
 import { AdminDenied, AdminShell } from "./AdminShell";
 import { Card } from "@/components/ui/card";
+import { StatCard, StatGrid } from "@/components/ui/stat-card";
 
 export default async function AdminPage() {
   await connection();
@@ -154,25 +155,24 @@ export default async function AdminPage() {
     <AdminShell
       title="Administration"
       subtitle="OpenNeko configuration, users, plugins, and data access."
-      wide
     >
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryStat
+      <StatGrid label="Workspace status">
+        <StatCard
           label="Setup"
           value={setupCompleteAt ? "Complete" : "Incomplete"}
           tone={setupCompleteAt ? "ok" : "warn"}
         />
-        <SummaryStat
+        <StatCard
           label="Plugins"
           value={`${pluginStatus.loaded.length}`}
-          detail={`${pluginStatus.kinds.length} action kinds`}
+          detail={`${pluginStatus.kinds.length} plugin action kinds`}
         />
-        <SummaryStat
+        <StatCard
           label="Auth"
           value={pluginStatus.authProvider ? "Plugin" : "Solo"}
           detail={pluginStatus.authProvider ?? "userless admin"}
         />
-        <SummaryStat
+        <StatCard
           label="GraphJin"
           value={
             enabledSources.length > 0
@@ -186,7 +186,7 @@ export default async function AdminPage() {
               : "warn"
           }
         />
-      </div>
+      </StatGrid>
 
       <AdminCardGroup title="Core" cards={coreCards} />
       <AdminCardGroup title="Operate" cards={operateCards} />
@@ -211,7 +211,7 @@ function AdminCardGroup({
 }) {
   return (
     <section className="mt-7">
-      <h2 className="mb-4 text-ui-subsection font-semibold text-text2">
+      <h2 className="mb-4 font-display text-ui-label font-bold uppercase tracking-[0.13em] text-text3">
         {title}
       </h2>
       <div className="grid gap-4 md:grid-cols-2">
@@ -243,35 +243,5 @@ function StatusText({ value, ok }: { value: string; ok: boolean }) {
     >
       {value}
     </div>
-  );
-}
-
-function SummaryStat({
-  label,
-  value,
-  detail,
-  tone = "neutral",
-}: {
-  label: string;
-  value: string;
-  detail?: string;
-  tone?: "neutral" | "ok" | "warn";
-}) {
-  const toneClass =
-    tone === "ok"
-      ? "text-success-ink"
-      : tone === "warn"
-        ? "text-danger"
-        : "text-text";
-  return (
-    <Card className="p-4">
-      <div className="text-ui-caption font-semibold text-text2">
-        {label}
-      </div>
-      <div className={`mt-2 font-display text-2xl font-bold ${toneClass}`}>
-        {value}
-      </div>
-      {detail ? <div className="mt-1 text-xs text-text2">{detail}</div> : null}
-    </Card>
   );
 }

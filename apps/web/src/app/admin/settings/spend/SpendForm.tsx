@@ -50,8 +50,8 @@ export default function SpendForm({ initial }: { initial: SpendSettings }) {
 
   return (
     <>
-      <div className="root" style={{ "--page-width": "min(1000px, 100%)" } as React.CSSProperties}>
-        <AppHeader back={{ href: "/admin/settings", label: "All settings" }}>
+      <div className="root">
+        <AppHeader back={{ href: "/admin/settings", label: "Settings" }}>
           <SectionNav current="admin" />
         </AppHeader>
 
@@ -115,7 +115,7 @@ export default function SpendForm({ initial }: { initial: SpendSettings }) {
             </Field>
           </div>
           <div className="flex justify-end">
-            <Button type="submit" disabled={saving}>
+            <Button type="submit" variant="primary" disabled={saving}>
               {saving ? "Saving…" : "Save limits"}
             </Button>
           </div>

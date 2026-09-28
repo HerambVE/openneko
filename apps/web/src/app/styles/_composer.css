@@ -444,6 +444,7 @@
   .work-composer-hint kbd,
   .work-composer-hint-sep { display: none; }
   .work-composer-hint { font-size: var(--type-label); }
+  .work-composer-keys { display: none; }
 }
 /* Touch devices: hover styles are misleading (sticky tap = sticky hover).
    Strip the lift/glow on hover for anything that can't truly hover. */
@@ -533,12 +534,10 @@
   color: var(--text2);
   line-height: 1.6;
   margin-bottom: 14px;
-  padding-left: 54px;
 }
 .dchart {
   background: color-mix(in srgb, var(--mood-tint, var(--bg)) 50%, var(--bg));
   border: 1px solid color-mix(in srgb, var(--mood-color, var(--border)) 18%, var(--border));
   border-radius: 14px;
   padding: 14px 12px 8px 12px;
-  margin-left: 54px;
 }

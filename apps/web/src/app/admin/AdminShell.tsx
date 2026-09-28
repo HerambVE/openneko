@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import AppHeader from "@/components/AppHeader";
 import PageHeading from "@/components/PageHeading";
 import SectionNav from "@/components/SectionNav";
@@ -8,19 +8,16 @@ export function AdminShell({
   subtitle,
   children,
   back,
-  wide = false,
+  narrow = false,
 }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
   back?: { href: string; label: string };
-  wide?: boolean;
+  narrow?: boolean;
 }) {
-  const style = wide
-    ? ({ "--page-width": "min(1120px, calc(100vw - 40px))" } as CSSProperties)
-    : undefined;
   return (
-    <div className="root" style={style}>
+    <div className={narrow ? "root is-narrow" : "root"}>
       <AppHeader back={back}>
         <SectionNav current="admin" />
       </AppHeader>

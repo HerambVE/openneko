@@ -226,7 +226,7 @@ export default function Dashboard() {
           return;
         }
         if (status.state === "processing") {
-          router.replace("/business-profile");
+          router.replace("/business-profile?from=setup");
           return;
         }
         const isPersonal = status.mode === "personal";
@@ -773,7 +773,7 @@ export default function Dashboard() {
               )}
 
             <div className="mb-6">
-              <div className="label">Today&apos;s Briefing</div>
+              <div className="label">Today&apos;s briefing</div>
               <ProgressiveList
                 count={briefingCards.length}
                 label="cards"

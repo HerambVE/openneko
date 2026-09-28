@@ -674,6 +674,7 @@ body {
     background: transparent;
     color: var(--text);
     font: 700 var(--type-body-sm)/1.2 var(--font-body), "Manrope", sans-serif;
+    text-overflow: ellipsis;
     cursor: pointer;
   }
 
@@ -684,14 +685,14 @@ body {
 
   .app-rail-record-search {
     width: 100%;
-    min-height: 34px;
+    min-height: 38px;
     display: flex;
     align-items: center;
-    gap: 7px;
-    padding: 6px 9px;
+    gap: 8px;
+    padding: 7px 9px;
     border: 1px solid var(--border);
-    border-radius: 9px;
-    background: var(--neutral-soft);
+    border-radius: 10px;
+    background: var(--card);
     color: var(--text3);
   }
 
@@ -741,7 +742,7 @@ body {
 
   .app-rail-record-section-label {
     display: block;
-    padding: 2px 8px 4px;
+    padding: 2px 11px 4px;
     color: var(--text3);
     font: 800 var(--type-label)/1.2 var(--font-display), "Archivo", sans-serif;
     letter-spacing: 0.1em;
@@ -757,19 +758,19 @@ body {
 
   .app-rail-record-object {
     width: auto;
-    min-height: 34px;
+    min-height: 40px;
     min-width: 0;
     flex: 1;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 7px 8px;
-    border-radius: 8px;
+    gap: 11px;
+    padding: 9px 11px;
+    border-radius: 10px;
   }
 
   .app-rail-record-object svg {
-    width: 15px;
-    height: 15px;
+    width: 18px;
+    height: 18px;
     flex: 0 0 auto;
   }
 
@@ -779,7 +780,7 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: var(--type-body-sm);
+    font-size: var(--type-body);
     font-weight: 600;
   }
 

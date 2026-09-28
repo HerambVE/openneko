@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { connection } from "next/server";
 import { getCurrentActor } from "@/lib/actor";
 import { getPluginActionDescriptors, getPluginStatus } from "@/lib/auth";
+import { StatCard, StatGrid } from "@/components/ui/stat-card";
 import { AdminDenied, AdminShell } from "../AdminShell";
 
 export default async function AdminPluginsPage() {
@@ -19,25 +20,19 @@ export default async function AdminPluginsPage() {
       title="Plugin administration"
       subtitle="Registry health, capabilities, action descriptors, and provider surfaces."
       back={{ href: "/admin", label: "Admin" }}
-      wide
     >
-      <section
-        aria-label="Plugin status"
-        className="overflow-hidden rounded-[var(--radius)] border border-border bg-border shadow-soft"
-      >
-        <div className="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
-          <Stat label="Loaded" value={status.loaded.length} />
-          <Stat
-            label="Flagged"
-            value={status.flagged.length}
-            warn={status.flagged.length > 0}
-          />
-          <Stat label="Action kinds" value={status.kinds.length} />
-          <Stat label="VMs" value={status.vmsRunning} />
-        </div>
-      </section>
+      <StatGrid label="Plugin status">
+        <StatCard label="Loaded" value={status.loaded.length} />
+        <StatCard
+          label="Flagged"
+          value={status.flagged.length}
+          tone={status.flagged.length > 0 ? "warn" : "neutral"}
+        />
+        <StatCard label="Plugin action kinds" value={status.kinds.length} />
+        <StatCard label="VMs" value={status.vmsRunning} />
+      </StatGrid>
 
-      <section className="settings-card !mt-5">
+      <section className="settings-card">
         <div className="settings-card-head">
           <div className="min-w-0">
             <h2 className="settings-card-title">Registry</h2>
@@ -104,8 +99,8 @@ export default async function AdminPluginsPage() {
               Registered action kinds and their default approval modes.
             </p>
           </div>
-          <div className="shrink-0 font-mono text-xs tabular-nums text-text3">
-            {descriptors.length.toString().padStart(2, "0")} registered
+          <div className="shrink-0 text-ui-caption tabular-nums text-text3">
+            {descriptors.length} action kinds
           </div>
         </div>
 
@@ -116,7 +111,7 @@ export default async function AdminPluginsPage() {
         ) : (
           <div className="mt-4 border-t border-border">
             <div
-              className="hidden grid-cols-[minmax(0,0.9fr)_120px_minmax(0,1.5fr)] gap-5 border-b border-border py-2 text-ui-label font-bold uppercase tracking-[0.12em] text-text3 md:grid"
+              className="hidden grid-cols-[minmax(0,0.9fr)_180px_minmax(0,1.5fr)] gap-5 border-b border-border py-2 text-ui-caption font-semibold text-text2 md:grid"
               aria-hidden="true"
             >
               <div>Kind</div>
@@ -126,7 +121,7 @@ export default async function AdminPluginsPage() {
             {descriptors.map((descriptor) => (
               <div
                 key={descriptor.kind}
-                className="grid gap-3 border-b border-border py-4 last:border-b-0 md:grid-cols-[minmax(0,0.9fr)_120px_minmax(0,1.5fr)] md:gap-5"
+                className="grid gap-3 border-b border-border py-4 last:border-b-0 md:grid-cols-[minmax(0,0.9fr)_180px_minmax(0,1.5fr)] md:gap-5"
               >
                 <DescriptorField label="Kind">
                   <span className="font-mono text-xs font-semibold text-text">
@@ -149,31 +144,6 @@ export default async function AdminPluginsPage() {
         )}
       </section>
     </AdminShell>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  warn = false,
-}: {
-  label: string;
-  value: number;
-  warn?: boolean;
-}) {
-  return (
-    <div className="flex min-h-[92px] items-end justify-between gap-4 bg-card px-5 py-4">
-      <div className="text-ui-label font-bold uppercase tracking-[0.12em] text-text3">
-        {label}
-      </div>
-      <div
-        className={`font-display text-3xl font-bold leading-none tabular-nums ${
-          warn ? "text-danger" : "text-text"
-        }`}
-      >
-        {value.toString().padStart(2, "0")}
-      </div>
-    </div>
   );
 }
 
@@ -268,5 +238,5 @@ function formatMode(
 ): string {
   if (!mode) return "default";
   if (typeof mode === "string") return mode;
-  return `external:${mode.external ?? "default"} - internal:${mode.internal ?? "default"}`;
+  return `external ${mode.external ?? "default"} · internal ${mode.internal ?? "default"}`;
 }

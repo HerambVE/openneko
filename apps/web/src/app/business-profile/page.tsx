@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import PageHeading from "@/components/PageHeading";
@@ -43,6 +43,8 @@ const STAGE_FALLBACK_COPY: Record<StageKind, readonly string[]> = {
 const FALLBACK_DEFAULT = "Reading your data sources…";
 const FALLBACK_CYCLE_MS = 3500;
 
+const noSubscribe = () => () => {};
+
 export default function ProcessingPage() {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("loading");
@@ -54,6 +56,11 @@ export default function ProcessingPage() {
   const [insights, setInsights] = useState("");
   const [insightsStatus, setInsightsStatus] = useState<InsightsStatus>("processing");
   const [needsPersona, setNeedsPersona] = useState(false);
+  const fromSetup = useSyncExternalStore(
+    noSubscribe,
+    () => new URLSearchParams(window.location.search).get("from") === "setup",
+    () => false,
+  );
   const profileEditedRef = useRef(false);
   const insightsEditedRef = useRef(false);
 
@@ -218,7 +225,7 @@ export default function ProcessingPage() {
 
   if (phase === "loading") {
     return (
-      <div className="root">
+      <div className="root is-narrow">
         <AppHeader>
           <SectionNav current="business-profile" />
         </AppHeader>
@@ -237,7 +244,7 @@ export default function ProcessingPage() {
       message = FALLBACK_DEFAULT;
     }
     return (
-      <div className="root">
+      <div className="root is-narrow">
         <AppHeader>
           <SectionNav current="business-profile" />
         </AppHeader>
@@ -261,14 +268,14 @@ export default function ProcessingPage() {
   const insightsPending = !insights && insightsStatus !== "disabled";
 
   return (
-    <div className="root">
+    <div className="root is-narrow">
       <AppHeader>
         <SectionNav current="business-profile" />
       </AppHeader>
       <PageHeading
         title="Business profile"
         description="Review and refine the operating context OpenNeko uses in briefings, answers, and agent runs."
-        meta={insightsPending ? "research running" : "ready"}
+        meta={insightsPending ? "Research running" : undefined}
       />
 
       <SegmentedControl
@@ -355,19 +362,19 @@ export default function ProcessingPage() {
           animation: "fadeUp 0.5s ease 0.45s both",
         }}
       >
-        <Button
-          variant="primary"
-          className="px-8 py-3.5 text-ui-body-lg"
-          onClick={async () => {
-            await flushAll();
-            router.replace(needsPersona ? "/onboarding" : "/");
-          }}
-        >
-          {needsPersona ? "Continue to personal setup" : "Continue to your briefing"}
-        </Button>
+        {needsPersona || fromSetup ? (
+          <Button
+            variant="primary"
+            onClick={async () => {
+              await flushAll();
+              router.replace(needsPersona ? "/onboarding" : "/");
+            }}
+          >
+            {needsPersona ? "Continue to personal setup" : "Continue to your briefing"}
+          </Button>
+        ) : null}
         {insights && insightsStatus !== "disabled" && (
           <Button
-            className="px-6 py-3.5 text-sm"
             onClick={async () => {
               await flushAll();
               try {

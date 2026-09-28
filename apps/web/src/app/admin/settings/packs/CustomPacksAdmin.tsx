@@ -250,10 +250,10 @@ export default function CustomPacksAdmin({ initialPack = "", connected = "" }: {
 
   return <section className="grid gap-4 mb-6" aria-label="Solution packs" aria-busy={busy !== null}>
     <Card as="section" className="grid gap-4">
-      <div><h2>Built-in packs</h2><p className="text-ui-body-sm text-text2">These packs are included with OpenNeko. Install them here, then configure their connections.</p></div>
-      {catalog === null ? (!error && <p role="status">Loading packs…</p>) : <ul className="grid gap-3">{catalog.filter(pack => pack.source === "embedded").map(pack => <li key={pack.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
-        <div><h3 className="font-display text-ui-subsection font-bold">{pack.name}</h3><p className="text-ui-caption text-text2">Version {pack.version}</p><Badge variant={pack.installed ? "success" : "muted"}>{pack.installed ? "Installed" : "Available"}</Badge></div>
-        <Button variant={pack.installed ? "secondary" : "primary"} disabled={busy !== null} onClick={() => void (pack.installed ? loadPack(pack.id) : installBuiltin(pack))}>{busy === `install-${pack.id}` ? "Installing…" : pack.installed ? "Manage" : "Install"}</Button>
+      <div className="grid gap-1"><h2>Built-in packs</h2><p className="text-ui-body-sm text-text2">These packs are included with OpenNeko. Install them here, then configure their connections.</p></div>
+      {catalog === null ? (!error && <p role="status">Loading packs…</p>) : <ul className="grid gap-3">{catalog.filter(pack => pack.source === "embedded").map(pack => <li key={pack.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3 last:border-b-0 last:pb-0">
+        <div className="grid gap-1"><div className="flex flex-wrap items-center gap-2"><h3 className="font-display text-ui-subsection font-bold">{pack.name}</h3><Badge variant={pack.installed ? "success" : "muted"}>{pack.installed ? "Installed" : "Available"}</Badge></div><p className="text-ui-caption text-text2">Version {pack.version}</p></div>
+        <Button variant="secondary" disabled={busy !== null} onClick={() => void (pack.installed ? loadPack(pack.id) : installBuiltin(pack))}>{busy === `install-${pack.id}` ? "Installing…" : pack.installed ? "Manage" : "Install"}</Button>
       </li>)}</ul>}
       <Disclosure title="Upload a custom pack">
         <form onSubmit={upload} className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">

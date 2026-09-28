@@ -540,10 +540,12 @@ export function WorkflowApiAccessPanel({ workflowId }: { workflowId: string }) {
           </form>
         </Disclosure>
 
-        <p className="workflow-api-dates">
-          Issued {formatDate(access.tokenCreatedAt)}
-          {access.tokenRotatedAt ? ` · Rotated ${formatDate(access.tokenRotatedAt)}` : ""}
-        </p>
+        {access.tokenCreatedAt ? (
+          <p className="workflow-api-dates">
+            Issued {formatDate(access.tokenCreatedAt)}
+            {access.tokenRotatedAt ? ` · Rotated ${formatDate(access.tokenRotatedAt)}` : ""}
+          </p>
+        ) : null}
       </div>
     </section>
   );

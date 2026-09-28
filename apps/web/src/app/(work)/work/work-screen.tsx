@@ -440,7 +440,7 @@ export default function WorkScreen() {
           return;
         }
         if (status.state === "processing") {
-          router.replace("/business-profile");
+          router.replace("/business-profile?from=setup");
           return;
         }
         setGateChecked(true);
@@ -1230,15 +1230,16 @@ export default function WorkScreen() {
             <History aria-hidden="true" strokeWidth={1.9} />
             <span>History</span>
           </Button>
-          <Button
-            variant="primary"
-            className="work-command-action is-primary"
-            onClick={() => router.push("/work")}
-            disabled={!activeThreadId && !bundle?.messages.length}
-          >
-            <Plus aria-hidden="true" strokeWidth={2} />
-            <span>New work</span>
-          </Button>
+          {activeThreadId || bundle?.messages.length ? (
+            <Button
+              variant="primary"
+              className="work-command-action is-primary"
+              onClick={() => router.push("/work")}
+            >
+              <Plus aria-hidden="true" strokeWidth={2} />
+              <span>New work</span>
+            </Button>
+          ) : null}
         </div>
       </header>
 
@@ -1614,7 +1615,7 @@ export default function WorkScreen() {
                 ) : files.length > 0 ? (
                   <>{files.length} of {MAX_ATTACHMENTS} attached</>
                 ) : (
-                  <>Enter to dispatch · Shift + Enter for a new line</>
+                  <span className="work-composer-keys">Enter to dispatch · Shift + Enter for a new line</span>
                 )}
               </span>
             </div>

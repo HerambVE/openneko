@@ -67,7 +67,7 @@ export default function HoursSavedHero({
             <>
               {" · "}
               <b className="text-success-ink font-bold">
-                +{windowLabel} in the last {value.windowHours}h
+                +{windowLabel.replace(/^~/, "")} in the last {value.windowHours}h
               </b>
               {value.windowTasks > 0 && (
                 <>

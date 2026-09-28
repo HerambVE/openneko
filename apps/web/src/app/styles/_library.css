@@ -71,10 +71,10 @@
 
 .library-page {
   width: 100%;
-  max-width: none;
+  max-width: var(--content-max);
   min-width: 0;
   min-height: 100svh;
-  margin: 0;
+  margin: 0 auto;
   padding: 0 0 112px;
   background: var(--bg);
   color: var(--text);
@@ -507,6 +507,10 @@ section.library-empty [data-ui-empty-state-body] {
   white-space: nowrap;
 }
 
+.memory-usage > span {
+  text-transform: none;
+}
+
 .memory-kind small,
 .memory-scope small,
 .memory-usage small {
@@ -930,7 +934,10 @@ section.library-empty [data-ui-empty-state-body] {
   line-height: 1.15;
 }
 
-.library-markdown h1 {
+.library-markdown h1,
+.library-markdown h2.library-markdown-title {
+  padding-bottom: 0;
+  border-bottom: 0;
   font-size: var(--type-page);
 }
 
@@ -1352,6 +1359,10 @@ section.library-empty [data-ui-empty-state-body] {
 }
 
 /* Knowledge pages share the unboxed page heading and content gutters. */
+.library-page > [data-item-access-panel] {
+  margin: 24px var(--page-gutter) 0;
+}
+
 .library-page > .page-heading {
   margin: 0;
   padding: 28px var(--page-gutter) 24px;

@@ -33,8 +33,8 @@ export default async function WorkflowSettingsPage({
   const limits = orgLimits.rows[0];
 
   return (
-    <div className="root" style={{ "--page-width": "min(1000px, 100%)" } as React.CSSProperties}>
-      <AppHeader back={{ href: "/admin/settings", label: "All settings" }}>
+    <div className="root">
+      <AppHeader back={{ href: "/admin/settings", label: "Settings" }}>
         <SectionNav current="admin" />
       </AppHeader>
       <PageHeading
@@ -55,7 +55,12 @@ export default async function WorkflowSettingsPage({
         ) : (
           <nav aria-label="Choose workflow" className="flex flex-wrap gap-2">
             {workflows.map((item) => (
-              <Button key={item.id} asChild variant="secondary">
+              <Button
+                key={item.id}
+                asChild
+                size="sm"
+                variant={item.id === workflow?.id ? "primary" : "secondary"}
+              >
                 <Link
                   href={`/admin/settings/workflows?workflow=${item.id}`}
                   aria-current={item.id === workflow?.id ? "page" : undefined}
@@ -66,8 +71,12 @@ export default async function WorkflowSettingsPage({
             ))}
           </nav>
         )}
+        {workflow ? (
+          <div className="settings-workflow-api">
+            <WorkflowApiAccessPanel key={workflow.id} workflowId={workflow.id} />
+          </div>
+        ) : null}
       </section>
-      {workflow ? <WorkflowApiAccessPanel key={workflow.id} workflowId={workflow.id} /> : null}
     </div>
   );
 }

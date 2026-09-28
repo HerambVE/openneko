@@ -1,7 +1,7 @@
 "use client";
 
 import { ItemAccessPanel } from "@/components/admin/ItemAccessPanel";
-import { use as usePromise, useCallback, useEffect, useState } from "react";
+import { use as usePromise, useCallback, useEffect, useState, type ComponentPropsWithoutRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, FileText, Pencil } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -166,6 +166,13 @@ export default function SkillDetailPage({ params }: PageProps) {
     </div>
   );
 }
+
+// The page already owns the h1; a document title renders one level down.
+const SKILL_MARKDOWN_COMPONENTS = {
+  h1: ({ node: _node, ...props }: ComponentPropsWithoutRef<"h1"> & { node?: unknown }) => (
+    <h2 className="library-markdown-title" {...props} />
+  ),
+};
 
 function SkillWorkspace({
   skill,
@@ -381,7 +388,9 @@ function SkillWorkspace({
               <p className="skill-detail-summary">{skill.description}</p>
             ) : null}
             <div className="library-markdown">
-              <ReactMarkdown>{stripFrontmatter(file.text ?? "")}</ReactMarkdown>
+              <ReactMarkdown components={SKILL_MARKDOWN_COMPONENTS}>
+                {stripFrontmatter(file.text ?? "")}
+              </ReactMarkdown>
             </div>
             {file.truncated ? (
               <p className="skill-file-note">

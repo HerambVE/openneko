@@ -108,10 +108,7 @@ export default function PolicyDetailClient({ policyId }: { policyId: string }) {
 
   return (
     <>
-      <div
-        className="root"
-        style={{ "--page-width": "min(900px, 100%)" } as React.CSSProperties}
-      >
+      <div className="root is-narrow">
         <AppHeader back={{ href: "/admin/rules", label: "Rules" }}>
           <SectionNav current="admin" />
         </AppHeader>

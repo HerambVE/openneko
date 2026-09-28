@@ -7,7 +7,7 @@ import CreatorCredit from "@/components/CreatorCredit";
 import PageHeading from "@/components/PageHeading";
 import SectionNav from "@/components/SectionNav";
 import { Button, ButtonLink } from "@/components/ui/button";
-import { Input, NativeSelect } from "@/components/ui/field";
+import { Field, Input, NativeSelect } from "@/components/ui/field";
 import type {
   SsoEnvironmentRow,
   SsoOrganizationRow,
@@ -30,17 +30,17 @@ function StepHeader({
     <div className="flex items-center gap-2">
       {done ? (
         <span
-          className="flex items-center justify-center w-5 h-5 rounded-full bg-accent text-bg text-ui-label font-bold"
+          className="flex items-center justify-center w-6 h-6 rounded-full bg-accent text-bg text-ui-caption font-bold"
           aria-label="done"
         >
           ✓
         </span>
       ) : (
-        <span className="flex items-center justify-center w-5 h-5 rounded-full border-[1.5px] border-border text-text3 text-ui-label font-semibold">
+        <span className="flex items-center justify-center w-6 h-6 rounded-full border-[1.5px] border-text3 text-text2 text-ui-caption font-semibold">
           {step}
         </span>
       )}
-      <span className="text-ui-body font-semibold text-text">{title}</span>
+      <span className="text-ui-subsection font-semibold text-text">{title}</span>
       {done ? (
         <span className="text-ui-label font-semibold text-accent">Done</span>
       ) : null}
@@ -321,9 +321,8 @@ export default function SsoSetupForm({
     <>
       <div
         className="root"
-        style={{ "--page-width": "min(1000px, 100%)" } as React.CSSProperties}
       >
-        <AppHeader back={{ href: "/admin/settings", label: "All settings" }}>
+        <AppHeader back={{ href: "/admin/settings", label: "Settings" }}>
           <SectionNav current="admin" />
         </AppHeader>
 
@@ -332,7 +331,7 @@ export default function SsoSetupForm({
           description="Connect your identity provider (Okta, Entra ID, and others) through Scalekit. The agent fetches the environment URL and client id for you; you paste the client secret once."
         />
 
-        <section className="flex flex-col gap-6 mt-2">
+        <section className="flex flex-col gap-4">
           {loadError ? (
             <div className="rounded-xl border border-border bg-bg px-4 py-3">
               <p className={copyClass}>{loadError}</p>
@@ -346,7 +345,7 @@ export default function SsoSetupForm({
           ) : null}
 
           {/* Step 1 — workspace authorization */}
-          <div className="rounded-xl border border-border bg-bg px-4 py-4 flex flex-col gap-3">
+          <div className="settings-card !mt-0 flex flex-col gap-3">
             <StepHeader
               step={1}
               done={step1Done}
@@ -374,7 +373,7 @@ export default function SsoSetupForm({
           </div>
 
           {/* Step 2 — environment selection */}
-          <div className="rounded-xl border border-border bg-bg px-4 py-4 flex flex-col gap-3">
+          <div className="settings-card !mt-0 flex flex-col gap-3">
             <StepHeader
               step={2}
               done={step2Done}
@@ -456,26 +455,32 @@ export default function SsoSetupForm({
                       ))}
                     </NativeSelect>
                   ) : null}
-                  {envOptions.length === 0 && (
-                    <>
+                </div>
+                {envOptions.length === 0 && (
+                  <div className="grid grid-cols-2 gap-4 max-[720px]:grid-cols-1">
+                    <Field label="Environment ID" htmlFor="sso-environment-id">
                       <Input
-                        className="flex-1 min-w-[200px]"
-                        placeholder="environmentId (env_…)"
+                        id="sso-environment-id"
+                        placeholder="env_…"
                         value={environmentId}
                         onChange={(e) => setEnvironmentId(e.target.value)}
                         spellCheck={false}
                         autoComplete="off"
                       />
+                    </Field>
+                    <Field label="Organization ID" htmlFor="sso-organization-id">
                       <Input
-                        className="flex-1 min-w-[200px]"
-                        placeholder="organizationId (org_…)"
+                        id="sso-organization-id"
+                        placeholder="org_…"
                         value={organizationId}
                         onChange={(e) => setOrganizationId(e.target.value)}
                         spellCheck={false}
                         autoComplete="off"
                       />
-                    </>
-                  )}
+                    </Field>
+                  </div>
+                )}
+                <div className="flex justify-end">
                   <Button
                     type="button"
                     variant="secondary"
@@ -492,7 +497,7 @@ export default function SsoSetupForm({
           </div>
 
           {/* Step 3 — sign-in credentials */}
-          <div className="rounded-xl border border-border bg-bg px-4 py-4 flex flex-col gap-3">
+          <div className="settings-card !mt-0 flex flex-col gap-3">
             <StepHeader step={3} done={step3Done} title="Sign-in credentials" />
             {step3Done && editingStep !== 3 ? (
               <>
@@ -537,31 +542,40 @@ export default function SsoSetupForm({
                   >
                     Find the secret in Scalekit ↗
                   </ButtonLink>
-                  <Input
-                    className="flex-1 min-w-[220px]"
-                    placeholder="https://your-app.scalekit.com"
-                    value={environmentUrl}
-                    onChange={(e) => setEnvironmentUrl(e.target.value)}
-                    spellCheck={false}
-                    autoComplete="off"
-                  />
-                  <Input
-                    className="flex-1 min-w-[180px]"
-                    placeholder="client_id (skc_…)"
-                    value={clientId}
-                    onChange={(e) => setClientId(e.target.value)}
-                    spellCheck={false}
-                    autoComplete="off"
-                  />
-                  <Input
-                    type="password"
-                    className="flex-1 min-w-[180px]"
-                    placeholder="client_secret"
-                    value={clientSecret}
-                    onChange={(e) => setClientSecret(e.target.value)}
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4 max-[720px]:grid-cols-1">
+                  <Field label="Environment URL" htmlFor="sso-environment-url">
+                    <Input
+                      id="sso-environment-url"
+                      placeholder="https://your-app.scalekit.com"
+                      value={environmentUrl}
+                      onChange={(e) => setEnvironmentUrl(e.target.value)}
+                      spellCheck={false}
+                      autoComplete="off"
+                    />
+                  </Field>
+                  <Field label="Client ID" htmlFor="sso-client-id">
+                    <Input
+                      id="sso-client-id"
+                      placeholder="skc_…"
+                      value={clientId}
+                      onChange={(e) => setClientId(e.target.value)}
+                      spellCheck={false}
+                      autoComplete="off"
+                    />
+                  </Field>
+                  <Field label="Client secret" htmlFor="sso-client-secret" className="col-span-full">
+                    <Input
+                      id="sso-client-secret"
+                      type="password"
+                      value={clientSecret}
+                      onChange={(e) => setClientSecret(e.target.value)}
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                  </Field>
+                </div>
+                <div className="flex justify-end">
                   <Button
                     type="button"
                     variant="secondary"
@@ -578,7 +592,7 @@ export default function SsoSetupForm({
           </div>
 
           {/* Step 4 — IdP connection */}
-          <div className="rounded-xl border border-border bg-bg px-4 py-4 flex flex-col gap-3">
+          <div className="settings-card !mt-0 flex flex-col gap-3">
             <StepHeader
               step={4}
               done={step4Done}

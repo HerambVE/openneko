@@ -84,6 +84,15 @@
   }
 }
 
+/* Fields inside table rows match the compact 32px row actions on desktop.
+   Phones and coarse pointers keep the 44px touch target. */
+@media (min-width: 721px) and (pointer: fine) {
+  [data-slot="table-cell"] :where(input, select)[data-ui-field-control] {
+    min-height: var(--control-sm);
+    padding-block: 5px;
+  }
+}
+
 @media (max-width: 720px), (pointer: coarse) {
   :where([data-ui-button], .ui-button),
   [data-ui-tab],

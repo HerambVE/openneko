@@ -269,7 +269,6 @@ export default function MemoryPage() {
               <span>Agent context</span>
               <h2>Saved memories</h2>
             </div>
-            <strong>{String(visibleActive.length).padStart(2, "0")}</strong>
           </header>
 
           {loading ? (
@@ -330,7 +329,7 @@ export default function MemoryPage() {
                     </div>
                     <IconButton
                       label="Archive memory"
-                      variant="danger"
+                      variant="ghost"
                       className="memory-archive-control"
                       disabled={busyId === memory.id}
                       onClick={() => void archive(memory.id)}

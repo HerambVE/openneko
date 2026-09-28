@@ -11,8 +11,8 @@ export default async function SettingsPacksPage({ searchParams }: { searchParams
   const actor = await getCurrentActor();
   if (actor.role !== "admin") return <AdminDenied />;
   const initialPack = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(query.pack ?? "") ? query.pack : undefined;
-  return <div className="root">
-    <AppHeader back={{ href: "/admin/settings", label: "All settings" }} />
+  return <div className="root is-narrow">
+    <AppHeader back={{ href: "/admin/settings", label: "Settings" }} />
     <PageHeading title="Packs" description="Install included packs, then configure their connections and capabilities." />
     <CustomPacksAdmin initialPack={initialPack} connected={query.connected} />
   </div>;

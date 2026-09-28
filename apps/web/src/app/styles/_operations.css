@@ -1196,7 +1196,9 @@ html[data-density="compact"] .operations-root .operations-layout {
   z-index: 2;
   width: 9px;
   height: 9px;
-  align-self: center;
+  /* Sits on the title line, not the middle of a multi-line row. */
+  align-self: start;
+  margin-top: 27px;
   justify-self: center;
   border: 2px solid var(--bg);
   border-radius: 999px;
@@ -1217,6 +1219,7 @@ html[data-density="compact"] .operations-root .operations-layout {
 .operations-root.is-workflows .workflows-row.is-active .workflows-route-node {
   width: 13px;
   height: 13px;
+  margin-top: 25px;
   border-width: 3px;
   background: var(--accent);
   box-shadow:
@@ -1908,6 +1911,14 @@ html[data-density="compact"] .operations-root .operations-layout {
     grid-template-columns: 30px minmax(0, 1fr);
     gap: 8px;
     padding: 19px 42px 18px 8px;
+  }
+
+  .operations-root.is-workflows .workflows-route-node {
+    margin-top: 24px;
+  }
+
+  .operations-root.is-workflows .workflows-row.is-active .workflows-route-node {
+    margin-top: 22px;
   }
 
   .operations-root.is-workflows .workflows-row-main .text-text2 {
@@ -2865,7 +2876,17 @@ html[data-density="compact"] .operations-root .operations-layout {
 .operations-root.is-workflows .is-overview .wf-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: clamp(30px, 5vw, 72px);
+  column-gap: 0;
+}
+
+/* Rows in the same grid line share one height, so their separators line up. */
+.operations-root.is-workflows .is-overview .wf-grid > li {
+  display: flex;
+  flex-direction: column;
+}
+
+.operations-root.is-workflows .is-overview .wf-grid > li > .workflows-row {
+  flex: 1;
 }
 
 .operations-root.is-workflows .is-overview .wf-grid::before {
@@ -2886,7 +2907,7 @@ html[data-density="compact"] .operations-root .operations-layout {
 }
 
 .operations-root.is-workflows .is-overview .workflow-group-head {
-  margin-left: 32px;
+  margin-left: 0;
 }
 
 .operations-root.is-workflows .is-overview .workflows-row-main {

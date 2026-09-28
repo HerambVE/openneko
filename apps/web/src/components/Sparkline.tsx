@@ -22,7 +22,8 @@ export function Sparkline({
       style={{ display: "block" }}
     >
       {values.map((v, i) => {
-        const h = (v / max) * height;
+        // Zero days keep a 1px baseline so a sparse series still reads as one chart.
+        const h = v === 0 ? 1 : Math.max(2, (v / max) * height);
         return (
           <rect
             key={i}

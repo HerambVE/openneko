@@ -18,7 +18,7 @@ describe("Users page without a sign-in plugin", () => {
     );
     // The form collected a real address for an account that cannot sign in.
     expect(html).not.toContain('id="new-user-email"');
-    expect(html).toContain("No sign-in plugin yet");
+    expect(html).toContain("Install a sign-in plugin");
     expect(html).toContain("/admin/plugins");
     // The existing people stay visible.
     expect(html).toContain("owner@company.com");
@@ -29,6 +29,6 @@ describe("Users page without a sign-in plugin", () => {
       createElement(UsersClient, { users, signInProvider: "Email link" }),
     );
     expect(html).toContain('id="new-user-email"');
-    expect(html).not.toContain("No sign-in plugin yet");
+    expect(html).not.toContain("Install a sign-in plugin");
   });
 });

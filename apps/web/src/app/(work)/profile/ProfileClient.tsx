@@ -81,7 +81,7 @@ export function ProfileClient({ email, signInEnabled }: { email: string; signInE
   }
 
   return (
-    <section className="settings-card">
+    <section className="settings-card max-w-(--form-max)">
       <div className="settings-card-head">
         <div>
           <h2 className="settings-card-title">Your profile</h2>
@@ -100,7 +100,7 @@ export function ProfileClient({ email, signInEnabled }: { email: string; signInE
         </div>
       ) : null}
 
-      <div className="flex max-w-[640px] flex-col gap-4">
+      <div className="flex flex-col gap-4">
         <Field label="Display name" htmlFor="profile-display-name">
           <Input
             id="profile-display-name"
@@ -131,11 +131,11 @@ export function ProfileClient({ email, signInEnabled }: { email: string; signInE
             placeholder={"Stock-outs on top SKUs\nReorder lead times\nWholesale margin"}
           />
         </Field>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-end gap-3">
+          {saved ? <span className="text-sm text-text2">Saved.</span> : null}
           <Button variant="primary" disabled={state !== "ready"} onClick={() => void save()}>
             {state === "saving" ? "Saving…" : "Save profile"}
           </Button>
-          {saved ? <span className="text-sm text-text2">Saved.</span> : null}
         </div>
       </div>
 

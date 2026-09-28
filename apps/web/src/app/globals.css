@@ -191,7 +191,6 @@ html[data-density="comfortable"] {
 .dash-root .icard { padding: var(--d-icard-pad); cursor: default; }
 
 /* ── Actions: triage queue (list + reading pane) in Compact ── */
-html[data-density="compact"] .approvals-root { --page-width: 1120px; }
 .triage-pane { display: none; }
 html[data-density="compact"] .triage-layout {
   display: grid;

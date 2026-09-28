@@ -868,15 +868,6 @@
 .work-timeline .icard .inum {
   display: none;
 }
-/* Headline/metric are flush-left once the ordinal is gone, so drop the
-   indent that kept the detail aligned under it. */
-.work-timeline .icard .dtext {
-  padding-left: 0;
-}
-.work-timeline .icard .dchart {
-  margin-left: 0;
-}
-
 /* ─── Table (a2ui Table) ─── */
 .work-table-wrap {
   width: 100%;

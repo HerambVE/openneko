@@ -2,7 +2,7 @@
    so these styles describe generic structure and field semantics only. */
 
 .apps-overview-root {
-  width: min(100%, 1080px);
+  width: min(100%, var(--content-max));
   min-height: 100vh;
   margin: 0 auto;
   padding: 28px var(--page-gutter) 72px;
@@ -141,13 +141,14 @@
 }
 
 .apps-overview-app-copy > span {
-  max-width: 620px;
+  max-width: 76ch;
   overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: var(--text2);
   font-size: var(--type-body);
   line-height: var(--leading-compact);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .apps-overview-app-copy small {
@@ -671,7 +672,7 @@
   color: var(--on-accent);
 }
 
-.app-chat-composer button:disabled { cursor: default; opacity: 0.4; }
+.app-chat-composer button:disabled { cursor: not-allowed; background: var(--neutral); color: var(--text3); opacity: 0.72; }
 .app-chat-composer button svg { width: 13px; height: 13px; }
 .app-chat-error { margin: 6px 2px 0; color: var(--danger); font-size: var(--type-caption); }
 

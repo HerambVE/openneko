@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import CreatorCredit from "@/components/CreatorCredit";
 import PageHeading from "@/components/PageHeading";
@@ -189,9 +190,8 @@ export default function RulesClient() {
     <>
       <div
         className="root"
-        style={{ "--page-width": "min(1000px, 100%)" } as React.CSSProperties}
       >
-        <AppHeader back={{ href: "/admin", label: "Administration" }}>
+        <AppHeader back={{ href: "/admin", label: "Admin" }}>
           <SectionNav current="admin" />
         </AppHeader>
 
@@ -207,7 +207,8 @@ export default function RulesClient() {
               )
             }
           >
-            + New rule
+            <Plus aria-hidden="true" />
+            New rule
           </Button>
           }
         />
@@ -254,6 +255,10 @@ export default function RulesClient() {
                 No rules match “{query}”.
               </div>
             ) : (
+              <section className="mt-8">
+              <h2 className="mb-2.5 font-display text-ui-section font-bold tracking-[-0.01em] text-text">
+                Rules
+              </h2>
               <ul className="list-none p-0 m-0 flex flex-col gap-2">
                 {filteredPolicies?.map((p) => (
                   <PolicyCard
@@ -268,6 +273,7 @@ export default function RulesClient() {
                   />
                 ))}
               </ul>
+              </section>
             )}
           </>
         )}
@@ -425,7 +431,7 @@ function InstalledPluginsSection({
   }
 
   return (
-    <section className="mb-6">
+    <section className="mt-8 mb-6">
       <div className="flex items-baseline justify-between mb-2.5">
         <h2 className="font-display text-ui-section font-bold tracking-[-0.01em] text-text">
           Installed plugins

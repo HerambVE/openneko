@@ -65,9 +65,11 @@ function formatRelative(iso: string): string {
   return `${days}d ago`;
 }
 
+const RUNS_PAGE_SIZE = 25;
+
 function formatDuration(ms: number | null): string {
   if (ms == null) return "running";
-  if (ms < 1000) return `${ms}ms`;
+  if (ms < 1000) return "<1s";
   const s = Math.round(ms / 1000);
   if (s < 60) return `${s}s`;
   return `${Math.floor(s / 60)}m ${s % 60}s`;
@@ -94,9 +96,21 @@ function statusVariant(status: string): BadgeVariant {
   }
 }
 
+// Summaries are agent Markdown; the list card shows them as plain text.
+function plainSummary(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/(\*\*|__)(.*?)\1/g, "$2")
+    .replace(/^\s{0,3}(#{1,6}|[-*+]|\d+\.)\s+/gm, "")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function describeRun(run: WorkflowRunRow): string {
   if (run.error) return run.error;
-  if (run.summary?.trim()) return run.summary;
+  if (run.summary?.trim()) return plainSummary(run.summary);
   if (run.outputCount > 0 || run.actionCount > 0) {
     const parts = [];
     if (run.outputCount > 0) {
@@ -133,6 +147,7 @@ function RunsPageInner() {
   const [data, setData] = useState<RunsPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [shown, setShown] = useState(RUNS_PAGE_SIZE);
 
   const load = useCallback(async () => {
     try {
@@ -168,6 +183,7 @@ function RunsPageInner() {
 
   const switchFilter = useCallback((next: StatusFilter) => {
     setFilter(next);
+    setShown(RUNS_PAGE_SIZE);
     const url = new URL(window.location.href);
     if (next === "all") url.searchParams.delete("status");
     else url.searchParams.set("status", next);
@@ -206,7 +222,10 @@ function RunsPageInner() {
           <SearchInput
             label="Search run history"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setShown(RUNS_PAGE_SIZE);
+            }}
             placeholder="Search workflows, triggers, and results"
           />
         </div>
@@ -237,7 +256,7 @@ function RunsPageInner() {
           </div>
         ) : (
           <ul className="list-none p-0 m-0 flex flex-col gap-2.5">
-            {visibleRuns.map((run) => (
+            {visibleRuns.slice(0, shown).map((run) => (
               <li key={run.id}>
                 <Button
                   variant="secondary"
@@ -314,6 +333,16 @@ function RunsPageInner() {
             ))}
           </ul>
         )}
+        {data && visibleRuns.length > shown ? (
+          <div className="mt-4 flex justify-center">
+            <Button
+              size="sm"
+              onClick={() => setShown((current) => current + RUNS_PAGE_SIZE)}
+            >
+              Show {Math.min(RUNS_PAGE_SIZE, visibleRuns.length - shown)} more runs
+            </Button>
+          </div>
+        ) : null}
       </div>
       <CreatorCredit />
     </>

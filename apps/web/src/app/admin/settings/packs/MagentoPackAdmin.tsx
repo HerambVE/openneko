@@ -373,8 +373,8 @@ export default function MagentoPackAdmin({ fixture }: { fixture?: MagentoPackAdm
   const visibleRules = management?.rules.filter((item) => !item.isTest) ?? [];
 
   return (
-    <div className="root" style={{ "--page-width": "min(1000px, 100%)" } as React.CSSProperties}>
-      <AppHeader back={{ href: "/admin/settings", label: "All settings" }}>
+    <div className="root">
+      <AppHeader back={{ href: "/admin/settings", label: "Settings" }}>
         <SectionNav current="admin" />
       </AppHeader>
       <PageHeading

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 
 type GraphjinConfigSettings = {
@@ -58,13 +59,9 @@ export default function GraphjinConfigControls({
             approved source, role, and access updates.
           </p>
         </div>
-        <span
-          className={`text-xs font-bold uppercase tracking-[0.12em] ${
-            enabled ? "text-success-ink" : "text-text3"
-          }`}
-        >
+        <Badge variant={enabled ? "success" : "muted"}>
           {saving ? "Saving" : enabled ? "Enabled" : "Disabled"}
-        </span>
+        </Badge>
       </div>
 
       <div className="mt-4">

@@ -2,7 +2,6 @@
 /* All operating-loop surfaces share max-width: 1000px so the AppHeader nav
    row sits at the same x-position across pages. Briefing (740) and Ask
    (existing) intentionally stay narrower per their editorial intent. */
-.workflows-root { --page-width: 1000px; }
 
 .workflows-new-btn {
   padding: 9px 16px;
@@ -763,7 +762,6 @@
 }
 
 /* ─── WORKFLOW BUILDER (authoring chat) ─── */
-.builder-root { --page-width: 1000px; }
 
 .builder-layout {
   display: grid;
@@ -1003,6 +1001,19 @@
 }
 
 .workflow-api-panel { scroll-margin-top: 16px; }
+
+/* On the settings page the panel sits inside a card, so it drops the
+   inspector's label column and its own padding. */
+.settings-workflow-api {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.settings-workflow-api .workflow-detail-section {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  padding: 0;
+  border-bottom: 0;
+}
 
 .workflow-api-heading {
   display: flex;

@@ -58,7 +58,7 @@ export function EffectiveAccessSheet({ userId, email }: { userId: string; email:
       }}
     >
       <SheetTrigger asChild>
-        <Button size="sm" variant="ghost">Access</Button>
+        <Button size="sm">Access</Button>
       </SheetTrigger>
       <SheetContent className="w-full overflow-y-auto sm:max-w-md">
         <SheetHeader>

@@ -523,6 +523,7 @@ export default function AppRail({ initial }: { initial?: RailIdentity }) {
                 <span className="sr-only">Choose an app</span>
                 <Database aria-hidden="true" strokeWidth={2} />
                 <NativeSelect
+                  title={activeRecordApp?.label ?? "Choose an app"}
                   value={activeRecordApp?.appId ?? ""}
                   onChange={(event) => {
                     if (event.target.value)

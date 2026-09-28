@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import AppHeader from "@/components/AppHeader";
 import CreatorCredit from "@/components/CreatorCredit";
@@ -99,11 +99,8 @@ export default function SecurityForm({
 
   return (
     <>
-      <div
-        className="root"
-        style={{ "--page-width": "min(1000px, 100%)" } as React.CSSProperties}
-      >
-        <AppHeader back={{ href: "/admin/settings", label: "All settings" }}>
+      <div className="root is-narrow">
+        <AppHeader back={{ href: "/admin/settings", label: "Settings" }}>
           <SectionNav current="admin" />
         </AppHeader>
 
@@ -112,17 +109,29 @@ export default function SecurityForm({
           description="Set the trust floor for plugin and skill installs. Every exception widens the agent’s install surface."
         />
 
-        <section className="flex flex-col gap-6 mt-2">
+        <section className="settings-card flex flex-col gap-6">
           <Toggle
             label="Allow unverified installs"
-            help="Lets operators run `openneko install <pkg> --unverified` (bypasses every marketplace). Use only for plugin authoring or emergency hotfixes. Integrity comes from npm on trust."
+            help={
+              <>
+                Lets operators run <Command>openneko install &lt;pkg&gt; --unverified</Command>,
+                which bypasses every marketplace. Use only for plugin authoring or emergency
+                hotfixes. Integrity comes from npm on trust.
+              </>
+            }
             checked={policy.allowUnverified}
             onChange={(v) => toggle("allowUnverified", v)}
           />
 
           <Toggle
             label="Allow community-skill installs from git URLs"
-            help="Lets operators run `openneko install <git-url>` to pull a skill directly from GitHub / GitLab / Codeberg. Skills are procedural knowledge the agent follows; any shell blocks run inside the agent's OpenShell sandbox."
+            help={
+              <>
+                Lets operators run <Command>openneko install &lt;git-url&gt;</Command> to pull a
+                skill directly from GitHub, GitLab, or Codeberg. Skills are procedural knowledge
+                the agent follows; any shell blocks run inside the agent&apos;s OpenShell sandbox.
+              </>
+            }
             checked={policy.allowGitUrlInstalls}
             onChange={(v) => toggle("allowGitUrlInstalls", v)}
           />
@@ -138,7 +147,7 @@ export default function SecurityForm({
                   key={url}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-bg"
                 >
-                  <code className="flex-1 truncate text-ui-body-sm text-text2">
+                  <code className="min-w-0 flex-1 break-all text-ui-body-sm text-text2">
                     {url}
                   </code>
                   {url === OFFICIAL_MARKETPLACE_URL ? (
@@ -177,8 +186,8 @@ export default function SecurityForm({
           </Field>
 
           <div className="flex justify-end mt-2">
-            <Button type="button" onClick={save} disabled={saving}>
-              {saving ? "Saving…" : "Save"}
+            <Button type="button" variant="primary" onClick={save} disabled={saving}>
+              {saving ? "Saving…" : "Save settings"}
             </Button>
           </div>
         </section>
@@ -196,7 +205,7 @@ function Toggle({
   onChange,
 }: {
   label: string;
-  help: string;
+  help: ReactNode;
   checked: boolean;
   onChange: (v: boolean) => void;
 }) {
@@ -211,5 +220,13 @@ function Toggle({
         {help}
       </p>
     </div>
+  );
+}
+
+function Command({ children }: { children: ReactNode }) {
+  return (
+    <code className="rounded-[4px] bg-neutral px-1 py-0.5 font-mono text-ui-caption text-text2">
+      {children}
+    </code>
   );
 }

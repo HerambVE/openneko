@@ -177,14 +177,14 @@ export default function FindingCard({
               </span>
             </span>
             <span className="opacity-50">·</span>
-            <span className="font-mono text-xs text-text2">
+            <span className="text-xs tabular-nums text-text2">
               {formatRelative(data.createdAt)}
             </span>
             {(data.seenCount ?? 1) > 1 && (
               <>
                 <span className="opacity-50">·</span>
                 <span
-                  className="font-mono text-xs text-text2"
+                  className="text-xs tabular-nums text-text2"
                   title={
                     data.lastSeenAt
                       ? `last seen ${formatRelative(data.lastSeenAt)}`

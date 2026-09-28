@@ -9,7 +9,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Field, Input, NativeSelect } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
 import { SearchInput } from "@/components/ui/search-input";
-import { EmptyState } from "@/components/ui/empty";
 import {
   Table,
   TableBody,
@@ -152,11 +151,14 @@ export function UsersClient({
       {/* A user row without a sign-in plugin promises an account nobody
           can reach, and asks a real person for their address to do it. */}
       {!signInProvider && !identitySetup ? (
-        <EmptyState
-          title="No sign-in plugin yet"
-          body="Install a sign-in plugin, such as Email link or Scalekit, and this page will add the people who use it. Until then this installation runs as a single operator."
-          action={<Button asChild><Link href="/admin/plugins">Open Plugins</Link></Button>}
-        />
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-control border border-border bg-neutral-soft px-4 py-3">
+          <p className="text-ui-body-sm text-text2">
+            Install a sign-in plugin, such as Email link or Scalekit, to add other people.
+          </p>
+          <Button asChild size="sm">
+            <Link href="/admin/plugins">Open Plugins</Link>
+          </Button>
+        </div>
       ) : (
       <form
         onSubmit={createUser}
@@ -222,7 +224,7 @@ export function UsersClient({
       ) : (
         <div className="overflow-x-auto">
           <Table className="w-full border-collapse text-left text-sm">
-            <TableHeader className="text-ui-label uppercase tracking-[0.12em] text-text3">
+            <TableHeader>
               <TableRow>
                 <TableHead className="border-b border-border px-3 py-2 font-bold">
                   User
@@ -316,7 +318,7 @@ export function UsersClient({
 
 function RoleBadge({ role }: { role: string }) {
   const isAdmin = role === "admin";
-  return <Badge variant={isAdmin ? "success" : "muted"}>{isAdmin ? "Administrator" : "Member"}</Badge>;
+  return <Badge variant={isAdmin ? "secondary" : "muted"}>{isAdmin ? "Administrator" : "Member"}</Badge>;
 }
 
 function StatusBadge({ disabled }: { disabled: boolean }) {
