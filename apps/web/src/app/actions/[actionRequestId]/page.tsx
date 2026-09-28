@@ -7,6 +7,13 @@ import { ActionChanges, hasActionChanges } from "@/components/ActionChanges";
 import CreatorCredit from "@/components/CreatorCredit";
 import PageHeading from "@/components/PageHeading";
 import SectionNav from "@/components/SectionNav";
+import {
+  OUTCOME_LABEL,
+  actionOutcome,
+  describeOutcome,
+  type ActionOutcome,
+  systemForActionKind,
+} from "@/lib/action-outcome";
 import { cn } from "@/lib/cn";
 import {
   parseRecordUpdatePayload,
@@ -72,32 +79,20 @@ type ActionDetailPayload = {
   approverKind: "operator" | "policy" | "auto" | null;
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  pending_approval: "Waiting for you",
-  approved: "Approved",
-  rejected: "Rejected",
-  executed: "Completed",
-  failed: "Failed",
-};
-
-function statusLabel(s: string): string {
-  return STATUS_LABEL[s] ?? s.replace(/_/g, " ");
-}
-
-function backToActionsHref(status: string): string {
-  if (status === "pending_approval") return "/actions?filter=awaiting";
-  if (status === "rejected" || status === "failed")
-    return "/actions?filter=rejected";
-  if (status === "executed" || status === "approved")
-    return "/actions?filter=fired";
+function backToActionsHref(outcome: ActionOutcome): string {
+  if (outcome === "waiting") return "/actions?filter=awaiting";
+  if (outcome === "rejected") return "/actions?filter=rejected";
+  if (outcome === "failed" || outcome === "needs_check" || outcome === "partial")
+    return "/actions?filter=failed";
+  if (outcome === "completed" || outcome === "approved") return "/actions?filter=fired";
   return "/actions";
 }
 
-function backToActionsLabel(status: string): string {
-  if (status === "pending_approval") return "Awaiting";
-  if (status === "rejected" || status === "failed") return "Rejected";
-  if (status === "executed" || status === "approved") return "Completed";
-  return "Actions";
+function backToActionsLabel(outcome: ActionOutcome): string {
+  if (outcome === "waiting") return "Waiting for you";
+  if (outcome === "rejected") return "Rejected";
+  if (outcome === "failed" || outcome === "needs_check" || outcome === "partial") return "Failed";
+  return "Completed";
 }
 
 function formatTime(iso: string | null): string {
@@ -246,6 +241,16 @@ export default function ActionPage() {
   } = data;
   const isPending = ar.status === "pending_approval";
   const latestExecution = executions[0] ?? null;
+  const resultStatus =
+    latestExecution?.result && typeof latestExecution.result === "object"
+      ? ((latestExecution.result as { status?: unknown }).status as string | undefined)
+      : undefined;
+  const outcome = actionOutcome(ar.status, resultStatus ?? latestExecution?.status);
+  const outcomeSentence = describeOutcome(
+    outcome,
+    latestExecution?.error ?? ar.rejectionReason,
+    systemForActionKind(ar.kind),
+  );
   const recordUpdate = parseRecordUpdatePayload(ar.kind, ar.payload);
 
   return (
@@ -253,8 +258,8 @@ export default function ActionPage() {
       <div className="root run-root">
         <AppHeader
           back={{
-            href: backToActionsHref(ar.status),
-            label: backToActionsLabel(ar.status),
+            href: backToActionsHref(outcome),
+            label: backToActionsLabel(outcome),
           }}
         >
           <SectionNav current="actions" />
@@ -262,11 +267,11 @@ export default function ActionPage() {
 
         <PageHeading
           title={ar.summary || ar.kind}
-          meta={statusLabel(ar.status)}
+          meta={OUTCOME_LABEL[outcome]}
           description={[
             ar.kind,
             ar.target,
-            ar.riskLevel ? `risk ${ar.riskLevel}` : null,
+            ar.riskLevel ? `${ar.riskLevel.charAt(0).toUpperCase()}${ar.riskLevel.slice(1)} risk` : null,
             formatRelative(ar.createdAt),
           ]
             .filter(Boolean)
@@ -326,10 +331,7 @@ export default function ActionPage() {
                   <span className="tabular-nums">{formatTime(ar.approvedAt)}</span>
                   <span className="text-text3/70"> · </span>
                   {approverKind === "operator" && (
-                    <span>
-                      by operator{" "}
-                      <span className="font-mono">{ar.approvedByUserId}</span>
-                    </span>
+                    <span title={ar.approvedByUserId ?? undefined}>by an operator</span>
                   )}
                   {approverKind === "policy" && policy && (
                     <span>
@@ -356,10 +358,14 @@ export default function ActionPage() {
                   <span
                     className={cn(
                       "inline-block px-2 py-0.5 rounded-full text-ui-caption font-semibold",
-                      actionStatusClasses(latestExecution.status),
+                      outcome === "needs_check" || outcome === "partial"
+                        ? "bg-watch-soft text-warn-ink"
+                        : actionStatusClasses(latestExecution.status),
                     )}
                   >
-                    {latestExecution.status}
+                    {outcome === "completed" || outcome === "approved"
+                      ? "Succeeded"
+                      : OUTCOME_LABEL[outcome]}
                   </span>
                   {latestExecution.finishedAt && (
                     <>
@@ -369,9 +375,21 @@ export default function ActionPage() {
                       </span>
                     </>
                   )}
-                  {latestExecution.error && (
-                    <div className="mt-1.5 px-2.5 py-2 bg-danger-soft text-danger rounded-lg font-mono text-ui-body-sm">
-                      {latestExecution.error}
+                  {outcomeSentence && (
+                    <div
+                      className={cn(
+                        "mt-2 rounded-lg px-3 py-2.5 text-ui-body-sm leading-[1.5]",
+                        outcome === "failed"
+                          ? "bg-danger-soft text-danger"
+                          : "bg-watch-soft text-warn-ink",
+                      )}
+                    >
+                      {outcomeSentence}
+                      {latestExecution.error ? (
+                        <span className="mt-1 block font-mono text-ui-caption opacity-75">
+                          {latestExecution.error}
+                        </span>
+                      ) : null}
                     </div>
                   )}
                 </>

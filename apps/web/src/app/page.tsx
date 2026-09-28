@@ -37,6 +37,7 @@ import {
   type AwaitingPayload,
 } from "@/lib/dashboard-actions";
 import { readBriefingMessages } from "@/lib/briefing-messages";
+import { useApprovalDecisions } from "@/hooks/useApprovalDecisions";
 
 type ElevatedCard = {
   id: string;
@@ -291,6 +292,11 @@ export default function Dashboard() {
       // best-effort
     }
   }, []);
+
+  const decisions = useApprovalDecisions(fetchAwaiting);
+  const awaitingRows = (awaiting?.actions ?? []).filter((a) => !decisions.hiddenIds.has(a.id));
+  const pendingCount = Math.max(0, (awaiting?.count ?? 0) - decisions.hiddenIds.size);
+  const decisionLabel = (id: string) => awaitingRows.find((a) => a.id === id)?.summary ?? "";
 
   const fetchHoursSaved = useCallback(async () => {
     try {
@@ -581,12 +587,12 @@ export default function Dashboard() {
                 )}
               </div>
               <h1 className="dash-command-head">
-                {awaiting && awaiting.count > 0 ? (
+                {pendingCount > 0 ? (
                   <>
                     <span className="dash-command-n">
-                      {awaiting.count} decision{awaiting.count === 1 ? "" : "s"}
+                      {pendingCount} decision{pendingCount === 1 ? "" : "s"}
                     </span>{" "}
-                    {awaiting.count === 1 ? "needs" : "need"} you.
+                    {pendingCount === 1 ? "needs" : "need"} you.
                   </>
                 ) : (
                   greeting || "You are all caught up."
@@ -614,7 +620,7 @@ export default function Dashboard() {
               />
             )}
 
-            {awaiting && awaiting.actions.length > 0 && (
+            {awaitingRows.length > 0 && (
               <section
                 className="dash-call"
                 style={{ animation: "fadeUp 0.5s ease 0.2s both" }}
@@ -624,15 +630,30 @@ export default function Dashboard() {
                   <span className="dash-call-dot" aria-hidden="true" />
                   <span className="dash-call-label">Waiting for your decision</span>
                   <span className="dash-call-count tabular-nums">
-                    {awaiting.count}
+                    {pendingCount}
                   </span>
                   <Link className="dash-call-skim" href="/actions?filter=awaiting">
                     Open all
                   </Link>
                 </div>
                 <div className="act-list">
-                  {groupAwaiting(awaiting.actions).map((group, i) => (
-                    <ActCard key={group.key} data={group.card} index={i} />
+                  {groupAwaiting(awaitingRows).map((group, i) => (
+                    <ActCard
+                      key={group.key}
+                      data={group.card}
+                      index={i}
+                      rejectingRowId={decisions.rejectingId}
+                      rejectReason={decisions.rejectReason}
+                      onRejectReasonChange={decisions.setRejectReason}
+                      onCancelReject={decisions.cancelReject}
+                      onSubmitReject={() =>
+                        decisions.submitReject(
+                          decisions.rejectingId ? decisionLabel(decisions.rejectingId) : "",
+                        )
+                      }
+                      onApproveRow={(id) => decisions.approve(id, decisionLabel(id))}
+                      onBeginRejectRow={decisions.beginReject}
+                    />
                   ))}
                 </div>
               </section>

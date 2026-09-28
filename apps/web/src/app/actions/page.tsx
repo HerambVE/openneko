@@ -13,6 +13,13 @@ import ActCard, {
 } from "@/components/ActCard";
 import { ActionChanges } from "@/components/ActionChanges";
 import { Disclosure } from "@/components/ui/disclosure";
+import { useApprovalDecisions } from "@/hooks/useApprovalDecisions";
+import {
+  actionOutcome,
+  describeOutcome,
+  systemForActionKind,
+  type ActionOutcome,
+} from "@/lib/action-outcome";
 import { cn } from "@/lib/cn";
 import { formatSavedShort } from "@/lib/hours-saved";
 import { workflowDisplayName } from "@/lib/workflow-label";
@@ -26,7 +33,7 @@ import { SearchInput } from "@/components/ui/search-input";
 import { Tab, Tabs } from "@/components/ui/tabs";
 import { matchesListSearch } from "@/lib/list-search";
 
-type Filter = "awaiting" | "fired" | "rejected" | "all";
+type Filter = "awaiting" | "fired" | "failed" | "rejected" | "all";
 
 type ActionRow = {
   id: string;
@@ -45,6 +52,8 @@ type ActionRow = {
   approverKind: "operator" | "policy" | "auto" | null;
   approverLabel: string | null;
   rejectionReason: string | null;
+  outcome: ActionOutcome;
+  executionError: string | null;
   runAt: string;
   createdAt: string;
 };
@@ -58,6 +67,7 @@ type ActionsPayload = {
 const TABS: Array<{ key: Filter; label: string }> = [
   { key: "awaiting", label: "Waiting for you" },
   { key: "fired", label: "Completed" },
+  { key: "failed", label: "Failed" },
   { key: "rejected", label: "Rejected" },
   { key: "all", label: "All" },
 ];
@@ -72,8 +82,14 @@ function approverPhrase(
   return null;
 }
 
+function outcomeOf(row: ActionRow): ActionOutcome {
+  return row.outcome ?? actionOutcome(row.status);
+}
+
 function rowToneFor(row: ActionRow): ActRowTone {
-  if (row.status === "rejected" || row.status === "failed") return "action";
+  const outcome = outcomeOf(row);
+  if (outcome === "rejected" || outcome === "failed") return "action";
+  if (outcome === "needs_check" || outcome === "partial") return "watch";
   if (row.status === "pending_approval") {
     if (row.riskLevel === "high" || row.riskLevel === "critical") return "action";
     return "watch";
@@ -83,7 +99,10 @@ function rowToneFor(row: ActionRow): ActRowTone {
 
 function stateFor(row: ActionRow): ActCardData["state"] {
   if (row.status === "pending_approval") return "awaiting";
-  if (row.status === "rejected" || row.status === "failed") return "rejected";
+  const outcome = outcomeOf(row);
+  if (outcome === "rejected") return "rejected";
+  if (outcome === "failed") return "failed";
+  if (outcome === "needs_check" || outcome === "partial") return "needs_check";
   return "live";
 }
 
@@ -91,6 +110,7 @@ function isFilter(value: string | null): value is Filter {
   return (
     value === "awaiting" ||
     value === "fired" ||
+    value === "failed" ||
     value === "rejected" ||
     value === "all"
   );
@@ -147,10 +167,7 @@ function ActionsPageInner() {
   const [filter, setFilter] = useState<Filter>(isFilter(initial) ? initial : "awaiting");
   const [data, setData] = useState<ActionsPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
   const [query, setQuery] = useState("");
   const rowRefs = useRef<Record<string, HTMLLIElement | null>>({});
 
@@ -173,6 +190,16 @@ function ActionsPageInner() {
     }
   }, [filter, focusedId]);
 
+  const {
+    hiddenIds,
+    rejectingId,
+    rejectReason,
+    setRejectReason,
+    approve,
+    beginReject,
+    cancelReject,
+    submitReject,
+  } = useApprovalDecisions(load);
   useEffect(() => {
     const initialLoadId = window.setTimeout(() => {
       void load();
@@ -183,48 +210,17 @@ function ActionsPageInner() {
   const switchFilter = useCallback((next: Filter) => {
     setFilter(next);
     setFocusedId(null);
-    setRejectingId(null);
+    cancelReject();
     const url = new URL(window.location.href);
     if (next === "awaiting") url.searchParams.delete("filter");
     else url.searchParams.set("filter", next);
     window.history.replaceState({}, "", url.toString());
-  }, []);
+  }, [cancelReject]);
 
-  const act = useCallback(
-    async (id: string, decision: "approve" | "reject", reason?: string) => {
-      setBusyId(id);
-      try {
-        await fetch(`/api/action-requests/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ decision, reason }),
-        });
-        await load();
-      } finally {
-        setBusyId(null);
-      }
-    },
-    [load],
+  const labelFor = useCallback(
+    (id: string) => data?.actions.find((a) => a.id === id)?.summary ?? "",
+    [data?.actions],
   );
-
-  const beginReject = useCallback((id: string) => {
-    setRejectingId(id);
-    setRejectReason("");
-  }, []);
-
-  const cancelReject = useCallback(() => {
-    setRejectingId(null);
-    setRejectReason("");
-  }, []);
-
-  const submitReject = useCallback(async () => {
-    if (!rejectingId) return;
-    const id = rejectingId;
-    const reason = rejectReason.trim() || undefined;
-    setRejectingId(null);
-    setRejectReason("");
-    await act(id, "reject", reason);
-  }, [rejectingId, rejectReason, act]);
 
   useEffect(() => {
     if (!focusedId) return;
@@ -237,6 +233,7 @@ function ActionsPageInner() {
   const visibleActions = useMemo(
     () =>
       (data?.actions ?? []).filter((action) =>
+        !hiddenIds.has(action.id) &&
         matchesListSearch(
           query,
           action.summary,
@@ -248,7 +245,7 @@ function ActionsPageInner() {
           action.triggeredByObservation?.title,
         ),
       ),
-    [data?.actions, query],
+    [data?.actions, hiddenIds, query],
   );
   const groups = useMemo(() => groupActions(visibleActions), [visibleActions]);
   const visibleFocusedId = visibleActions.some(
@@ -323,7 +320,7 @@ function ActionsPageInner() {
                   id: r.id,
                   tone: rowToneFor(r),
                   headline: r.summary || r.kind,
-                  detail: null,
+                  detail: describeOutcome(outcomeOf(r), r.executionError, systemForActionKind(r.kind)),
                   target: r.target,
                   kind: r.kind,
                   payload: r.payload,
@@ -341,14 +338,13 @@ function ActionsPageInner() {
                   data={cardData}
                   index={i}
                   focusedRowId={visibleFocusedId}
-                  busyRowId={busyId}
                   rejectingRowId={rejectingId}
                   rejectReason={rejectReason}
                   onRejectReasonChange={setRejectReason}
                   onCancelReject={cancelReject}
-                  onSubmitReject={submitReject}
+                  onSubmitReject={() => submitReject(rejectingId ? labelFor(rejectingId) : "")}
                   onFocusRow={setFocusedId}
-                  onApproveRow={(id) => act(id, "approve")}
+                  onApproveRow={(id) => approve(id, labelFor(id))}
                   onBeginRejectRow={beginReject}
                   rowRef={(id, el) => {
                     rowRefs.current[id] = el;
@@ -362,9 +358,9 @@ function ActionsPageInner() {
                 action={
                   visibleActions.find((a) => a.id === visibleFocusedId) ?? null
                 }
-                busy={busyId !== null && busyId === visibleFocusedId}
+                busy={false}
                 onApprove={() => {
-                  if (visibleFocusedId) void act(visibleFocusedId, "approve");
+                  if (visibleFocusedId) approve(visibleFocusedId, labelFor(visibleFocusedId));
                 }}
                 onReject={() => {
                   if (visibleFocusedId) beginReject(visibleFocusedId);
@@ -493,13 +489,18 @@ function ActionsEmptyState({ filter, onBack }: { filter: Filter; onBack: () => v
         }
       : filter === "fired"
         ? {
-            line: "No actions have fired yet.",
-            sub: "When a workflow proposes an action and your rules approve it, it'll land here.",
+            line: "No completed actions yet.",
+            sub: "Changes that ran and were confirmed in your systems appear here.",
           }
+        : filter === "failed"
+          ? {
+              line: "Nothing failed.",
+              sub: "Approved changes that did not run, or that OpenNeko could not confirm, appear here.",
+            }
         : filter === "rejected"
           ? {
               line: "Nothing rejected.",
-              sub: "Rejected and failed actions land here so you have an audit trail.",
+              sub: "Changes that someone declined appear here with the reason.",
             }
           : {
               line: "No actions yet.",
@@ -512,7 +513,7 @@ function ActionsEmptyState({ filter, onBack }: { filter: Filter; onBack: () => v
       className="py-20"
       action={
         <Button variant="ghost" size="sm" onClick={onBack}>
-          ← Back to briefing
+          Back to Briefing
         </Button>
       }
     />

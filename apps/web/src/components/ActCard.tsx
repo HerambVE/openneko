@@ -32,7 +32,7 @@ export type ActCardData = {
   runId: string | null;
   runAt: string;
   trigger?: string | null;
-  state: "live" | "awaiting" | "rejected";
+  state: "live" | "awaiting" | "rejected" | "failed" | "needs_check";
   workflowName?: string | null;
   rows: ActRowData[];
 };
@@ -49,12 +49,16 @@ const STATE_LABEL: Record<ActCardData["state"], string> = {
   live: "Auto-response live",
   awaiting: "Waiting for you",
   rejected: "Rejected",
+  failed: "Failed",
+  needs_check: "Needs checking",
 };
 
 const STATE_PILL_VARIANT: Record<ActCardData["state"], BadgeVariant> = {
   live: "live",
   awaiting: "watch",
   rejected: "muted",
+  failed: "danger",
+  needs_check: "watch",
 };
 
 const TONE_DOT: Record<ActRowTone, string> = {
