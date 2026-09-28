@@ -1191,11 +1191,13 @@ export default function WorkScreen() {
     <div className="work-command-surface">
       <header className="work-command-head">
         <div className="work-command-copy">
-          <div className="work-command-eyebrow">
-            <span>Work</span>
-            <span className="work-command-slash" aria-hidden="true">/</span>
-            <span data-phase={workPhase}>{workStateLabel}</span>
-          </div>
+          {workPhase !== "prompt" ? (
+            <div className="work-command-eyebrow">
+              <span>Work</span>
+              <span className="work-command-slash" aria-hidden="true">/</span>
+              <span data-phase={workPhase}>{workStateLabel}</span>
+            </div>
+          ) : null}
           <h1 title={threadTitle}>{threadTitle}</h1>
         </div>
         <div className="work-command-actions">
@@ -1523,7 +1525,7 @@ export default function WorkScreen() {
             placeholder={
               sending
                 ? "OpenNeko is working…"
-                : "Describe the job, decision, or question…"
+                : "Ask a question or describe a task…"
             }
             value={draft}
             onChange={(event) =>
@@ -1672,35 +1674,27 @@ const EMPTY_PROMPTS: Array<{ label: string; text: string }> = [
   { label: "Top customers", text: "Who are our top 10 customers by revenue this year?" },
   { label: "Revenue trend", text: "How has revenue changed over the last 4 quarters?" },
   { label: "Inventory risk", text: "Which products are below their reorder threshold?" },
+  { label: "Watch for a change", text: "Set up a workflow that " },
 ];
 
 function EmptyAsk({ onPick }: { onPick: (text: string) => void }) {
   return (
-    <div className="work-empty">
-      <div className="work-empty-statement">
-        <h2>Give<br />OpenNeko<br />a&nbsp;job.</h2>
-        <p>
-          Ask for an answer, investigation, file, or recurring workflow.
-          OpenNeko shows its work while it runs.
-        </p>
-      </div>
-      <div className="work-empty-prompts" aria-label="Example jobs">
-        {EMPTY_PROMPTS.map((prompt, index) => (
+    <div className="ask-start">
+      <h2 className="ask-start-title">What should OpenNeko look into?</h2>
+      <p className="ask-start-copy">
+        Ask about your data, investigate a change, or set up a workflow.
+        OpenNeko shows each step while it works.
+      </p>
+      <div className="ask-start-prompts" aria-label="Example questions">
+        {EMPTY_PROMPTS.map((prompt) => (
           <Button
             key={prompt.label}
-            size="sm"
-            variant="ghost"
-            className="work-empty-prompt"
+            variant="secondary"
+            className="ask-start-prompt"
             onClick={() => onPick(prompt.text)}
           >
-            <span className="work-empty-prompt-no">
-              {index + 1}
-            </span>
-            <span className="work-empty-prompt-copy">
-              <strong>{prompt.label}</strong>
-              <span>{prompt.text}</span>
-            </span>
-            <span className="work-empty-prompt-arrow" aria-hidden="true">↗</span>
+            <strong>{prompt.label}</strong>
+            <span>{prompt.text.trim()}{prompt.text.endsWith(" ") ? "…" : ""}</span>
           </Button>
         ))}
       </div>

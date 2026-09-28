@@ -480,14 +480,10 @@
    headline — the goal is to feel like the assistant's invitation to
    talk, not a marketing landing hero. The text and prompts share the
    transcript's column width so the empty state and a populated thread
-   read as the same container, just differently filled. */
-.work-empty-prompt:hover {
+   read as the same container {
   border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
   background: var(--card);
   transform: translateY(-1px);
-}
-@media (hover: none) {
-  .work-empty-prompt:hover { transform: none; }
 }
 
 .iactions {
