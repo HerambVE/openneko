@@ -220,7 +220,7 @@ export default function MemoryPage() {
           <section className="library-section memory-review">
             <header className="library-section-head">
               <div>
-                <span>Review queue</span>
+                <span>Needs review</span>
                 <h2>Pending suggestions</h2>
               </div>
               <strong>{visiblePending.length}</strong>

@@ -116,97 +116,117 @@ export default async function SettingsPage() {
     (source) => source.authMode === "jwt",
   ).length;
 
-  const cards: {
+  type SettingsCard = {
     href: string;
     title: string;
     copy: string;
     status?: string;
     statusTone?: "success" | "watch" | "neutral";
-  }[] = [
+  };
+  const spentToday = spend.org.day.spentUsd + spend.org.day.heldUsd;
+  const groups: Array<{ title: string; cards: SettingsCard[] }> = [
     {
-      href: "/admin/settings/data",
-      title: "Data source",
-      copy: "GraphJin server endpoint OpenNeko should connect to.",
-      status: dataReady ? "Configured" : "Not set",
-      statusTone: dataReady ? "success" : "watch",
+      title: "Connections",
+      cards: [
+        {
+          href: "/admin/settings/data",
+          title: "Data source",
+          copy: "The connection OpenNeko uses to read your business data.",
+          status: dataReady ? "Connected" : "Not set",
+          statusTone: dataReady ? "success" : "watch",
+        },
+        {
+          href: "/admin/settings/packs",
+          title: "Solution packs",
+          copy: "Install and manage packs for applications such as Magento.",
+          status: "Magento ready",
+          statusTone: "success",
+        },
+        {
+          href: "/admin/settings/graphjin",
+          title: "Data access rules",
+          copy: "How OpenNeko signs in to each source, and what each role can read.",
+          status: graphjinConfig.settings.sourceConfigEnabled
+            ? enabledSources.length === 0
+              ? "Ask-based config on · No source"
+              : `Ask-based config on · ${jwtSources} of ${enabledSources.length} signed`
+            : "Ask-based config off",
+          statusTone: !graphjinConfig.settings.sourceConfigEnabled
+            ? "neutral"
+            : enabledSources.length > 0 && jwtSources === enabledSources.length
+              ? "success"
+              : "watch",
+        },
+      ],
     },
     {
-      href: "/admin/settings/agent",
       title: "Agent",
-      copy: "The Hermes runtime works with any supported primary provider.",
-      status: primaryReady ? "Hermes runtime" : "Primary provider not set",
-      statusTone: primaryReady ? "success" : "watch",
+      cards: [
+        {
+          href: "/admin/settings/agent",
+          title: "Model and provider",
+          copy: "The AI model OpenNeko uses, and the provider that runs it.",
+          status: primaryReady ? "Ready" : "Model not set",
+          statusTone: primaryReady ? "success" : "watch",
+        },
+        {
+          href: "/admin/settings/research",
+          title: "Industry research",
+          copy: "Optional research on your industry that OpenNeko runs during setup.",
+          status: researchStatus === "enabled" ? "On" : "Off",
+          statusTone: researchStatus === "enabled" ? "success" : "neutral",
+        },
+      ],
     },
     {
-      href: "/admin/settings/graphjin",
-      title: "GraphJin config",
-      copy: "Source-mode endpoints and RBAC token claims passed to GraphJin.",
-      status:
-        graphjinConfig.settings.sourceConfigEnabled
-          ? enabledSources.length === 0
-            ? "MCP on · no source"
-            : `MCP on · ${jwtSources}/${enabledSources.length} JWT`
-          : "MCP config off",
-      statusTone: !graphjinConfig.settings.sourceConfigEnabled
-        ? "neutral"
-        : enabledSources.length > 0 && jwtSources === enabledSources.length
-          ? "success"
-          : "watch",
+      title: "Access",
+      cards: [
+        {
+          href: "/admin/settings/sso",
+          title: "Single sign-on",
+          copy: "People sign in with Okta, Entra ID, or another identity provider. Their groups map to roles.",
+          ...authStatus("@open-neko/plugin-scalekit"),
+        },
+        {
+          href: "/admin/settings/signin",
+          title: "Email-link sign-in",
+          copy: "Invited people sign in with a one-time link sent to their email.",
+          ...authStatus("@open-neko/plugin-magic-link"),
+        },
+        {
+          href: "/admin/settings/security",
+          title: "Install policy",
+          copy: "The marketplaces that plugins and skills can come from.",
+          ...securityStatus,
+        },
+      ],
     },
     {
-      href: "/admin/settings/packs",
-      title: "Solution packs",
-      copy: "Connect and administer Magento and future application packs without using the terminal.",
-      status: "Magento ready",
-      statusTone: "success",
-    },
-    {
-      href: "/admin/settings/research",
-      title: "Research",
-      copy: "Optional industry research run during onboarding.",
-      status: researchStatus === "enabled" ? "Enabled" : "Disabled",
-      statusTone: researchStatus === "enabled" ? "success" : "neutral",
+      title: "Spending",
+      cards: [
+        {
+          href: "/admin/settings/spend",
+          title: "Spending limits",
+          copy: "Caps on AI model spend per run, per hour, and per day.",
+          status:
+            spend.alerts.length > 0
+              ? `${spend.alerts.length} open ${spend.alerts.length === 1 ? "alert" : "alerts"}`
+              : `$${spentToday.toFixed(2)} of $${spend.org.day.limitUsd.toFixed(2)} today`,
+          statusTone:
+            spend.alerts.length > 0 || spentToday >= (spend.org.day.limitUsd * spend.limits.warnPercent) / 100
+              ? "watch"
+              : "success",
+        },
+        {
+          href: "/admin/settings/workflows",
+          title: "Workflow API limits",
+          copy: "Budgets for workflows that other systems start through the API.",
+          status: workflowOrgLimits.rows.length > 0 ? "Custom budget" : "Default budget",
+          statusTone: "neutral",
+        },
+      ],
     },
   ];
-  cards.push({
-    href: "/admin/settings/sso",
-    title: "Single sign-on",
-    copy: "Connect your IdP (Okta, Entra ID, and others) through Scalekit and map groups to roles.",
-    ...authStatus("@open-neko/plugin-scalekit"),
-  });
-  cards.push({
-    href: "/admin/settings/signin",
-    title: "Email-link sign-in",
-    copy: "Passwordless magic-link sign-in for provisioned users: email delivery, first admins, and gate status.",
-    ...authStatus("@open-neko/plugin-magic-link"),
-  });
-  const spentToday = spend.org.day.spentUsd + spend.org.day.heldUsd;
-  cards.push({
-    href: "/admin/settings/spend",
-    title: "Spending limits",
-    copy: "Per-run cap and hourly and daily budgets for model spend across chat, channels, workflows and the API.",
-    status:
-      spend.alerts.length > 0
-        ? `${spend.alerts.length} open ${spend.alerts.length === 1 ? "alert" : "alerts"}`
-        : `$${spentToday.toFixed(2)} of $${spend.org.day.limitUsd.toFixed(2)} today`,
-    statusTone:
-      spend.alerts.length > 0 || spentToday >= (spend.org.day.limitUsd * spend.limits.warnPercent) / 100
-        ? "watch"
-        : "success",
-  });
-  cards.push({
-    href: "/admin/settings/workflows",
-    title: "Workflow API limits",
-    copy: "Organization budgets and per-workflow runtime, call, token, and artifact limits.",
-    status: workflowOrgLimits.rows.length > 0 ? "Custom budget" : "Default budget",
-    statusTone: "neutral",
-  });
-  cards.push({
-    href: "/admin/settings/security",
-    title: "Security",
-    copy: "Trust floor for plugin and skill installs: which marketplaces are allowed, and whether unverified or community installs are permitted.",
-    ...securityStatus,
-  });
 
   return (
     <div className="root">
@@ -215,34 +235,41 @@ export default async function SettingsPage() {
       </AppHeader>
       <PageHeading
         title="Workspace settings"
-        description="Configure the agent runtime, data access, research, and trust policy."
+        description="Connections, the agent, sign-in, and spending for this workspace."
       />
 
-      <div className="settings-index-grid">
-        {cards.map((card) => (
-          <Link
-            key={card.href}
-            href={card.href}
-            className="settings-card settings-index-card no-underline"
-          >
-            <div className="settings-index-card-top">
-              <h2 className="settings-card-title">{card.title}</h2>
-              <ArrowUpRight className="settings-index-card-arrow" aria-hidden="true" />
-            </div>
-            <p className="settings-card-copy">{card.copy}</p>
-            {card.status ? (
-              <div className="settings-index-card-foot">
-                <span
-                  className="settings-index-status"
-                  data-tone={card.statusTone ?? "neutral"}
-                >
-                  {card.status}
-                </span>
-              </div>
-            ) : null}
-          </Link>
-        ))}
-      </div>
+      {groups.map((group) => (
+        <section key={group.title} className="settings-index-group" aria-labelledby={`settings-${group.title}`}>
+          <h2 id={`settings-${group.title}`} className="settings-index-group-title">
+            {group.title}
+          </h2>
+          <div className="settings-index-grid">
+            {group.cards.map((card) => (
+              <Link
+                key={card.href}
+                href={card.href}
+                className="settings-card settings-index-card no-underline"
+              >
+                <div className="settings-index-card-top">
+                  <h3 className="settings-card-title">{card.title}</h3>
+                  <ArrowUpRight className="settings-index-card-arrow" aria-hidden="true" />
+                </div>
+                <p className="settings-card-copy">{card.copy}</p>
+                {card.status ? (
+                  <div className="settings-index-card-foot">
+                    <span
+                      className="settings-index-status"
+                      data-tone={card.statusTone ?? "neutral"}
+                    >
+                      {card.status}
+                    </span>
+                  </div>
+                ) : null}
+              </Link>
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }
