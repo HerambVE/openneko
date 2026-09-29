@@ -9,6 +9,7 @@ import SectionNav from "@/components/SectionNav";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/field";
 import { adminApi } from "@/components/admin/admin-api";
+import { targetPatterns } from "../RulesClient";
 
 type PolicyDetail = {
   policy: {
@@ -150,6 +151,31 @@ export default function PolicyDetailClient({ policyId }: { policyId: string }) {
                 </span>
               </div>
             </Field>
+
+            {(["allowedTargets", "deniedTargets"] as const).map((key) => {
+              const patterns = targetPatterns(policy[key]);
+              if (patterns.length === 0) return null;
+              const onMissNext = key === "allowedTargets" && policy.allowedTargets?.on_miss === "next";
+              return (
+                <Field key={key} label={key === "allowedTargets" ? "Allowed targets" : "Denied targets"}>
+                  <div className="text-ui-body-sm text-text">
+                    {patterns.map((p) => (
+                      <code
+                        key={p}
+                        className="font-mono text-ui-caption bg-neutral-soft text-text2 px-1.5 py-0.5 rounded mr-1.5"
+                      >
+                        {p}
+                      </code>
+                    ))}
+                    {key === "allowedTargets" ? (
+                      <span className="text-text3 ml-1">
+                        · {onMissNext ? "any other target goes to the next rule" : "any other target is denied"}
+                      </span>
+                    ) : null}
+                  </div>
+                </Field>
+              );
+            })}
 
             {policy.riskThresholdAutoApprove && (
               <Field label="Auto-approve">

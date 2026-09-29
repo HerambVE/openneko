@@ -74,10 +74,14 @@ function describeTargets(
   obj: Record<string, unknown> | null,
   label: "Allowed" | "Denied",
 ): string | null {
-  if (!obj) return null;
-  const keys = Object.keys(obj);
-  if (keys.length === 0) return null;
-  return `${label} targets: ${keys.join(", ")}`;
+  const patterns = targetPatterns(obj);
+  if (patterns.length === 0) return null;
+  const miss = label === "Allowed" && obj?.on_miss === "next" ? "; others go to the next rule" : "";
+  return `${label} targets: ${patterns.join(", ")}${miss}`;
+}
+
+export function targetPatterns(obj: Record<string, unknown> | null): string[] {
+  return Array.isArray(obj?.patterns) ? obj.patterns.filter((p): p is string => typeof p === "string") : [];
 }
 
 function describeLimits(limits: Record<string, unknown>): string | null {

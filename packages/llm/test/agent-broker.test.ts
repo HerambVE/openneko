@@ -151,6 +151,59 @@ describe("startAgentBroker token registry", () => {
       await handle.close();
     }
   });
+
+  it("decides an action request's status from the rules, not the sandbox", async () => {
+    const cp = stubControlPlane();
+    cp.evaluateActionPolicy = vi.fn(async () => ({
+      decision: "needs_approval" as const,
+      mode: "approval_required" as const,
+      policy: { id: "ask-policy" } as never,
+    }));
+    cp.createActionRequest = vi.fn(async () => ({ id: "req-1", status: "pending_approval" }));
+    const handle = await startAgentBroker({ controlPlane: cp, port: 0 });
+    try {
+      const token = handle.tokenFor({ runId: "run-1", orgId: "org-1", kind: "work" });
+      const response = await fetch(new URL("/v1/action/request", `http://127.0.0.1:${handle.port}`), {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          scope: "external",
+          kind: "send_email",
+          payload: { to: ["x@gmail.com"] },
+          status: "approved",
+          policyId: "forged",
+        }),
+      });
+      expect(response.status).toBe(200);
+      expect(cp.evaluateActionPolicy).toHaveBeenCalledWith(
+        expect.objectContaining({ orgId: "org-1", kind: "send_email", payload: { to: ["x@gmail.com"] } }),
+      );
+      expect(cp.createActionRequest).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "pending_approval", policyId: "ask-policy", orgId: "org-1" }),
+      );
+    } finally {
+      await handle.close();
+    }
+  });
+
+  it("refuses an action request that the rules deny", async () => {
+    const cp = stubControlPlane();
+    cp.evaluateActionPolicy = vi.fn(async () => ({ decision: "no_policy" as const, reason: "no_matching_policy" as const }));
+    cp.createActionRequest = vi.fn();
+    const handle = await startAgentBroker({ controlPlane: cp, port: 0 });
+    try {
+      const token = handle.tokenFor({ runId: "run-1", orgId: "org-1", kind: "work" });
+      const response = await fetch(new URL("/v1/action/request", `http://127.0.0.1:${handle.port}`), {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify({ scope: "external", kind: "send_email", status: "approved" }),
+      });
+      expect(response.status).toBe(403);
+      expect(cp.createActionRequest).not.toHaveBeenCalled();
+    } finally {
+      await handle.close();
+    }
+  });
 });
 
 describe("ensureAgentBroker (SEC9: always on)", () => {

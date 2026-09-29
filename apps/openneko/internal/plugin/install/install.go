@@ -538,6 +538,7 @@ func convertCapabilities(c marketplace.Capabilities) manifest.Capabilities {
 				Kind:        a.Kind,
 				Description: a.Description,
 				DefaultMode: a.DefaultMode,
+				Targets:     a.Targets,
 			}
 		}
 		out.Action = &manifest.ActionCapability{Kinds: acts}

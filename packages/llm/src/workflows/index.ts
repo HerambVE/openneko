@@ -258,6 +258,13 @@ export {
   type PolicyRequestSubject,
 } from "./policy-engine";
 export {
+  deriveActionTargets,
+  getActionTargetSpec,
+  syncPluginActionTargetSpecs,
+  withActionTargets,
+  type ActionTargetSpec,
+} from "./action-targets";
+export {
   buildWorkflowActionServer,
   handleWorkActionRequest,
   type HandleWorkActionRequestResult,

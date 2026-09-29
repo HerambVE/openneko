@@ -1863,6 +1863,7 @@ function buildGovernedActionServer(
             typeof args.target === "string" && args.target.length > 0
               ? args.target
               : null,
+          payload: (args.payload as Record<string, unknown> | undefined) ?? null,
           riskLevel: (args.risk_level as RiskLevel | undefined) ?? null,
         });
 

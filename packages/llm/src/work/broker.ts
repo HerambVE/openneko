@@ -127,16 +127,37 @@ async function handle(
             } as Parameters<AgentControlPlane["evaluateActionPolicy"]>[0]),
         }),
       );
-    case "/v1/action/request":
+    case "/v1/action/request": {
+      // The sandbox's status and policyId are claims. The broker decides both
+      // from the rules, so code in the box cannot create an approved request.
+      const input = {
+        ...body,
+        orgId: binding.orgId,
+        workRunId: binding.runId,
+      } as Parameters<AgentControlPlane["createActionRequest"]>[0];
+      const decision = await cp.evaluateActionPolicy({
+        orgId: binding.orgId,
+        scope: input.scope,
+        kind: input.kind,
+        target: input.target ?? null,
+        payload: input.payload ?? null,
+        riskLevel: input.riskLevel ?? null,
+      });
+      if (decision.decision === "deny" || decision.decision === "no_policy") {
+        return send(res, 403, { error: `action ${input.kind} denied: ${decision.reason}` });
+      }
+      const status =
+        input.status === "draft"
+          ? "draft"
+          : input.status === "approved" && decision.decision === "allow"
+            ? "approved"
+            : "pending_approval";
       return send(
         res,
         200,
-        await cp.createActionRequest({
-          ...body,
-          orgId: binding.orgId,
-          workRunId: binding.runId,
-        } as Parameters<AgentControlPlane["createActionRequest"]>[0]),
+        await cp.createActionRequest({ ...input, policyId: decision.policy.id, status }),
       );
+    }
     case "/v1/action/enqueue":
       await cp.enqueueActionExecute({
         orgId: binding.orgId,

@@ -31,8 +31,10 @@ export function buildRuleBuilderServer(ctx: RuleBuilderContext) {
       "if a rule with the same name already exists, it is updated in place.",
       "Use this when the operator asks to gate, allow, or deny specific action",
       "kinds (e.g. 'auto-approve low-risk slack posts', 'always ask before",
-      "sending email externally'). After saving, the tool emits a confirmation",
-      "card the operator can click to open the rule.",
+      "sending email externally'). To send without approval only to approved",
+      "recipients, use allowed_targets with on_miss 'next' so any other",
+      "recipient falls to the rule that asks. After saving, the tool emits a",
+      "confirmation card the operator can click to open the rule.",
     ].join(" "),
     POLICY_SAVE_SCHEMA.shape,
     async (args) => {

@@ -52,6 +52,7 @@ export async function handleWorkflowActionViaControlPlane(
     scope: args.scope as ActionScope,
     kind: args.kind,
     target: args.target ?? null,
+    payload: args.payload ?? null,
     riskLevel: (args.risk_level as RiskLevel | undefined) ?? null,
   });
 

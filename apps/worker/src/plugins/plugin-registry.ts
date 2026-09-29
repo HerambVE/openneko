@@ -31,6 +31,7 @@ import { randomBytes } from "node:crypto";
 import { createRequire } from "node:module";
 import path from "node:path";
 import {
+  ActionTargetSpec,
   ApplyDirectoryChangeRpcParams,
   ApplyDirectoryChangeRpcResult,
   ListDirectoryRpcParams,
@@ -1693,13 +1694,11 @@ export class PluginRegistry {
 }
 
 /**
- * The marketplace schema doesn't carry action `example` payloads, and the Go
- * install path drops them — so a marketplace-installed manifest has none. The
- * agent prompt relies on examples to get payload shapes right (small models
- * otherwise invent wrong shapes), so read them back from each installed
- * package's own package.json (which always carries them) and fill any kind
- * whose manifest entry is missing one. No-ops for the source-build dev
- * manifest, which already carries examples.
+ * Older install paths drop action `example` and `targets` from the manifest.
+ * The agent prompt relies on examples to get payload shapes right, and rules
+ * rely on targets to match real recipients, so read both back from each
+ * installed package's own package.json and fill any kind that lacks them.
+ * No-ops for the source-build dev manifest, which already carries both.
  */
 async function enrichExamplesFromPackages(
   manifest: PluginManifest | null,
@@ -1708,30 +1707,31 @@ async function enrichExamplesFromPackages(
   if (!manifest) return;
   for (const entry of manifest.plugins) {
     const kinds = entry.capabilities.action?.kinds;
-    if (!kinds?.length || kinds.every((k) => k.example !== undefined)) continue;
-    let byKind: Map<string, Record<string, unknown>>;
+    if (!kinds?.length || kinds.every((k) => k.example !== undefined && k.targets !== undefined)) continue;
+    let byKind: Map<string, { example?: unknown; targets?: unknown }>;
     try {
       const pkgPath = path.join(installDir, "node_modules", entry.name, "package.json");
       const pkg = JSON.parse(await readFile(pkgPath, "utf8")) as {
         openneko?: {
-          capabilities?: { action?: { kinds?: Array<{ kind?: string; example?: unknown }> } };
+          capabilities?: { action?: { kinds?: Array<{ kind?: string; example?: unknown; targets?: unknown }> } };
         };
       };
       byKind = new Map(
         (pkg.openneko?.capabilities?.action?.kinds ?? [])
-          .filter(
-            (k): k is { kind: string; example: Record<string, unknown> } =>
-              typeof k.kind === "string" && !!k.example && typeof k.example === "object",
-          )
-          .map((k) => [k.kind, k.example]),
+          .filter((k): k is { kind: string; example?: unknown; targets?: unknown } => typeof k.kind === "string")
+          .map((k) => [k.kind, k]),
       );
     } catch {
-      continue; // package unreadable → leave manifest examples untouched
+      continue; // package unreadable → leave the manifest untouched
     }
     for (const decl of kinds) {
-      if (decl.example === undefined) {
-        const ex = byKind.get(decl.kind);
-        if (ex) decl.example = ex;
+      const fromPkg = byKind.get(decl.kind);
+      if (decl.example === undefined && fromPkg?.example && typeof fromPkg.example === "object") {
+        decl.example = fromPkg.example as Record<string, unknown>;
+      }
+      if (decl.targets === undefined && fromPkg?.targets !== undefined) {
+        const parsed = ActionTargetSpec.safeParse(fromPkg.targets);
+        if (parsed.success) decl.targets = parsed.data;
       }
     }
   }
