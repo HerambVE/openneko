@@ -75,6 +75,12 @@ export interface InstallOptions {
     requirement: MarketplaceEnvRequirement,
   ) => Promise<string>;
   /**
+   * Install without the missing required env and list it in `envMissing`,
+   * for callers that collect the values after the install (the admin UI).
+   * The plugin's actions fail until an admin sets them.
+   */
+  deferMissingEnv?: boolean;
+  /**
    * Policy values in effect when this install runs. Recorded verbatim
    * on the new manifest entry's policySnapshot so audit can answer
    * "how did this get installed?" months later. Omit to skip the
@@ -98,6 +104,8 @@ export interface InstallResult {
   envSaved: string[];
   /** Required env keys that were already present in the secrets store. */
   envAlreadySet: string[];
+  /** Required env keys left unset because of `deferMissingEnv`. */
+  envMissing: string[];
   /** ISO timestamp recorded on the manifest entry. */
   installedAt: string;
   /**
@@ -225,6 +233,7 @@ export async function runInstall(
     source: "marketplace",
     envSaved: envOutcome.saved,
     envAlreadySet: envOutcome.alreadySet,
+    envMissing: envOutcome.missing,
     installedAt,
     ...(skillInstalledAt ? { skillInstalledAt } : {}),
   };
@@ -234,21 +243,26 @@ async function resolveRequiredEnv(
   pluginName: string,
   version: MarketplaceVersion,
   options: InstallOptions,
-): Promise<{ saved: string[]; alreadySet: string[] }> {
+): Promise<{ saved: string[]; alreadySet: string[]; missing: string[] }> {
   const required = (version.permissions?.env ?? []).filter(
     (r) => r.required !== false,
   );
-  if (required.length === 0) return { saved: [], alreadySet: [] };
+  if (required.length === 0) return { saved: [], alreadySet: [], missing: [] };
 
   const store = await readSecretsStore(options.secretsConfigDir);
   const existing = new Set(listKeysForPlugin(store, pluginName));
   const alreadySet = required.filter((r) => existing.has(r.key)).map((r) => r.key);
   const missing = required.filter((r) => !existing.has(r.key));
-  if (missing.length === 0) return { saved: [], alreadySet };
+  if (missing.length === 0) return { saved: [], alreadySet, missing: [] };
 
   let updated = store;
   const saved: string[] = [];
+  const deferred: string[] = [];
   for (const req of missing) {
+    if (options.deferMissingEnv && !req.autogenerate) {
+      deferred.push(req.key);
+      continue;
+    }
     // Host-minted secrets (HMAC keys etc.) are generated, not prompted —
     // the operator never needs to see them.
     const value = req.autogenerate
@@ -262,8 +276,8 @@ async function resolveRequiredEnv(
     updated = setSecret(updated, pluginName, req.key, value);
     saved.push(req.key);
   }
-  await writeSecretsStore(updated, options.secretsConfigDir);
-  return { saved, alreadySet };
+  if (saved.length > 0) await writeSecretsStore(updated, options.secretsConfigDir);
+  return { saved, alreadySet, missing: deferred };
 }
 
 async function installUnverified(
@@ -317,6 +331,7 @@ async function installUnverified(
     source: "unverified",
     envSaved: [],
     envAlreadySet: [],
+    envMissing: [],
     installedAt,
     ...(skillInstalledAt ? { skillInstalledAt } : {}),
   };

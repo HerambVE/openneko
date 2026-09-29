@@ -9,6 +9,7 @@ import SectionNav from "@/components/SectionNav";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/field";
 import { adminApi } from "@/components/admin/admin-api";
+import { TargetListEditor } from "@/components/admin/TargetListEditor";
 import { targetPatterns } from "../RulesClient";
 
 type PolicyDetail = {
@@ -152,30 +153,40 @@ export default function PolicyDetailClient({ policyId }: { policyId: string }) {
               </div>
             </Field>
 
-            {(["allowedTargets", "deniedTargets"] as const).map((key) => {
-              const patterns = targetPatterns(policy[key]);
-              if (patterns.length === 0) return null;
-              const onMissNext = key === "allowedTargets" && policy.allowedTargets?.on_miss === "next";
-              return (
-                <Field key={key} label={key === "allowedTargets" ? "Allowed targets" : "Denied targets"}>
-                  <div className="text-ui-body-sm text-text">
-                    {patterns.map((p) => (
-                      <code
-                        key={p}
-                        className="font-mono text-ui-caption bg-neutral-soft text-text2 px-1.5 py-0.5 rounded mr-1.5"
-                      >
-                        {p}
-                      </code>
-                    ))}
-                    {key === "allowedTargets" ? (
-                      <span className="text-text3 ml-1">
-                        · {onMissNext ? "any other target goes to the next rule" : "any other target is denied"}
-                      </span>
-                    ) : null}
-                  </div>
-                </Field>
-              );
-            })}
+            <div className="mb-4">
+              <TargetListEditor
+                label="Allowed targets"
+                hint="One target per line. The rule applies only when every target of an action is on this list. Use *.acme.com for subdomains, or end a line with * to match a prefix. Leave it empty to apply the rule to every target."
+                placeholder={"acme.com\n*.acme.com"}
+                patterns={targetPatterns(policy.allowedTargets)}
+                onMiss={policy.allowedTargets?.on_miss === "next" ? "next" : "deny"}
+                onSave={async (text, onMiss) => {
+                  const result = await adminApi<{ policy: { allowedTargets: Record<string, unknown> | null } }>(
+                    `/api/policies/${policy.id}`,
+                    "PATCH",
+                    { allowedTargets: { patterns: text, onMiss } },
+                  );
+                  if (!result.ok) return { ok: false, error: result.error };
+                  setPolicy((current) => (current ? { ...current, allowedTargets: result.body.policy.allowedTargets } : current));
+                  return { ok: true };
+                }}
+              />
+            </div>
+
+            {targetPatterns(policy.deniedTargets).length > 0 ? (
+              <Field label="Denied targets">
+                <div className="text-ui-body-sm text-text">
+                  {targetPatterns(policy.deniedTargets).map((p) => (
+                    <code
+                      key={p}
+                      className="font-mono text-ui-caption bg-neutral-soft text-text2 px-1.5 py-0.5 rounded mr-1.5"
+                    >
+                      {p}
+                    </code>
+                  ))}
+                </div>
+              </Field>
+            ) : null}
 
             {policy.riskThresholdAutoApprove && (
               <Field label="Auto-approve">

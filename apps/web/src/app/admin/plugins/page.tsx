@@ -4,6 +4,7 @@ import { getCurrentActor } from "@/lib/actor";
 import { getPluginActionDescriptors, getPluginStatus } from "@/lib/auth";
 import { StatCard, StatGrid } from "@/components/ui/stat-card";
 import { AdminDenied, AdminShell } from "../AdminShell";
+import PluginSettingsPanel from "./PluginSettingsPanel";
 
 export default async function AdminPluginsPage() {
   await connection();
@@ -18,7 +19,7 @@ export default async function AdminPluginsPage() {
   return (
     <AdminShell
       title="Plugin administration"
-      subtitle="Registry health, capabilities, action descriptors, and provider surfaces."
+      subtitle="Install plugins, enter their settings, and check registry health."
       back={{ href: "/admin", label: "Admin" }}
     >
       <StatGrid label="Plugin status">
@@ -31,6 +32,8 @@ export default async function AdminPluginsPage() {
         <StatCard label="Plugin action kinds" value={status.kinds.length} />
         <StatCard label="VMs" value={status.vmsRunning} />
       </StatGrid>
+
+      <PluginSettingsPanel />
 
       <section className="settings-card">
         <div className="settings-card-head">

@@ -219,6 +219,31 @@ const REFRESH_DEBOUNCE_MS = 200;
  */
 export const DEPLOYMENT_CONNECT_SLOT = "deployment";
 
+export interface PluginSettingField {
+  key: string;
+  required: boolean;
+  secret: boolean;
+  description: string;
+  set: boolean;
+  value?: string;
+}
+
+export interface PluginSettings {
+  name: string;
+  version: string;
+  fields: PluginSettingField[];
+  missing: string[];
+  /** Actions that declare `targets`, so an admin can approve a target list for them. */
+  targetActions: Array<{ kind: string; description: string; as: "value" | "email_domain" }>;
+}
+
+export class PluginSettingsError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PluginSettingsError";
+  }
+}
+
 export class PluginRegistry {
   private runtime: PluginRuntime | null = null;
   private state: ManifestState = EMPTY_STATE;
@@ -682,6 +707,59 @@ export class PluginRegistry {
     this.scrubber = createScrubber(
       allSecretValuesFull({ env: nextEnv, operators: before.operators }),
     );
+  }
+
+  /**
+   * Declared settings of every installed plugin, for the admin UI. A secret
+   * reports only whether it is set; a plain setting also reports its value.
+   * Host-minted keys are left out because nobody enters them.
+   */
+  pluginSettings(): PluginSettings[] {
+    return [...this.state.entriesByPluginId.values()]
+      .map((entry) => {
+        const env = mergeEnv(entry, this.secrets);
+        const fields = (entry.permissions.env ?? [])
+          .filter((req) => !req.autogenerate)
+          .map((req) => {
+            const value = env[req.key];
+            const set = typeof value === "string" && value.length > 0;
+            const secret = req.secret !== false;
+            return {
+              key: req.key,
+              required: req.required !== false,
+              secret,
+              description: req.description,
+              set,
+              ...(set && !secret ? { value } : {}),
+            };
+          });
+        return {
+          name: entry.name,
+          version: entry.version,
+          fields,
+          missing: fields.filter((f) => f.required && !f.set).map((f) => f.key),
+          targetActions: (entry.capabilities.action?.kinds ?? []).flatMap((decl) =>
+            decl.targets ? [{ kind: decl.kind, description: decl.description, as: decl.targets.as ?? "value" }] : [],
+          ),
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** Writes or clears declared settings of one plugin. Refuses undeclared keys and clearing a required one. */
+  async setPluginSettings(pluginName: string, values: Record<string, string | null>): Promise<void> {
+    const settings = this.pluginSettings().find((p) => p.name === pluginName);
+    if (!settings) throw new PluginSettingsError(`${pluginName} is not installed`);
+    const fields = new Map(settings.fields.map((f) => [f.key, f]));
+    for (const [key, value] of Object.entries(values)) {
+      const field = fields.get(key);
+      if (!field) throw new PluginSettingsError(`${pluginName} does not declare ${key}`);
+      if (value === null && field.required) throw new PluginSettingsError(`${key} is required and cannot be cleared`);
+    }
+    for (const [key, value] of Object.entries(values)) {
+      if (value === null) await this.deletePluginSecret(pluginName, key);
+      else await this.setPluginSecret(pluginName, key, value);
+    }
   }
 
   // ─── connect capability (per-operator OAuth) ─────────────────────────

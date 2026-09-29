@@ -78,6 +78,34 @@ async function runWorkspaceAwarePackageInstall(
 }
 
 /**
+ * Installs a plugin from the official marketplace. Required env is never
+ * prompted: chat fails with a pointer to the secrets flow, and the admin UI
+ * (`deferMissingEnv`) installs first and collects the values after.
+ */
+export function installFromOfficialMarketplace(opts: {
+  spec: string;
+  repoRoot: string;
+  policy: { allowUnverified: boolean; allowGitUrlInstalls: boolean; allowedMarketplaces: string[] };
+  deferMissingEnv?: boolean;
+}) {
+  return runInstall({
+    spec: opts.spec,
+    repoRoot: opts.repoRoot,
+    trustedMarketplaces: [
+      { name: OFFICIAL_MARKETPLACE_NAME, url: OFFICIAL_MARKETPLACE_URL },
+    ],
+    npmRunner: runWorkspaceAwarePackageInstall,
+    envPrompt: async (plugin, requirement) => {
+      throw new Error(
+        `${plugin} requires ${requirement.key}. Set it in Admin → Plugins, or run \`openneko secrets set ${plugin} ${requirement.key}\`, then install again. Credentials never flow through chat.`,
+      );
+    },
+    ...(opts.deferMissingEnv ? { deferMissingEnv: true } : {}),
+    policySnapshot: opts.policy,
+  });
+}
+
+/**
  * ADM3 — executes approved plugin_install / plugin_uninstall action
  * requests. The chat agent can only PROPOSE these (policy-gated); the
  * worker executes after approval, reusing the CLI's install machinery
@@ -98,20 +126,10 @@ export function registerPluginManagementAdapters(opts: {
       (request.payload as Record<string, unknown>).spec ?? "",
     ).trim();
     if (!spec) throw new Error("plugin_install: payload.spec is required");
-    const policy = await opts.getInstallPolicy();
-    const result = await runInstall({
+    const result = await installFromOfficialMarketplace({
       spec,
       repoRoot: opts.repoRoot,
-      trustedMarketplaces: [
-        { name: OFFICIAL_MARKETPLACE_NAME, url: OFFICIAL_MARKETPLACE_URL },
-      ],
-      npmRunner: runWorkspaceAwarePackageInstall,
-      envPrompt: async (plugin, requirement) => {
-        throw new Error(
-          `${plugin} requires ${requirement.key}. Set it first (openneko secrets set ${plugin} ${requirement.key} …) and re-approve the install — credentials never flow through chat.`,
-        );
-      },
-      policySnapshot: policy,
+      policy: await opts.getInstallPolicy(),
     });
     return {
       commandOrOperation: `install ${spec}`,

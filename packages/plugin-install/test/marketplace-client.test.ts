@@ -87,6 +87,11 @@ describe("pickInstallVersion", () => {
     const plugin = marketplace().plugins[0]!;
     expect(pickInstallVersion(plugin).version).toBe("0.2.0");
   });
+  it("skips a draft version that npm does not have yet", () => {
+    const plugin = marketplace().plugins[0]!;
+    plugin.versions[1]!.draft = true;
+    expect(pickInstallVersion(plugin).version).toBe("0.1.0");
+  });
   it("honours an explicit version request", () => {
     const plugin = marketplace().plugins[0]!;
     expect(pickInstallVersion(plugin, "0.1.0").version).toBe("0.1.0");
