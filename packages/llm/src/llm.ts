@@ -262,7 +262,22 @@ export async function buildLlm(
   return ai({
     name: toAxProviderName(resolved.provider),
     apiKey: resolved.secrets.apiKey,
-    config: { model: resolved.model, stream: false },
+    // Ax defaults temperature to 0. Anthropic models with adaptive thinking
+    // reject it; send temperature only when explicitly set above zero.
+    config: {
+      model: resolved.model,
+      stream: false,
+      ...(resolved.provider === "anthropic"
+        ? {
+            temperature:
+              typeof resolved.config.temperature === "number" &&
+              Number.isFinite(resolved.config.temperature) &&
+              resolved.config.temperature > 0
+                ? resolved.config.temperature
+                : undefined,
+          }
+        : {}),
+    },
     options: { ...LLM_RETRY_OPTIONS },
   } as never);
 }
