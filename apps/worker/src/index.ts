@@ -556,6 +556,40 @@ const server = createServer(
         includeRecordActionDescriptors(
           pluginRegistry?.getRegisteredActionDescriptors() ?? [],
         ),
+      settings: () => pluginRegistry?.pluginSettings() ?? [],
+      setSettings: async (plugin, values) => {
+        if (!pluginRegistry) throw new Error("plugin registry not initialised");
+        await pluginRegistry.setPluginSettings(plugin, values);
+      },
+      catalog: async () => {
+        const { createMarketplaceClient, OFFICIAL_MARKETPLACE_URL } = await import("@open-neko/plugin-install");
+        const installed = new Set((pluginRegistry?.pluginSettings() ?? []).map((p) => p.name));
+        try {
+          const marketplace = await createMarketplaceClient().fetch(OFFICIAL_MARKETPLACE_URL);
+          return {
+            available: (marketplace.plugins ?? [])
+              .filter((p) => !installed.has(p.name) && p.versions.some((v) => !v.yanked && !v.draft))
+              .map((p) => {
+                const latest = p.versions.find((v) => !v.yanked && !v.draft);
+                return { name: p.name, title: p.title || p.name, description: p.description ?? "", version: latest?.version ?? "unknown" };
+              }),
+          };
+        } catch (err) {
+          return { available: [], error: `marketplace unavailable: ${err instanceof Error ? err.message : String(err)}` };
+        }
+      },
+      install: async (name) => {
+        const { getInstallPolicyForOrg } = await import("@neko/db");
+        const { installFromOfficialMarketplace } = await import("./plugins/manage-adapters.js");
+        const result = await installFromOfficialMarketplace({
+          spec: name,
+          repoRoot: process.cwd(),
+          policy: await getInstallPolicyForOrg(ADMIN_ORG_ID),
+          deferMissingEnv: true,
+        });
+        await pluginRegistry?.refresh();
+        return { name: result.name, version: result.version, envMissing: result.envMissing };
+      },
     },
     actionRequests: {
       create: async (input) => {

@@ -57,6 +57,8 @@ export interface MarketplaceVersion {
   publishedAt: string;
   yanked?: boolean;
   yanked_reason?: string;
+  /** Listed before its first npm publish; never installable. */
+  draft?: boolean;
 }
 
 export interface MarketplacePlugin {
@@ -113,7 +115,7 @@ export function pickInstallVersion(
   plugin: MarketplacePlugin,
   requested?: string,
 ): MarketplaceVersion {
-  const live = plugin.versions.filter((v) => !v.yanked);
+  const live = plugin.versions.filter((v) => !v.yanked && !v.draft);
   if (live.length === 0) {
     throw new Error(
       `marketplace: every published version of ${plugin.name} is yanked`,

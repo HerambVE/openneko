@@ -13,7 +13,7 @@ import {
   type MarketplaceClient,
   type MarketplaceVersion,
 } from "../src/marketplace-client";
-import { PLUGIN_MANIFEST_FILE, PLUGIN_MANIFEST_SCHEMA_URL } from "../src/manifest";
+import { PLUGIN_MANIFEST_FILE, PLUGIN_MANIFEST_SCHEMA_URL, readManifest } from "../src/manifest";
 import { readSecretsStore } from "../src/secrets-store";
 
 const INTEGRITY = "sha512-" + "a".repeat(86) + "==";
@@ -285,6 +285,47 @@ describe("runInstall", () => {
       readBack["@open-neko/plugin-magic-link"].MAGIC_LINK_SIGNING_SECRET;
     expect(minted).toMatch(/^[A-Za-z0-9_-]+$/);
     expect(minted.length).toBeGreaterThanOrEqual(48);
+  });
+
+  it("defers missing required env for the admin UI, still minting autogenerate keys", async () => {
+    const plugin = {
+      name: "@open-neko/plugin-resend",
+      title: "Resend",
+      description: "...",
+      source: "https://github.com/open-neko/plugins",
+      versions: [
+        actionVersion({
+          permissions: {
+            network: ["api.resend.com"],
+            env: [
+              { key: "RESEND_API_KEY", required: true, secret: true, description: "Key." },
+              { key: "HMAC_KEY", required: true, secret: true, autogenerate: true, description: "Minted." },
+              { key: "RESEND_LOGO_URL", required: false, secret: false, description: "Logo." },
+            ],
+          },
+          kinds: [{ kind: "send_email", description: "Send." }],
+        }),
+      ],
+    };
+    const fixtures = new Map([[OFFICIAL_MARKETPLACE_URL, marketplaceWith([plugin])]]);
+    const result = await runInstall({
+      repoRoot: repoDir,
+      spec: "@open-neko/plugin-resend",
+      trustedMarketplaces: [officialMarketplace],
+      secretsConfigDir: configDir,
+      marketplaceClient: fakeClient(fixtures),
+      npmRunner: async () => {},
+      envPrompt: async () => {
+        throw new Error("must not prompt");
+      },
+      deferMissingEnv: true,
+    });
+    expect(result.envMissing).toEqual(["RESEND_API_KEY"]);
+    expect(result.envSaved).toEqual(["HMAC_KEY"]);
+    const manifest = await readManifest(repoDir);
+    expect(manifest?.plugins.map((p) => p.name)).toEqual(["@open-neko/plugin-resend"]);
+    const stored = await readSecretsStore(configDir);
+    expect(Object.keys(stored["@open-neko/plugin-resend"] ?? {})).toEqual(["HMAC_KEY"]);
   });
 
   it("errors when envPrompt returns empty for a required key", async () => {

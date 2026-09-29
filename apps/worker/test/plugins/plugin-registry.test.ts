@@ -719,6 +719,36 @@ describe("PluginRegistry — auth provider", () => {
     await reg.stop();
   });
 
+  it("pluginSettings hides secret values and host-minted keys; setPluginSettings guards required keys", async () => {
+    await writeFile(
+      path.join(repoRoot, "openneko.plugins.json"),
+      JSON.stringify(manifestWithMagicLinkEntry()),
+      "utf8",
+    );
+    const reg = newRegistry(new FakeRuntime());
+    await reg.start();
+    const name = "@open-neko/plugin-magic-link";
+    const before = reg.pluginSettings().find((p) => p.name === name)!;
+    expect(before.fields.map((f) => f.key)).toEqual(["MAGIC_LINK_FROM", "RESEND_API_KEY"]);
+    expect(before.missing).toEqual(["MAGIC_LINK_FROM"]);
+
+    await reg.setPluginSettings(name, { MAGIC_LINK_FROM: "Ops <ops@acme.com>", RESEND_API_KEY: "re_secret" });
+    const after = reg.pluginSettings().find((p) => p.name === name)!;
+    expect(after.missing).toEqual([]);
+    expect(after.fields).toEqual([
+      expect.objectContaining({ key: "MAGIC_LINK_FROM", set: true, value: "Ops <ops@acme.com>" }),
+      expect.objectContaining({ key: "RESEND_API_KEY", set: true, secret: true }),
+    ]);
+    expect(JSON.stringify(reg.pluginSettings())).not.toContain("re_secret");
+
+    await expect(reg.setPluginSettings(name, { MAGIC_LINK_SIGNING_SECRET: "x" })).rejects.toThrow(/does not declare/);
+    await expect(reg.setPluginSettings(name, { MAGIC_LINK_FROM: null })).rejects.toThrow(/cannot be cleared/);
+    await expect(reg.setPluginSettings("@x/missing", { A: "b" })).rejects.toThrow(/not installed/);
+    await reg.setPluginSettings(name, { RESEND_API_KEY: null });
+    expect(reg.pluginSettings().find((p) => p.name === name)!.fields[1]!.set).toBe(false);
+    await reg.stop();
+  });
+
   it("deletePluginSecret removes a stored value and reopens the gap", async () => {
     await writeFile(
       path.join(repoRoot, "openneko.plugins.json"),

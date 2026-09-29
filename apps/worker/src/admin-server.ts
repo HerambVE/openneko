@@ -25,6 +25,11 @@
  *                               Proxies to the installed auth plugin's
  *                               complete_auth RPC.
  *   GET  /admin/plugins/status → 200 + registry health/status summary.
+ *   GET  /admin/plugins/settings → each installed plugin's declared settings
+ *                               (secrets report only whether they are set).
+ *   POST /admin/plugins/settings → { plugin, values: { KEY: string | null } }.
+ *   GET  /admin/plugins/catalog → official marketplace plugins not yet installed.
+ *   POST /admin/plugins/install → { name }; installs and lists missing settings.
  *   GET  /admin/directory/status → directory plugin and last sync state.
  *   POST /admin/directory/sync  → run a full directory sync now.
  *   POST /admin/directory/users → create a user in the identity provider ({ email, name? }).
@@ -297,6 +302,25 @@ export interface PluginsHandlerSurface {
         };
     example?: Record<string, unknown>;
   }>;
+  settings?(): PluginSettingsView[];
+  setSettings?(plugin: string, values: Record<string, string | null>): Promise<void>;
+  catalog?(): Promise<{ available: PluginCatalogItem[]; error?: string }>;
+  install?(name: string): Promise<{ name: string; version: string; envMissing: string[] }>;
+}
+
+export interface PluginSettingsView {
+  name: string;
+  version: string;
+  fields: Array<{ key: string; required: boolean; secret: boolean; description: string; set: boolean; value?: string }>;
+  missing: string[];
+  targetActions: Array<{ kind: string; description: string; as: "value" | "email_domain" }>;
+}
+
+export interface PluginCatalogItem {
+  name: string;
+  title: string;
+  description: string;
+  version: string;
 }
 
 export interface PluginRegistryStatus {
@@ -605,6 +629,10 @@ export function createAdminHandler(opts: AdminHandlerOptions = {}) {
     }
     if (req.method === "GET" && req.url === "/admin/plugins/status") {
       handlePluginStatus(res, plugins);
+      return;
+    }
+    if (req.url === "/admin/plugins/settings" || req.url === "/admin/plugins/catalog" || req.url === "/admin/plugins/install") {
+      void handlePluginAdmin(req, res, plugins);
       return;
     }
     if (req.method === "GET" && req.url === "/admin/connect/providers") {
@@ -1044,6 +1072,55 @@ async function handleInstallPolicy(
     json(res, 200, { policy, source: "org" });
   } catch (err) {
     json(res, 500, { error: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+const PLUGIN_NAME = /^(@[a-z0-9-]+\/)?[a-z0-9][a-z0-9-_.]*$/;
+const MAX_SETTING_LENGTH = 8192;
+
+async function handlePluginAdmin(
+  req: IncomingMessage,
+  res: ServerResponse,
+  plugins: PluginsHandlerSurface | null,
+) {
+  try {
+    if (req.url === "/admin/plugins/settings" && req.method === "GET") {
+      if (!plugins?.settings) return json(res, 503, { error: "plugin registry unavailable" });
+      return json(res, 200, { plugins: plugins.settings() });
+    }
+    if (req.url === "/admin/plugins/settings" && req.method === "POST") {
+      if (!plugins?.setSettings) return json(res, 503, { error: "plugin registry unavailable" });
+      const body = (await readJson(req).catch(() => null)) as { plugin?: unknown; values?: unknown } | null;
+      const plugin = typeof body?.plugin === "string" ? body.plugin : "";
+      const values = body?.values;
+      if (!PLUGIN_NAME.test(plugin)) return json(res, 400, { error: "plugin must be a package name" });
+      if (!values || typeof values !== "object" || Array.isArray(values) || Object.keys(values).length === 0) {
+        return json(res, 400, { error: "values must map at least one setting to a string or null" });
+      }
+      for (const value of Object.values(values)) {
+        if (value !== null && (typeof value !== "string" || value.length === 0 || value.length > MAX_SETTING_LENGTH)) {
+          return json(res, 400, { error: `each value must be null or a string of 1 to ${MAX_SETTING_LENGTH} characters` });
+        }
+      }
+      await plugins.setSettings(plugin, values as Record<string, string | null>);
+      return json(res, 200, { ok: true });
+    }
+    if (req.url === "/admin/plugins/catalog" && req.method === "GET") {
+      if (!plugins?.catalog) return json(res, 503, { error: "plugin registry unavailable" });
+      return json(res, 200, await plugins.catalog());
+    }
+    if (req.url === "/admin/plugins/install" && req.method === "POST") {
+      if (!plugins?.install) return json(res, 503, { error: "plugin registry unavailable" });
+      const body = (await readJson(req).catch(() => null)) as { name?: unknown } | null;
+      const name = typeof body?.name === "string" ? body.name.trim() : "";
+      if (!PLUGIN_NAME.test(name)) return json(res, 400, { error: "name must be a package name from the marketplace" });
+      return json(res, 200, await plugins.install(name));
+    }
+    return json(res, 405, { error: "method not allowed" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = err instanceof Error && err.name === "PluginSettingsError" ? 400 : 500;
+    return json(res, status, { error: message });
   }
 }
 
