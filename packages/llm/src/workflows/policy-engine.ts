@@ -11,6 +11,8 @@ export type PolicyRequestSubject = {
   scope: ActionScope;
   kind: string;
   target?: string | null;
+  /** Targets read from the payload. When set, every one must pass allowed_targets. */
+  targets?: readonly string[];
   riskLevel?: RiskLevel | null;
 };
 
@@ -54,19 +56,29 @@ function riskExceedsThreshold(
   return RISK_ORDER[riskLevel] > RISK_ORDER[threshold];
 }
 
-function targetMatches(
-  target: string | null | undefined,
-  patterns: Record<string, unknown> | null,
-): boolean {
-  if (!patterns) return false;
-  if (!target) return false;
-  const list = patterns.patterns;
-  if (!Array.isArray(list)) return false;
-  return list.some((p) => {
-    if (typeof p !== "string") return false;
-    if (p.endsWith("*")) return target.startsWith(p.slice(0, -1));
-    return target === p;
-  });
+function targetPatterns(patterns: Record<string, unknown> | null): string[] | null {
+  if (!patterns || !Array.isArray(patterns.patterns)) return null;
+  return patterns.patterns.filter((p): p is string => typeof p === "string");
+}
+
+function patternMatches(target: string, pattern: string): boolean {
+  if (pattern.startsWith("*.")) return target.endsWith(pattern.slice(1));
+  if (pattern.endsWith("*")) return target.startsWith(pattern.slice(0, -1));
+  return target === pattern;
+}
+
+function requestTargets(request: PolicyRequestSubject): readonly string[] {
+  if (request.targets) return request.targets;
+  return request.target ? [request.target] : [];
+}
+
+function anyTargetMatches(targets: readonly string[], patterns: Record<string, unknown> | null): boolean {
+  const list = targetPatterns(patterns);
+  return !!list && targets.some((t) => list.some((p) => patternMatches(t, p)));
+}
+
+function allTargetsMatch(targets: readonly string[], list: string[]): boolean {
+  return targets.length > 0 && targets.every((t) => list.some((p) => patternMatches(t, p)));
 }
 
 function policyApplies(
@@ -101,24 +113,24 @@ export function evaluateActionPolicy(
   const ordered = [...policies].sort((a, b) => a.priority - b.priority);
   for (const policy of ordered) {
     if (!policyApplies(policy, request)) continue;
-    if (targetMatches(request.target, policy.deniedTargets)) {
+    const targets = requestTargets(request);
+    const shown = targets.join(", ");
+    if (anyTargetMatches(targets, policy.deniedTargets)) {
       return {
         decision: "deny",
         policy,
         mode: policy.mode === "never" ? "never" : "observe_only",
-        reason: `target "${request.target}" is in policy "${policy.name}" denied_targets`,
+        reason: `target "${shown}" is in policy "${policy.name}" denied_targets`,
       };
     }
-    if (
-      policy.allowedTargets &&
-      Array.isArray((policy.allowedTargets as { patterns?: unknown }).patterns) &&
-      !targetMatches(request.target, policy.allowedTargets)
-    ) {
+    const allowed = targetPatterns(policy.allowedTargets);
+    if (allowed && !allTargetsMatch(targets, allowed)) {
+      if (policy.allowedTargets?.on_miss === "next") continue;
       return {
         decision: "deny",
         policy,
         mode: "observe_only",
-        reason: `target "${request.target}" is not in policy "${policy.name}" allowed_targets`,
+        reason: `target "${shown}" is not in policy "${policy.name}" allowed_targets`,
       };
     }
     return decisionFromMode(policy, request);

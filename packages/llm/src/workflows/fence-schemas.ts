@@ -150,8 +150,16 @@ export const POLICY_SAVE_SCHEMA = z.object({
     .default(["external"] as ("internal" | "external")[]),
   mode: z.enum(POLICY_MODES),
   risk_threshold_auto_approve: z.enum(RISK_LEVELS).optional(),
-  allowed_targets: z.record(z.string(), z.unknown()).optional(),
-  denied_targets: z.record(z.string(), z.unknown()).optional(),
+  allowed_targets: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe(
+      '{"patterns": [...], "on_miss"?: "next"}. Every target must match a pattern. A pattern is exact ("acme.com"), a prefix ("https://hooks.acme.com/*"), or subdomains only ("*.acme.com"). Email actions match lowercase recipient domains. Without on_miss, a miss is denied; with "next", a miss falls to the next rule, usually one that asks.',
+    ),
+  denied_targets: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('{"patterns": [...]}. Denies the action when any target matches.'),
   limits: z.record(z.string(), z.unknown()).default({}),
   approver_role: z.string().trim().max(120).optional(),
   priority: z.number().int().min(0).max(10_000).default(100),

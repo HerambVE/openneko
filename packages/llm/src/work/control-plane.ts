@@ -14,6 +14,7 @@ import {
 } from "../workflows/action-store";
 import type { ActionExecutionOutcome } from "../workflows/action-executor";
 import { evaluateActionPolicy } from "../workflows/policy-engine";
+import { withActionTargets } from "../workflows/action-targets";
 import {
   saveWorkflowWithTrigger,
   type SaveWorkflowWithTriggerResult,
@@ -487,6 +488,9 @@ async function activeRecordAppIds(orgId: string): Promise<ReadonlySet<string>> {
   return new Set(rows.map((row) => row.appId));
 }
 
+/** The payload lets kinds with a target spec match their real targets. */
+export type PolicyEvaluationInput = { orgId: string; payload?: Record<string, unknown> | null } & PolicyRequestSubject;
+
 /**
  * The narrow control-plane surface an agent turn touches: policy eval,
  * action-request create + enqueue, the two memory ops, and the builder
@@ -497,7 +501,7 @@ async function activeRecordAppIds(orgId: string): Promise<ReadonlySet<string>> {
  */
 export interface AgentControlPlane {
   evaluateActionPolicy(
-    input: { orgId: string } & PolicyRequestSubject,
+    input: PolicyEvaluationInput,
   ): Promise<PolicyDecision>;
   createActionRequest(input: CreateActionRequestInput): Promise<{ id: string; status: string }>;
   enqueueActionExecute(input: {
@@ -849,11 +853,11 @@ export type PluginCatalog = {
 
 export class InProcessControlPlane implements AgentControlPlane {
   async evaluateActionPolicy(
-    input: { orgId: string } & PolicyRequestSubject,
+    input: PolicyEvaluationInput,
   ): Promise<PolicyDecision> {
-    const { orgId, ...subject } = input;
+    const { orgId, payload, ...subject } = input;
     const policies = await listEnabledPolicies(orgId);
-    return evaluateActionPolicy(subject, policies);
+    return evaluateActionPolicy(await withActionTargets(orgId, subject, payload), policies);
   }
 
   async createActionRequest(

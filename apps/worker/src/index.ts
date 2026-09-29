@@ -104,6 +104,7 @@ import {
   registerFallbackActionAdapterResolver,
   seedDefaultActionPolicies,
   seedPluginActionPolicies,
+  syncPluginActionTargetSpecs,
   startSubscriptionManager,
   type DataSourceContext,
   type PluginActionSeed,
@@ -888,6 +889,14 @@ pluginRegistry = new PluginRegistry({
     const { created, skipped } = await seedPluginActionPolicies(
       ADMIN_ORG_ID,
       seeds,
+    );
+    await syncPluginActionTargetSpecs(
+      ADMIN_ORG_ID,
+      entries.flatMap((entry) =>
+        (entry.capabilities.action?.kinds ?? []).flatMap((decl) =>
+          decl.targets ? [{ pluginName: entry.name, kind: decl.kind, spec: decl.targets }] : [],
+        ),
+      ),
     );
     if (created > 0) {
       console.log(

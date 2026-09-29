@@ -23,6 +23,7 @@ import {
   evaluateActionPolicy,
   type PolicyDecision,
 } from "./policy-engine";
+import { withActionTargets } from "./action-targets";
 import { clampActionMinutes } from "./value";
 
 export type WorkflowActionContext = {
@@ -103,12 +104,16 @@ export async function handleActionRequest(
 
   const policies = await listPolicies(ctx.orgId);
   const decision = evaluateActionPolicy(
-    {
-      scope: args.scope as ActionScope,
-      kind: args.kind,
-      target: args.target ?? null,
-      riskLevel: (args.risk_level as RiskLevel | undefined) ?? null,
-    },
+    await withActionTargets(
+      ctx.orgId,
+      {
+        scope: args.scope as ActionScope,
+        kind: args.kind,
+        target: args.target ?? null,
+        riskLevel: (args.risk_level as RiskLevel | undefined) ?? null,
+      },
+      args.payload,
+    ),
     policies,
   );
 
@@ -185,6 +190,7 @@ async function handleActionRequestViaControlPlane(
     scope: args.scope as ActionScope,
     kind: args.kind,
     target: args.target ?? null,
+    payload: args.payload ?? null,
     riskLevel: (args.risk_level as RiskLevel | undefined) ?? null,
   });
 
@@ -297,12 +303,16 @@ export async function handleWorkActionRequest(
 
   const policies = await listPolicies(ctx.orgId);
   const decision = evaluateActionPolicy(
-    {
-      scope: args.scope as ActionScope,
-      kind: args.kind,
-      target: args.target ?? null,
-      riskLevel: (args.risk_level as RiskLevel | undefined) ?? null,
-    },
+    await withActionTargets(
+      ctx.orgId,
+      {
+        scope: args.scope as ActionScope,
+        kind: args.kind,
+        target: args.target ?? null,
+        riskLevel: (args.risk_level as RiskLevel | undefined) ?? null,
+      },
+      args.payload,
+    ),
     policies,
   );
 

@@ -128,3 +128,27 @@ func TestConvertOpennekoCapabilities_AuthAndDirectory(t *testing.T) {
 		t.Fatalf("directory declaration lost: %s", encoded)
 	}
 }
+
+// Losing an action's targets would let a rule check the agent's target
+// instead of the real recipients.
+func TestConvertCapabilities_ActionTargets(t *testing.T) {
+	targets := json.RawMessage(`{"fields":["to","cc","bcc"],"as":"email_domain"}`)
+	out := convertCapabilities(marketplace.Capabilities{
+		Action: &marketplace.ActionCapability{Kinds: []marketplace.ActionDeclaration{
+			{Kind: "send_email", Description: "Send an email.", Targets: targets},
+		}},
+	})
+	if out.Action == nil || string(out.Action.Kinds[0].Targets) != string(targets) {
+		t.Fatalf("action targets not passed through: %+v", out.Action)
+	}
+
+	var pkg pkgCapabilities
+	raw := `{"action":{"kinds":[{"kind":"send_email","description":"Send an email.","targets":{"fields":["to"],"as":"email_domain"}}]}}`
+	if err := json.Unmarshal([]byte(raw), &pkg); err != nil {
+		t.Fatal(err)
+	}
+	fromPkg := convertOpennekoCapabilities(&pkg)
+	if string(fromPkg.Action.Kinds[0].Targets) != `{"fields":["to"],"as":"email_domain"}` {
+		t.Fatalf("package action targets not passed through: %s", fromPkg.Action.Kinds[0].Targets)
+	}
+}

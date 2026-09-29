@@ -96,6 +96,23 @@ export const ActionDefaultMode = z.union([ActionMode, ActionModePerScope]);
 export type ActionDefaultMode = z.infer<typeof ActionDefaultMode>;
 
 /**
+ * Where an action's targets are in its payload. The host reads the targets
+ * from these top-level fields and ignores the agent's `target`, so a rule's
+ * allowed and denied targets apply to where the action really goes. A field
+ * can hold a string or an array of strings.
+ *
+ *  - "value": each value as written, e.g. a channel id or a URL
+ *  - "email_domain": the lowercase domain of each email address, including
+ *    "Name <a@b.com>" forms
+ */
+export const ActionTargetSpec = z.object({
+  fields: z.array(z.string().min(1)).min(1),
+  as: z.enum(["value", "email_domain"]).default("value"),
+});
+
+export type ActionTargetSpec = z.infer<typeof ActionTargetSpec>;
+
+/**
  * Single declared action — a snake_case kind the agent can request,
  * plus the description the agent uses to pick it. Same shape lives in
  * the marketplace entry, the installed manifest, and the plugin's
@@ -113,6 +130,8 @@ export const PluginActionDeclaration = z.object({
    * schema or it's stripped when the manifest is parsed.
    */
   example: z.record(z.string(), z.unknown()).optional(),
+  /** Payload fields that hold the action's targets. See ActionTargetSpec. */
+  targets: ActionTargetSpec.optional(),
 });
 
 export type PluginActionDeclaration = z.infer<typeof PluginActionDeclaration>;

@@ -405,9 +405,37 @@ export async function updateActionRequestPayload(args: {
   return record;
 }
 
+/**
+ * For a kind with a target spec, stores the targets read from the payload and
+ * re-checks an approved request against them, so no caller can approve an
+ * action for targets that the rules do not allow.
+ */
+async function checkActionTargets(input: CreateActionRequestInput): Promise<CreateActionRequestInput> {
+  const { withActionTargets } = await import("./action-targets");
+  const subject = await withActionTargets(
+    input.orgId,
+    { scope: input.scope, kind: input.kind, target: input.target ?? null, riskLevel: input.riskLevel ?? null },
+    input.payload,
+  );
+  if (!subject.targets) return input;
+  if (input.status !== "approved") return { ...input, target: subject.target };
+  const { evaluateActionPolicy } = await import("./policy-engine");
+  const decision = evaluateActionPolicy(subject, await listEnabledPolicies(input.orgId));
+  if (decision.decision === "deny" || decision.decision === "no_policy") {
+    throw new Error(`action ${input.kind} is not allowed for its targets: ${decision.reason}`);
+  }
+  return {
+    ...input,
+    target: subject.target,
+    policyId: decision.policy.id,
+    status: decision.decision === "allow" ? "approved" : "pending_approval",
+  };
+}
+
 export async function createActionRequest(
-  input: CreateActionRequestInput,
+  rawInput: CreateActionRequestInput,
 ): Promise<ActionRequestRecord> {
+  const input = await checkActionTargets(rawInput);
   // SEC5: snapshot the dual identity at creation. When the caller did
   // not resolve it, derive it from the originating work run (K1 actor
   // + agent backend) so every request carries who-via-which-agent.

@@ -32,6 +32,7 @@ type ActionDeclaration struct {
 	Kind        string          `json:"kind"`
 	Description string          `json:"description"`
 	DefaultMode json.RawMessage `json:"default_mode,omitempty"`
+	Targets     json.RawMessage `json:"targets,omitempty"`
 }
 
 type ActionCapability struct {

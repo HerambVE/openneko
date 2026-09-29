@@ -2370,6 +2370,22 @@ export const action_policy = pgTable(
   }),
 );
 
+export const action_target_spec = pgTable(
+  "action_target_spec",
+  {
+    org_id: text("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    plugin_name: text("plugin_name").notNull(),
+    spec: jsonb("spec").notNull(),
+    updated_at: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.org_id, t.kind] }),
+  }),
+);
+
 export const action_request = pgTable(
   "action_request",
   {

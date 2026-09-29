@@ -30,12 +30,12 @@ export class WebhookAdapterError extends Error {
 }
 
 /**
- * Generic outbound HTTP adapter. The action's `target` is the URL the
- * agent proposes; the agent must also include the URL in `payload.url`
- * so the policy layer can match either field. The default
- * `external_default` policy requires operator approval for every URL —
- * narrower org policies can use `allowed_targets.patterns` to allow
- * specific URLs (e.g. a corporate Slack webhook) without approval.
+ * Generic outbound HTTP adapter. The host sets the request's `target` to
+ * `payload.url` (see action-targets.ts), so rules match the URL this
+ * adapter calls. The default `external_default` policy requires operator
+ * approval for every URL; narrower org policies can use
+ * `allowed_targets.patterns` to allow specific URLs (e.g. a corporate
+ * Slack webhook) without approval.
  *
  * Captures status + first 4KB of response body + response headers into
  * the action_execution row. Non-2xx responses throw; the framework
