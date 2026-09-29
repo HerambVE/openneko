@@ -91,6 +91,7 @@ export function installFromOfficialMarketplace(opts: {
   return runInstall({
     spec: opts.spec,
     repoRoot: opts.repoRoot,
+    packageDir: process.env.OPENNEKO_PLUGIN_INSTALL_DIR?.trim() || opts.repoRoot,
     trustedMarketplaces: [
       { name: OFFICIAL_MARKETPLACE_NAME, url: OFFICIAL_MARKETPLACE_URL },
     ],
