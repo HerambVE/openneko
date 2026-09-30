@@ -75,6 +75,12 @@ export interface InstallOptions {
     requirement: MarketplaceEnvRequirement,
   ) => Promise<string>;
   /**
+   * Directory npm installs plugin packages into, and where bundled skills
+   * are read from. Defaults to `repoRoot`. The packaged worker sets it to
+   * OPENNEKO_PLUGIN_INSTALL_DIR, because its app root is a pnpm workspace.
+   */
+  packageDir?: string;
+  /**
    * Install without the missing required env and list it in `envMissing`,
    * for callers that collect the values after the install (the admin UI).
    * The plugin's actions fail until an admin sets them.
@@ -130,6 +136,10 @@ export function parseInstallSpec(spec: string): ParsedSpec {
   const marketplaceRef = spec.slice(at + 1);
   if (!marketplaceRef) return { name: spec, marketplaceRef: null };
   return { name, marketplaceRef };
+}
+
+function packageDirOf(options: InstallOptions): string {
+  return options.packageDir ?? options.repoRoot;
 }
 
 export async function runInstall(
@@ -199,7 +209,7 @@ export async function runInstall(
   const npmRunner = options.npmRunner ?? runNpm;
   await npmRunner(
     ["install", `${plugin.name}@${version.version}`],
-    options.repoRoot,
+    packageDirOf(options),
   );
 
   const manifest = (await readManifest(options.repoRoot)) ?? emptyManifest();
@@ -221,7 +231,7 @@ export async function runInstall(
   await writeManifest(options.repoRoot, upsertEntry(manifest, entry));
   const skillInstalledAt = await copyBundledSkill(
     plugin.name,
-    options.repoRoot,
+    packageDirOf(options),
     options.skillsInstallDir,
   );
   return {
@@ -287,9 +297,9 @@ async function installUnverified(
   const name = parsed.name;
   const npmRunner = options.npmRunner ?? runNpm;
   const spec = options.version ? `${name}@${options.version}` : name;
-  await npmRunner(["install", spec], options.repoRoot);
+  await npmRunner(["install", spec], packageDirOf(options));
 
-  const meta = await readPackageMeta(name, options.repoRoot);
+  const meta = await readPackageMeta(name, packageDirOf(options));
   if (!meta) {
     throw new Error(
       `--unverified install: cannot read package.json for ${name} after install`,
@@ -319,7 +329,7 @@ async function installUnverified(
   await writeManifest(options.repoRoot, upsertEntry(manifest, entry));
   const skillInstalledAt = await copyBundledSkill(
     name,
-    options.repoRoot,
+    packageDirOf(options),
     options.skillsInstallDir,
   );
   return {

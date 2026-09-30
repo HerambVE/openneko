@@ -1358,6 +1358,7 @@ export class InProcessControlPlane implements AgentControlPlane {
       readManifest,
       createMarketplaceClient,
       OFFICIAL_MARKETPLACE_URL,
+      pickInstallVersion,
     } = await import("@open-neko/plugin-install");
     const manifest = await readManifest(process.cwd()).catch(() => null);
     const installed = (manifest?.plugins ?? []).map((p) => ({
@@ -1373,14 +1374,12 @@ export class InProcessControlPlane implements AgentControlPlane {
       const marketplace = await createMarketplaceClient().fetch(
         OFFICIAL_MARKETPLACE_URL,
       );
-      available = (marketplace.plugins ?? []).map((p) => {
-        const latest = p.versions.find((v) => !v.yanked) ?? p.versions[0];
-        return {
-          name: p.name,
-          title: p.title || p.name,
-          description: p.description ?? "",
-          version: latest?.version ?? "unknown",
-        };
+      available = (marketplace.plugins ?? []).flatMap((p) => {
+        try {
+          return [{ name: p.name, title: p.title || p.name, description: p.description ?? "", version: pickInstallVersion(p).version }];
+        } catch {
+          return [];
+        }
       });
     } catch (err) {
       marketplaceError = err instanceof Error ? err.message : String(err);

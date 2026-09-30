@@ -328,6 +328,36 @@ describe("runInstall", () => {
     expect(Object.keys(stored["@open-neko/plugin-resend"] ?? {})).toEqual(["HMAC_KEY"]);
   });
 
+  it("runs npm in packageDir and keeps the manifest in repoRoot", async () => {
+    const plugin = {
+      name: "@open-neko/plugin-x",
+      title: "x",
+      description: "x",
+      source: "https://github.com/x/x",
+      versions: [actionVersion({ permissions: { network: [], env: [] }, kinds: [{ kind: "x", description: "x" }] })],
+    };
+    const packageDir = await mkdtemp(path.join(tmpdir(), "openneko-pkgdir-"));
+    const cwds: string[] = [];
+    try {
+      await runInstall({
+        repoRoot: repoDir,
+        packageDir,
+        spec: "@open-neko/plugin-x",
+        trustedMarketplaces: [officialMarketplace],
+        secretsConfigDir: configDir,
+        marketplaceClient: fakeClient(new Map([[OFFICIAL_MARKETPLACE_URL, marketplaceWith([plugin])]])),
+        npmRunner: async (_args, cwd) => {
+          cwds.push(cwd);
+        },
+        envPrompt: async () => "",
+      });
+      expect(cwds).toEqual([packageDir]);
+      expect((await readManifest(repoDir))?.plugins.map((p) => p.name)).toEqual(["@open-neko/plugin-x"]);
+    } finally {
+      await rm(packageDir, { recursive: true, force: true });
+    }
+  });
+
   it("errors when envPrompt returns empty for a required key", async () => {
     const plugin = {
       name: "@open-neko/plugin-x",

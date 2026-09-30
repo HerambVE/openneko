@@ -562,17 +562,19 @@ const server = createServer(
         await pluginRegistry.setPluginSettings(plugin, values);
       },
       catalog: async () => {
-        const { createMarketplaceClient, OFFICIAL_MARKETPLACE_URL } = await import("@open-neko/plugin-install");
+        const { createMarketplaceClient, OFFICIAL_MARKETPLACE_URL, pickInstallVersion } = await import("@open-neko/plugin-install");
         const installed = new Set((pluginRegistry?.pluginSettings() ?? []).map((p) => p.name));
         try {
           const marketplace = await createMarketplaceClient().fetch(OFFICIAL_MARKETPLACE_URL);
           return {
             available: (marketplace.plugins ?? [])
               .filter((p) => !installed.has(p.name) && p.versions.some((v) => !v.yanked && !v.draft))
-              .map((p) => {
-                const latest = p.versions.find((v) => !v.yanked && !v.draft);
-                return { name: p.name, title: p.title || p.name, description: p.description ?? "", version: latest?.version ?? "unknown" };
-              }),
+              .map((p) => ({
+                name: p.name,
+                title: p.title || p.name,
+                description: p.description ?? "",
+                version: pickInstallVersion(p).version,
+              })),
           };
         } catch (err) {
           return { available: [], error: `marketplace unavailable: ${err instanceof Error ? err.message : String(err)}` };
