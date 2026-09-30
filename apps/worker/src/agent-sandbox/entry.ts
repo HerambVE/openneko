@@ -180,7 +180,7 @@ async function startRunDataSocket(
           : {}),
       }),
   });
-  await installDataClient(job.workspace.binRoot);
+  await installDataClient(job.workspace.binRoot, socket.path);
   process.env.OPENNEKO_DATA_SOCKET = socket.path;
   process.env.PYTHONPATH = [job.workspace.binRoot, process.env.PYTHONPATH]
     .filter(Boolean)

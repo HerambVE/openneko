@@ -20,6 +20,10 @@ __all__ = ["NekoDataError", "call_tool", "query"]
 
 _ids = itertools.count(1)
 
+# Written by the run at install time. Tools that scrub the environment, such
+# as Hermes execute_code, still reach the run's socket through this default.
+_DEFAULT_SOCKET = __NEKO_DATA_SOCKET__
+
 
 class NekoDataError(RuntimeError):
     pass
@@ -38,9 +42,9 @@ class _UnixConnection(http.client.HTTPConnection):
 
 
 def _socket_path():
-    path = os.environ.get("OPENNEKO_DATA_SOCKET")
+    path = os.environ.get("OPENNEKO_DATA_SOCKET") or _DEFAULT_SOCKET
     if not path:
-        raise NekoDataError("OPENNEKO_DATA_SOCKET is not set: this run has no data access")
+        raise NekoDataError("this run has no data socket, so it has no data access")
     return path
 
 
@@ -150,10 +154,17 @@ if __name__ == "__main__":
     sys.exit(main())
 `;
 
-/** Writes neko_data.py and neko-query into the run's bin directory. */
-export async function installDataClient(binRoot: string): Promise<void> {
+/** Writes neko_data.py, bound to the run's socket, and neko-query into bin. */
+export async function installDataClient(
+  binRoot: string,
+  socketPath: string,
+): Promise<void> {
   await mkdir(binRoot, { recursive: true });
-  await writeFile(join(binRoot, "neko_data.py"), NEKO_DATA_PY, "utf8");
+  const client = NEKO_DATA_PY.replace(
+    "__NEKO_DATA_SOCKET__",
+    JSON.stringify(socketPath),
+  );
+  await writeFile(join(binRoot, "neko_data.py"), client, "utf8");
   const cli = join(binRoot, "neko-query");
   await writeFile(cli, NEKO_QUERY_CLI, "utf8");
   await chmod(cli, 0o755);
