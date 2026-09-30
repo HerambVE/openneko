@@ -52,7 +52,7 @@ describe("run data socket", () => {
           ...(toolPolicy ? { toolPolicy } : {}),
         }),
     });
-    await installDataClient(join(dir, "bin"));
+    await installDataClient(join(dir, "bin"), socket.path);
     const env = {
       ...process.env,
       OPENNEKO_DATA_SOCKET: socket.path,
@@ -124,6 +124,19 @@ describe("run data socket", () => {
     ).catch((err: { code: number; stderr: string }) => err);
     expect(result).toMatchObject({ code: 1 });
     expect(callGraphjinTool).not.toHaveBeenCalled();
+  });
+
+  it("reaches the socket when a tool scrubs the environment", async () => {
+    const { env } = await setup({ data: { orders: [{ id: 3 }] } });
+    const { OPENNEKO_DATA_SOCKET: _removed, ...scrubbed } = env;
+
+    const { stdout } = await run(
+      "python3",
+      ["-c", "import json\nfrom neko_data import query\nprint(json.dumps(query('query { orders { id } }')))"],
+      { env: scrubbed },
+    );
+
+    expect(JSON.parse(stdout)).toEqual({ orders: [{ id: 3 }] });
   });
 
   it("removes the socket file on close", async () => {
