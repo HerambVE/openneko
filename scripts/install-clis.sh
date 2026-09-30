@@ -138,6 +138,10 @@ if ! $SKIP_HERMES && ! hermes_matches_version; then
     patch --batch --forward --fuzz=0 -d "$hermes_source_root" -p1 \
       < "$REPO_ROOT/scripts/patches/hermes-acp-cost.patch"
   fi
+  if ! grep -q 'OPENNEKO_HERMES_MAX_ITERATIONS' "$hermes_source_root/acp_adapter/session.py"; then
+    patch --batch --forward --fuzz=0 -d "$hermes_source_root" -p1 \
+      < "$REPO_ROOT/scripts/patches/hermes-acp-run-budget.patch"
+  fi
   uv venv --clear "$hermes_tool_root" --python 3.11
   UV_PROJECT_ENVIRONMENT="$hermes_tool_root" \
     uv sync --project "$hermes_source_root" --locked --no-dev --extra acp --extra mcp --extra anthropic
@@ -191,6 +195,12 @@ if ! $SKIP_HERMES; then
     patch --batch --forward --fuzz=0 -d "$hermes_site" -p1 \
       < "$REPO_ROOT/scripts/patches/hermes-acp-cost.patch"
   fi
+  if ! grep -q 'OPENNEKO_HERMES_MAX_ITERATIONS' "$hermes_session"; then
+    patch --batch --forward --fuzz=0 -d "$hermes_site" -p1 \
+      < "$REPO_ROOT/scripts/patches/hermes-acp-run-budget.patch"
+  fi
+  "$hermes_python" -c \
+    "from acp_adapter.session import _openneko_run_budget; import os; os.environ['OPENNEKO_HERMES_MAX_ITERATIONS']='60'; assert _openneko_run_budget({}, '')['max_iterations'] == 60, 'Hermes ACP run budget missing'"
   "$hermes_python" -c \
     "import hermes_cli; assert hermes_cli.__version__ == '${HERMES_AGENT_VERSION}'"
   "$hermes_python" -c \

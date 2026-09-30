@@ -868,6 +868,7 @@ that flags churn risk every Monday."
           shellTool,
           queryTool: GRAPHJIN_EXECUTE_GRAPHQL_TOOL_TITLE,
           queryIdentity: "actor",
+          scriptAccess: true,
           workspace,
           knowledge,
           inlineKnowledge: "syntax",

@@ -146,6 +146,14 @@ describe("buildDataAccessSection", () => {
     expect(section).not.toContain("`terminal`");
   });
 
+  it("tells scripts how to query when script access is on", () => {
+    const section = native({ scriptAccess: true });
+    expect(section).toContain("from neko_data import query");
+    expect(section).toContain("neko-query");
+    expect(section).not.toContain("do not bypass it with the");
+    expect(native()).not.toContain("neko_data");
+  });
+
   it("inlines correctness rules for native queries", () => {
     const section = native();
     expect(section).toContain("multiple operators under");

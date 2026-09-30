@@ -285,6 +285,8 @@ export class HermesBackend implements AgentBackend {
       wantsCards = false,
       backendState = {},
       nativeDelegation = "enabled",
+      reasoningEffort,
+      maxToolIterations,
     } = opts;
 
     const fullPrompt = userMessage
@@ -311,6 +313,8 @@ export class HermesBackend implements AgentBackend {
           wantsCards,
           configuredIdentity: this.configuredIdentity,
           nativeDelegation,
+          reasoningEffort,
+          maxToolIterations,
           mcpServerNames: Object.keys(opts.mcpServers ?? {}),
           mcpBridgeEnv: opts.mcpBridgeEnv,
         });
@@ -354,9 +358,17 @@ export class HermesBackend implements AgentBackend {
     if (onEvent) {
       await onEvent({ type: "error", message });
     }
-    return { finalText: "", status: "failed", backendState, error: message };
+    return {
+      finalText: "",
+      status: "failed",
+      backendState,
+      error: message,
+      ...(message.startsWith(HERMES_TURN_TIMEOUT_PREFIX) ? { timedOut: true } : {}),
+    };
   }
 }
+
+const HERMES_TURN_TIMEOUT_PREFIX = "hermes turn exceeded its ";
 
 type RunOnceArgs = {
   prompt: string;
@@ -370,6 +382,8 @@ type RunOnceArgs = {
   wantsCards: boolean;
   configuredIdentity: AgentModelIdentity | undefined;
   nativeDelegation: AgentNativeDelegationPolicy;
+  reasoningEffort: AgentRunOptions["reasoningEffort"];
+  maxToolIterations: number | undefined;
   mcpServerNames: string[];
   mcpBridgeEnv: Record<string, string> | undefined;
 };
@@ -394,6 +408,8 @@ async function runOnce(args: RunOnceArgs): Promise<RunOnceOutcome> {
     wantsCards,
     configuredIdentity,
     nativeDelegation,
+    reasoningEffort,
+    maxToolIterations,
     mcpServerNames,
     mcpBridgeEnv,
   } = args;
@@ -438,6 +454,13 @@ async function runOnce(args: RunOnceArgs): Promise<RunOnceOutcome> {
   delete env[HERMES_NATIVE_DELEGATION_ENV];
   if (nativeDelegation === "disabled") {
     env[HERMES_NATIVE_DELEGATION_ENV] = HERMES_NATIVE_DELEGATION_DISABLED;
+  }
+  // Read by scripts/patches/hermes-acp-run-budget.patch.
+  delete env.OPENNEKO_HERMES_REASONING_EFFORT;
+  delete env.OPENNEKO_HERMES_MAX_ITERATIONS;
+  if (reasoningEffort) env.OPENNEKO_HERMES_REASONING_EFFORT = reasoningEffort;
+  if (maxToolIterations && maxToolIterations > 0) {
+    env.OPENNEKO_HERMES_MAX_ITERATIONS = String(Math.floor(maxToolIterations));
   }
   if (orgId) {
     env.HERMES_HOME = hermesHomeForOrg(orgId);
@@ -811,7 +834,9 @@ async function runOnce(args: RunOnceArgs): Promise<RunOnceOutcome> {
     }
 
     if (timedOut) {
-      throw new Error(`hermes timed out after ${timeoutMs}ms`);
+      throw new Error(
+        `hermes turn exceeded its ${Math.round(timeoutMs / 1000)}s budget and was terminated`,
+      );
     }
     if (promptError) {
       return { finalText: "", error: promptError };

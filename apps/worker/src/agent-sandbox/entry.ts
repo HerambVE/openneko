@@ -19,11 +19,14 @@ import {
   runAgentBackend,
   runWorkflowAgentBackend,
   type RunAgentBackendInput,
+  type RunWorkflowAgentBackendInput,
 } from "@neko/llm/sandbox-runtime";
 import { BrokerControlPlane } from "./broker-client";
 import { ARTIFACTS_MARKER, EVENT_MARKER, RESULT_MARKER } from "./protocol";
 import { configureAgentRuntime } from "./runtime-contract";
 import { hasArtifacts } from "./artifacts";
+import { installDataClient } from "./data-client";
+import { startDataSocket, type DataSocket } from "./data-socket";
 
 /**
  * Runs INSIDE the agent's OpenShell sandbox (Phase 3). The launcher (work-run)
@@ -59,6 +62,9 @@ interface SandboxJob {
   mode?: "live" | "headless";
   networkHosts?: string[];
   triggeredByObservationId?: string | null;
+  steps?: RunWorkflowAgentBackendInput["steps"];
+  input?: Record<string, unknown>;
+  maxContinuations?: number;
   workspace: AgentWorkspace;
   /** Skill names the run's actor holds. Undefined means every skill. */
   allowedSkills?: string[];
@@ -79,6 +85,8 @@ interface SandboxJob {
     | "backendState"
     | "nativeDelegation"
     | "wantsCards"
+    | "reasoningEffort"
+    | "maxToolIterations"
   >;
 }
 
@@ -137,6 +145,56 @@ export async function main(job = loadJob()): Promise<void> {
   if (kind !== "agent-job" && !controlPlane) {
     throw new Error("agent-sandbox: work run missing broker control plane");
   }
+  const dataSocket = await startRunDataSocket(job, controlPlane);
+  try {
+    await runJob(job, kind, backend, controlPlane, emit);
+  } finally {
+    await dataSocket?.close();
+  }
+}
+
+/**
+ * Gives skill scripts the run's neko_graphjin tools, so a script fetches its
+ * own data instead of passing every query through the model.
+ */
+async function startRunDataSocket(
+  job: SandboxJob,
+  controlPlane: BrokerControlPlane | undefined,
+): Promise<DataSocket | undefined> {
+  if (!controlPlane) return undefined;
+  const kind = job.kind ?? "work";
+  const enabled =
+    kind === "workflow" ||
+    (kind === "work" && job.dataSurface !== "records") ||
+    (kind === "agent-job" && job.agentAccess?.graphjinRead === true);
+  if (!enabled) return undefined;
+  const socket = await startDataSocket({
+    runId: job.runId,
+    buildServer: () =>
+      buildGraphjinMcpServer({
+        orgId: job.orgId,
+        ...(kind === "agent-job" ? {} : { runId: job.runId }),
+        controlPlane,
+        ...(kind === "work" && job.graphjinToolPolicy
+          ? { toolPolicy: job.graphjinToolPolicy }
+          : {}),
+      }),
+  });
+  await installDataClient(job.workspace.binRoot);
+  process.env.OPENNEKO_DATA_SOCKET = socket.path;
+  process.env.PYTHONPATH = [job.workspace.binRoot, process.env.PYTHONPATH]
+    .filter(Boolean)
+    .join(":");
+  return socket;
+}
+
+async function runJob(
+  job: SandboxJob,
+  kind: NonNullable<SandboxJob["kind"]>,
+  backend: ReturnType<typeof makeAgentBackend>,
+  controlPlane: BrokerControlPlane | undefined,
+  emit: (event: AgentEvent) => Promise<void>,
+): Promise<void> {
   let result: AgentRunResult;
   if (kind === "agent-job") {
     const graphjinRead = job.agentAccess?.graphjinRead === true;
@@ -220,6 +278,16 @@ export async function main(job = loadJob()): Promise<void> {
       controlPlane,
       emit,
       timeoutMs: job.agentRun?.timeoutMs,
+      steps: job.steps ?? [],
+      input: job.input ?? {},
+      maxContinuations: job.maxContinuations ?? 0,
+      ...(job.allowedSkills ? { allowedSkills: job.allowedSkills } : {}),
+      ...(job.agentRun?.reasoningEffort
+        ? { reasoningEffort: job.agentRun.reasoningEffort }
+        : {}),
+      ...(job.agentRun?.maxToolIterations
+        ? { maxToolIterations: job.agentRun.maxToolIterations }
+        : {}),
     });
   } else {
     if (!controlPlane) {
