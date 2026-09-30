@@ -118,6 +118,14 @@ describe("Hermes install contract", () => {
       expect(source).toContain("hermes-acp-run-budget.patch");
       expect(source).toContain("Hermes ACP run budget missing");
     }
+    // The reasoning-config assertion inspects _make_agent, and the installer
+    // greps this line; the run-budget patch must add overrides after it.
+    const runBudgetPatch = await readFile(
+      `${REPO_ROOT}scripts/patches/hermes-acp-run-budget.patch`,
+      "utf8",
+    );
+    expect(runBudgetPatch).not.toMatch(/^-\s+"reasoning_config": resolve_reasoning_config/m);
+    expect(runBudgetPatch).toMatch(/^\+\s+\*\*_openneko_run_budget\(\),$/m);
   });
 
   it("patches ACP to pass per-turn cost and prices Gemini 3.7 and 3.8 Flash", async () => {

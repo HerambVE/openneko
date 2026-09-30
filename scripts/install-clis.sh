@@ -200,7 +200,7 @@ if ! $SKIP_HERMES; then
       < "$REPO_ROOT/scripts/patches/hermes-acp-run-budget.patch"
   fi
   "$hermes_python" -c \
-    "from acp_adapter.session import _openneko_run_budget; import os; os.environ['OPENNEKO_HERMES_MAX_ITERATIONS']='60'; assert _openneko_run_budget({}, '')['max_iterations'] == 60, 'Hermes ACP run budget missing'"
+    "from acp_adapter.session import _openneko_run_budget; import os; os.environ['OPENNEKO_HERMES_MAX_ITERATIONS']='60'; assert _openneko_run_budget()['max_iterations'] == 60, 'Hermes ACP run budget missing'"
   "$hermes_python" -c \
     "import hermes_cli; assert hermes_cli.__version__ == '${HERMES_AGENT_VERSION}'"
   "$hermes_python" -c \
