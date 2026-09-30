@@ -172,6 +172,12 @@ describe("brokered neko_ui render MCP server", () => {
     await withRenderServer(async (client, emit) => {
       const listed = await client.listTools();
       expect(listed.tools.map((tool) => tool.name)).toEqual(["render_cards"]);
+      expect(listed.tools[0]?.description).toContain("Render cards and interactive UI");
+      expect(listed.tools[0]?.description?.length).toBeLessThan(500);
+      expect(
+        (listed.tools[0]?.inputSchema.properties?.messages as { description?: string })
+          .description,
+      ).toContain("Example — editable source proposal:");
 
       const result = await client.callTool({
         name: "render_cards",
