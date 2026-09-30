@@ -19,7 +19,7 @@ import type {
   WorkDataSurface,
 } from "./data-surface";
 import {
-  A2UI_RENDER_ACP_TITLE,
+  A2UI_RENDER_MCP_TOOL_NAME,
   A2UI_RENDER_TOOL_NAME,
 } from "./a2ui-contract";
 import { ASK_USER_TOOL_TITLE } from "./interaction-server";
@@ -88,20 +88,21 @@ heuristic as urgency, priority, or overdue status.
 </records_access>`;
 }
 
-// Web-only (callers gate this behind wantsCards). Hermes renders through a
+// Web-only (callers gate this behind wantsCards). Rendering uses a
 // `render_cards` tool mounted via the single brokered neko_ui MCP server. The
 // component catalog + generated message schema live on
-// the TOOL's description (ST1: the channel supplies its own rendering
+// the tool's messages parameter schema (ST1: the channel supplies its own rendering
 // vocabulary; the base prompt stays channel-neutral). See
 // docs/PER_CHANNEL_RENDERING.md.
 function buildRenderingSection(supportsCardTool: boolean): string {
   const tool = supportsCardTool
-    ? A2UI_RENDER_ACP_TITLE
+    ? A2UI_RENDER_MCP_TOOL_NAME
     : A2UI_RENDER_TOOL_NAME;
   return `<rendering>
 Call \`${tool}\` for every web answer that contains two or more figures, a
 comparison, a table, findings, a decision, a form, or an error-recovery path.
-Its description carries the available components and protocol. Compose an
+Use \`tool_describe\` for this name if deferred; its messages schema carries the
+available components, example, and protocol. Compose an
 interface that fits the current request, using the smallest useful combination
 of narrative, data, layout, inputs, and actions.
 The surface supports the conversation; it does not replace your assistant
@@ -455,7 +456,7 @@ runtime, or reload impact, complete these steps in order:
    status.
 
 When an edit needs operator input, call \`list_source_secret_names\` as needed,
-then use \`${A2UI_RENDER_ACP_TITLE}\` to present a bound A2UI v1.0 form with the relevant
+then use \`${A2UI_RENDER_MCP_TOOL_NAME}\` to present a bound A2UI v1.0 form with the relevant
 fields and one proposal action. In the next turn, validate the submitted values
 and call \`request_source_config_change\`. The source form offers Database, API,
 and Files. Use Conditional groups so the selected kind shows its own fields.

@@ -1,13 +1,17 @@
 import { z } from "zod";
 import type { AgentSurfaceMessage } from "../agent-backend";
+import { RENDER_CARDS_SCHEMA_GUIDANCE } from "./render-guidance";
 
 export const A2UI_VERSION = "v1.0" as const;
 export const A2UI_CATALOG_ID = "urn:openneko:catalog:work:v2" as const;
 export const A2UI_RENDER_SERVER_NAME = "neko_ui" as const;
 export const A2UI_RENDER_TOOL_NAME = "render_cards" as const;
+/** Registered name for render_cards on the brokered neko MCP server. */
+export const A2UI_RENDER_MCP_TOOL_NAME =
+  "mcp__neko__ui_render_cards" as const;
 
 /**
- * Hermes reports tools from the multiplexed `neko` bridge as
+ * ACP reports tools from the multiplexed `neko` bridge as
  * `mcp_neko_<logical-server>_<tool>` in ACP notifications.
  */
 export const A2UI_RENDER_ACP_TITLE =
@@ -87,7 +91,10 @@ const readableA2UIMessageSchema = messageSchema({ generated: false });
 /** The sole schema accepted by the render_cards tool. */
 export const renderCardsArgsSchema = z
   .object({
-    messages: z.array(generatedA2UIMessageSchema).min(1),
+    messages: z
+      .array(generatedA2UIMessageSchema)
+      .min(1)
+      .describe(RENDER_CARDS_SCHEMA_GUIDANCE),
   })
   .strict();
 

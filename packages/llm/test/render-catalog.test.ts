@@ -5,24 +5,16 @@ import {
 } from "../src/work/render-catalog";
 
 describe("render_cards catalog", () => {
-  it("advertises the v1.0 envelope and interactive form primitives", () => {
+  const messagesDescription = (
+    RENDER_CARDS_INPUT_SCHEMA.properties as Record<string, { description: string }>
+  ).messages.description;
+
+  it("keeps discovery text short and searchable", () => {
     expect(RENDER_CARDS_DESCRIPTION).toContain("A2UI v1.0");
     expect(RENDER_CARDS_DESCRIPTION).toContain("{messages:[...]}");
-    expect(RENDER_CARDS_DESCRIPTION).toContain("urn:openneko:catalog:work:v2");
-    expect(RENDER_CARDS_DESCRIPTION).toContain("TextField");
-    expect(RENDER_CARDS_DESCRIPTION).toContain("ChoicePicker");
-    expect(RENDER_CARDS_DESCRIPTION).toContain("Conditional");
-    expect(RENDER_CARDS_DESCRIPTION).toContain("Button");
-    expect(RENDER_CARDS_DESCRIPTION).toContain('values\":{\"path\":\"/form\"}');
-    expect(RENDER_CARDS_DESCRIPTION).toContain(
-      '"label":"Files","value":"file"',
-    );
-    expect(RENDER_CARDS_DESCRIPTION).toContain("OpenApiSpecInput");
-    expect(RENDER_CARDS_DESCRIPTION).toContain("ManagedFileSourceInput");
-    expect(RENDER_CARDS_DESCRIPTION).toContain("/form/openApiSpec/id");
-    expect(RENDER_CARDS_DESCRIPTION).toContain("Storage backend");
-    expect(RENDER_CARDS_DESCRIPTION).toContain("/form/localFiles/sourceName");
-    expect(RENDER_CARDS_DESCRIPTION).toContain('"messages": [');
+    expect(RENDER_CARDS_DESCRIPTION).toContain("Render cards and interactive UI");
+    expect(RENDER_CARDS_DESCRIPTION.length).toBeLessThan(500);
+    expect(RENDER_CARDS_DESCRIPTION).not.toContain("Example — editable source proposal:");
   });
 
   it("gives the model a strict v1 component schema", () => {
@@ -30,11 +22,24 @@ describe("render_cards catalog", () => {
     expect(schema).toContain('"const":"v1.0"');
     expect(schema).toContain('"required":["id","component"]');
     expect(schema).toContain("urn:openneko:catalog:work:v2");
+    expect(messagesDescription).toContain("urn:openneko:catalog:work:v2");
+    expect(messagesDescription).toContain("TextField");
+    expect(messagesDescription).toContain("ChoicePicker");
+    expect(messagesDescription).toContain("Conditional");
+    expect(messagesDescription).toContain("Button");
+    expect(messagesDescription).toContain("OpenApiSpecInput");
+    expect(messagesDescription).toContain("ManagedFileSourceInput");
+    expect(messagesDescription).toContain("Example — editable source proposal:");
+    expect(messagesDescription).toContain('"values":{"path":"/form"}');
+    expect(messagesDescription).toContain('"label":"Files","value":"file"');
+    expect(messagesDescription).toContain("/form/openApiSpec/id");
+    expect(messagesDescription).toContain("Storage backend");
+    expect(messagesDescription).toContain("/form/localFiles/sourceName");
   });
 
   it("keeps configuration submission on the proposal path", () => {
-    expect(RENDER_CARDS_DESCRIPTION).toContain("proposal tool");
-    expect(RENDER_CARDS_DESCRIPTION).toContain("approval policy");
-    expect(RENDER_CARDS_DESCRIPTION).toContain("secretRef");
+    expect(messagesDescription).toContain("proposal tool");
+    expect(messagesDescription).toContain("approval policy");
+    expect(messagesDescription).toContain("secretRef");
   });
 });

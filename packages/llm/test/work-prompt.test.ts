@@ -247,7 +247,8 @@ describe("per-channel rendering gate", () => {
   it("renders via the render_cards tool on web turns (wantsCards)", () => {
     const hermesMcp = build("hermes", { wantsCards: true, supportsCardTool: true });
     expect(hermesMcp).toContain("<rendering>");
-    expect(hermesMcp).toContain("mcp_neko_ui_render_cards");
+    expect(hermesMcp).toContain("mcp__neko__ui_render_cards");
+    expect(hermesMcp).not.toContain("mcp_neko_ui_render_cards");
     expect(hermesMcp).toContain("interface that fits the current request");
     expect(hermesMcp).not.toContain("BriefingCard");
 
