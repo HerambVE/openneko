@@ -97,6 +97,26 @@ describe("HermesBackend spawn invariants", () => {
     ).toBeUndefined();
   });
 
+  it("passes the run budget to the patched Hermes session", async () => {
+    const backend = new HermesBackend();
+    await backend.run({ prompt: "ping", reasoningEffort: "medium", maxToolIterations: 80 });
+
+    const env = controller.spawnCalls[0].options.env ?? {};
+    expect(env.OPENNEKO_HERMES_REASONING_EFFORT).toBe("medium");
+    expect(env.OPENNEKO_HERMES_MAX_ITERATIONS).toBe("80");
+  });
+
+  it("does not inherit a run budget into turns that set none", async () => {
+    vi.stubEnv("OPENNEKO_HERMES_REASONING_EFFORT", "low");
+    vi.stubEnv("OPENNEKO_HERMES_MAX_ITERATIONS", "5");
+    const backend = new HermesBackend();
+    await backend.run({ prompt: "ping" });
+
+    const env = controller.spawnCalls[0].options.env ?? {};
+    expect(env.OPENNEKO_HERMES_REASONING_EFFORT).toBeUndefined();
+    expect(env.OPENNEKO_HERMES_MAX_ITERATIONS).toBeUndefined();
+  });
+
   it("does not leak prompt text into argv (prompt goes over JSON-RPC stdin)", async () => {
     const backend = new HermesBackend();
     await backend.run({ prompt: "system instructions", userMessage: "hi" });

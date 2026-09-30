@@ -175,6 +175,7 @@ COPY scripts/patches/hermes-acp-native-delegation-policy.patch /tmp/hermes-acp-n
 COPY scripts/patches/hermes-acp-tool-usage.patch /tmp/hermes-acp-tool-usage.patch
 COPY scripts/patches/hermes-acp-mcp-output.patch /tmp/hermes-acp-mcp-output.patch
 COPY scripts/patches/hermes-acp-cost.patch /tmp/hermes-acp-cost.patch
+COPY scripts/patches/hermes-acp-run-budget.patch /tmp/hermes-acp-run-budget.patch
 COPY scripts/test-hermes-acp-tool-usage.py /tmp/test-hermes-acp-tool-usage.py
 COPY scripts/test-hermes-acp-cost.py /tmp/test-hermes-acp-cost.py
 RUN --mount=type=cache,id=hermes-uv,target=/tmp/uv-cache \
@@ -193,7 +194,8 @@ RUN --mount=type=cache,id=hermes-uv,target=/tmp/uv-cache \
     && patch --batch --forward --fuzz=0 -d /usr/local/lib/hermes-agent -p1 < /tmp/hermes-acp-tool-usage.patch \
     && patch --batch --forward --fuzz=0 -d /usr/local/lib/hermes-agent -p1 < /tmp/hermes-acp-mcp-output.patch \
     && patch --batch --forward --fuzz=0 -d /usr/local/lib/hermes-agent -p1 < /tmp/hermes-acp-cost.patch \
-    && rm /tmp/hermes-acp-cost.patch /tmp/hermes-acp-mcp-output.patch /tmp/hermes-acp-tool-usage.patch /tmp/hermes-acp-reasoning-config.patch /tmp/hermes-acp-interim-messages.patch /tmp/hermes-acp-anthropic-reasoning.patch /tmp/hermes-acp-native-delegation-policy.patch \
+    && patch --batch --forward --fuzz=0 -d /usr/local/lib/hermes-agent -p1 < /tmp/hermes-acp-run-budget.patch \
+    && rm /tmp/hermes-acp-run-budget.patch /tmp/hermes-acp-cost.patch /tmp/hermes-acp-mcp-output.patch /tmp/hermes-acp-tool-usage.patch /tmp/hermes-acp-reasoning-config.patch /tmp/hermes-acp-interim-messages.patch /tmp/hermes-acp-anthropic-reasoning.patch /tmp/hermes-acp-native-delegation-policy.patch \
     && cd /usr/local/lib/hermes-agent \
     && UV_PROJECT_ENVIRONMENT=/usr/local/uv/tools/hermes-agent \
        UV_CACHE_DIR=/tmp/uv-cache \
@@ -210,6 +212,7 @@ RUN --mount=type=cache,id=hermes-uv,target=/tmp/uv-cache \
     && /usr/local/uv/tools/hermes-agent/bin/python -c "from acp_adapter.events import make_interim_message_cb; from acp_adapter.server import HermesACPAgent; import inspect; source = inspect.getsource(HermesACPAgent.prompt); assert 'interim_assistant_callback' in source and 'pending_streamed_message.append(text)' in source and 'raw_interim_cb(text, already_streamed=False)' in source and 'not streamed_message' not in source; assert callable(make_interim_message_cb), 'Hermes ACP buffered interim callback missing'" \
     && /usr/local/uv/tools/hermes-agent/bin/python -c "from agent import chat_completion_helpers; from pathlib import Path; source = Path(chat_completion_helpers.__file__).read_text(); assert '_emit_unstreamed_anthropic_reasoning' in source and 'reasoning_was_streamed' in source, 'Hermes ACP Anthropic reasoning fallback missing'" \
     && /usr/local/uv/tools/hermes-agent/bin/python -c "from acp_adapter.session import _openneko_disabled_toolsets; import os; os.environ['OPENNEKO_HERMES_NATIVE_DELEGATION']='disabled'; assert _openneko_disabled_toolsets() == ['delegation'], 'Hermes ACP native delegation policy missing'" \
+    && /usr/local/uv/tools/hermes-agent/bin/python -c "from acp_adapter.session import _openneko_run_budget; import os; os.environ['OPENNEKO_HERMES_REASONING_EFFORT']='medium'; os.environ['OPENNEKO_HERMES_MAX_ITERATIONS']='60'; b = _openneko_run_budget({}, ''); assert b['max_iterations'] == 60 and b['reasoning_config'], 'Hermes ACP run budget missing'" \
     && /usr/local/uv/tools/hermes-agent/bin/python /tmp/test-hermes-acp-tool-usage.py \
     && /usr/local/uv/tools/hermes-agent/bin/python /tmp/test-hermes-acp-cost.py \
     && rm /tmp/test-hermes-acp-tool-usage.py /tmp/test-hermes-acp-cost.py \

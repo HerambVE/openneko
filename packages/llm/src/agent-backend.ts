@@ -253,6 +253,34 @@ export function agentTurnTimeoutMs(): number {
   return Number.isFinite(env) && env > 0 ? env : 9 * 60_000;
 }
 
+/**
+ * Budget for one workflow turn. Workflows are mechanical loops, so they run at
+ * lower reasoning effort, with a tool-call cap and a longer wall clock than chat.
+ */
+export function workflowTurnBudget(): Required<
+  Pick<AgentRunOptions, "timeoutMs" | "reasoningEffort" | "maxToolIterations">
+> & {
+  maxContinuations: number;
+} {
+  const num = (name: string, fallback: number) => {
+    const value = Number(process.env[name]);
+    return Number.isFinite(value) && value > 0 ? value : fallback;
+  };
+  const effort = process.env.OPENNEKO_WORKFLOW_REASONING_EFFORT?.trim();
+  return {
+    timeoutMs: num("OPENNEKO_WORKFLOW_TURN_TIMEOUT_MS", 15 * 60_000),
+    reasoningEffort: isReasoningEffort(effort) ? effort : "medium",
+    maxToolIterations: Math.floor(num("OPENNEKO_WORKFLOW_MAX_TOOL_CALLS", 150)),
+    maxContinuations: Math.floor(num("OPENNEKO_WORKFLOW_MAX_CONTINUATIONS", 2)),
+  };
+}
+
+export type AgentReasoningEffort = "low" | "medium" | "high";
+
+function isReasoningEffort(value: unknown): value is AgentReasoningEffort {
+  return value === "low" || value === "medium" || value === "high";
+}
+
 /** Per-run policy for a backend's own sub-agent primitive. */
 export type AgentNativeDelegationPolicy = "enabled" | "disabled";
 
@@ -285,6 +313,10 @@ export type AgentRunOptions = {
    *  in-process SDK card server (hermes) wire their own render tool when set.
    *  See docs/PER_CHANNEL_RENDERING.md. */
   wantsCards?: boolean;
+  /** Overrides the configured reasoning effort for this run. */
+  reasoningEffort?: AgentReasoningEffort;
+  /** Caps tool-calling iterations; the agent then stops and summarizes. */
+  maxToolIterations?: number;
 };
 
 export type AgentRunResult = {
@@ -301,6 +333,8 @@ export type AgentRunResult = {
   status: "completed" | "failed" | "cancelled";
   backendState?: Record<string, unknown>;
   error?: string;
+  /** The turn hit its wall-clock budget; work in the run directory survives. */
+  timedOut?: boolean;
 };
 
 export type AgentNativeDelegation = "hermes-delegate-task";

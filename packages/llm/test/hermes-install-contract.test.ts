@@ -114,6 +114,10 @@ describe("Hermes install contract", () => {
     expect(installer).toContain("Hermes ACP Anthropic reasoning fallback missing");
     expect(dockerfile).toContain("Hermes ACP native delegation policy missing");
     expect(installer).toContain("Hermes ACP native delegation policy missing");
+    for (const source of [dockerfile, installer]) {
+      expect(source).toContain("hermes-acp-run-budget.patch");
+      expect(source).toContain("Hermes ACP run budget missing");
+    }
   });
 
   it("patches ACP to pass per-turn cost and prices Gemini 3.7 and 3.8 Flash", async () => {

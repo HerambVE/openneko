@@ -116,6 +116,8 @@ export type DataAccessOptions = {
   queryIdentity?: "actor" | "service";
   /** Restrict this agent's use of otherwise caller-visible execution tools. */
   readOnly?: boolean;
+  /** Skill scripts can run the query tool through the run's data socket. */
+  scriptAccess?: boolean;
   /** Read-only GraphJin server-agent tool used by delegated jobs. */
   agentTool?: string;
   workspace: AgentWorkspace;
@@ -189,7 +191,13 @@ ${GRAPHJIN_AGGREGATE_RULE}
 }
 
 function buildBrokeredDataAccessSection(opts: DataAccessOptions): string {
-  const { queryTool, knowledge, queryIdentity = "service", readOnly = false } = opts;
+  const {
+    queryTool,
+    knowledge,
+    queryIdentity = "service",
+    readOnly = false,
+    scriptAccess = false,
+  } = opts;
   if (!queryTool) throw new Error("brokered data access requires queryTool");
   const graphjinTool = (name: string) =>
     queryTool.replace(/execute_graphql$/, name);
@@ -278,8 +286,23 @@ execute GraphQL by calling \`${queryTool}\` with:
   { "query": "<your GraphQL operation>" }
 
 GraphJin itself applies the caller's role, source capabilities, and tool gates.
-Treat a refusal or unavailable tool as authoritative; do not bypass it with the
-shell, raw HTTP, a CLI, or a hand-written MCP request.
+${
+  scriptAccess
+    ? `Treat a refusal or unavailable tool as authoritative. A script receives the
+same refusal, so fix the query instead of changing the transport.
+
+Scripts query GraphJin themselves through the same \`execute_graphql\` tool,
+identity, and policy. In Python, \`from neko_data import query\` and call
+\`query(graphql, variables)\`: it returns the data object and raises
+\`NekoDataError\` on any GraphQL error. In the shell, \`neko-query '<graphql>'\`
+prints the data object as JSON. When a skill bundles a script, run the script
+and let it fetch its own data. When a task needs many queries, chunked
+\`in\` filters, or rows that belong in files, write a script that uses
+\`neko_data\` and run it once. Call \`${queryTool}\` directly for discovery
+and for small answers.`
+    : `Treat a refusal or unavailable tool as authoritative; do not bypass it with the
+shell, raw HTTP, a CLI, or a hand-written MCP request.`
+}
 
 ${
   readOnly

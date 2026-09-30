@@ -167,13 +167,18 @@ export function buildWorkflowRunnerPrompt(
     queryTool: GRAPHJIN_EXECUTE_GRAPHQL_TOOL_TITLE,
     queryIdentity: "actor",
     readOnly: true,
+    scriptAccess: true,
     workspace,
     knowledge,
     inlineKnowledge: "syntax",
   });
 
   const stepsBlock = workflow.steps
-    .map((step, index) => `  ${index + 1}. ${step.description}`)
+    .map((step, index) =>
+      step.script
+        ? `  ${index + 1}. ${step.description} (script step: already ran; see <step_results>)`
+        : `  ${index + 1}. ${step.description}`,
+    )
     .join("\n");
 
   const overlay = workflow.systemPromptOverlay.trim();

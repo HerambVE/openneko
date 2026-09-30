@@ -2,7 +2,7 @@ import { startupPhase, withStartupTrace } from "@neko/telemetry/startup";
 import { heldItems, pool, resolveUserGroups } from "@neko/db";
 import { filterHeldActions, runAllowedLibrary, runEntitlementActor, runHeldItemIds } from "../work/entitlement-scope";
 import { getWorkRunActor } from "../work/personas";
-import type { AgentEvent } from "../agent-backend";
+import { workflowTurnBudget, type AgentEvent } from "../agent-backend";
 import type { HarnessObserver } from "@neko/telemetry";
 import { resolveAgentBackend as defaultResolveAgentBackend } from "../agent-backend-resolver";
 import {
@@ -160,7 +160,10 @@ export type RunWorkflowTurnOptions = {
   mode: "live" | "headless";
   emit: (event: AgentEvent) => Promise<void>;
   signal?: AbortSignal;
+  /** A hard runtime ceiling for the whole run (API runs); disables continuations. */
   timeoutMs?: number;
+  /** Tool-call ceiling for the run (API runs). */
+  maxToolIterations?: number;
   /** Metadata-only observation stream shared with Ask. */
   observer?: HarnessObserver;
   /**
@@ -294,6 +297,7 @@ async function runWorkflowTurnTraced(
     });
     const [allowedSkills, allowedLibrary] = await startupPhase("identity.entitlements", () =>
       Promise.all([runHeldItemIds(runActor, "skill"), runAllowedLibrary(runActor)]));
+    const budget = workflowTurnBudget();
     const coreResult = await runCore({
       ...(allowedSkills ? { allowedSkills } : {}),
       ...(allowedLibrary ? { allowedLibrary } : {}),
@@ -313,7 +317,12 @@ async function runWorkflowTurnTraced(
       emit: wrappedEmit,
       tag: `workflow ${workflow.name} ${workflowRun.id}`,
       signal,
-      timeoutMs: opts.timeoutMs,
+      steps: workflow.steps,
+      input: workflowRun.triggerPayload,
+      timeoutMs: opts.timeoutMs ?? budget.timeoutMs,
+      reasoningEffort: budget.reasoningEffort,
+      maxToolIterations: opts.maxToolIterations ?? budget.maxToolIterations,
+      maxContinuations: opts.timeoutMs ? 0 : budget.maxContinuations,
     });
     const spendStop = spendCapFromSignal(signal);
     const result = spendStop

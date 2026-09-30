@@ -156,6 +156,7 @@ const {
   sandboxLauncherOptionsFromEnv,
   stageSandboxWorkspace,
   verifyOpenShellGateway,
+  workflowExecBudgetMs,
 } = await import("../src/work/sandbox-launcher");
 
 describe("sandboxLauncherOptionsFromEnv", () => {
@@ -958,6 +959,54 @@ describe("makeSandboxRunCore", () => {
     expect(h.calls.filter((c) => c.args.includes("create"))).toHaveLength(1);
     expect(h.calls.filter((c) => c.args.includes("exec"))).toHaveLength(1);
     expect(h.calls.filter((c) => c.args.includes("delete"))).toHaveLength(1);
+  });
+
+  it("carries script steps, input, and the run budget into the sandbox job", async () => {
+    const runCore = makeSandboxWorkflowRunCore({
+      agentImage: "ghcr.io/open-neko/agent:test",
+      onLog: () => {},
+    });
+    const steps = [
+      { id: "plan", description: "agent step" },
+      {
+        id: "union",
+        description: "build the union",
+        script: { skill: "daily-lead-union", command: ["python3", "run.py"], timeoutSeconds: 600 },
+      },
+    ];
+
+    await runCore({
+      ...fakeWorkflowInput(async () => {}),
+      timeoutMs: 900_000,
+      steps,
+      input: { date: "2026-09-29" },
+      reasoningEffort: "medium",
+      maxToolIterations: 150,
+      maxContinuations: 2,
+    });
+
+    expect(jobCapture.jobs.at(-1)).toMatchObject({
+      steps,
+      input: { date: "2026-09-29" },
+      maxContinuations: 2,
+      agentRun: { timeoutMs: 900_000, reasoningEffort: "medium", maxToolIterations: 150 },
+    });
+    const execArgs = h.calls.find((call) => call.args.includes("exec"))?.args ?? [];
+    // 600s of steps + 3 turns of 900s + 120s margin.
+    expect(execArgs[execArgs.indexOf("--timeout") + 1]).toBe("3420");
+  });
+
+  it("sizes the exec budget for steps and continuations", () => {
+    const input = fakeWorkflowInput(async () => {});
+    expect(workflowExecBudgetMs({ ...input, timeoutMs: 60_000 })).toBe(60_000);
+    expect(
+      workflowExecBudgetMs({
+        ...input,
+        timeoutMs: 60_000,
+        maxContinuations: 1,
+        steps: [{ id: "s", description: "d", script: { skill: "x", command: ["true"] } }],
+      }),
+    ).toBe(1_200_000 + 120_000);
   });
 
   it("adds pack-declared workflow hosts to the OpenShell policy", async () => {

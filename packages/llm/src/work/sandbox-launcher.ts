@@ -186,6 +186,8 @@ type SerializableAgentRunOptions = Pick<
   | "backendState"
   | "nativeDelegation"
   | "wantsCards"
+  | "reasoningEffort"
+  | "maxToolIterations"
 >;
 
 function serializableAgentRunOptions(
@@ -203,6 +205,12 @@ function serializableAgentRunOptions(
       ? { nativeDelegation: run.nativeDelegation }
       : {}),
     ...(run.wantsCards !== undefined ? { wantsCards: run.wantsCards } : {}),
+    ...(run.reasoningEffort !== undefined
+      ? { reasoningEffort: run.reasoningEffort }
+      : {}),
+    ...(run.maxToolIterations !== undefined
+      ? { maxToolIterations: run.maxToolIterations }
+      : {}),
   };
 }
 
@@ -696,9 +704,15 @@ function makeSandboxCore(
             networkHosts: (input as RunWorkflowAgentBackendInput).networkHosts,
             triggeredByObservationId:
               (input as RunWorkflowAgentBackendInput).triggeredByObservationId ?? null,
+            steps: (input as RunWorkflowAgentBackendInput).steps ?? [],
+            input: (input as RunWorkflowAgentBackendInput).input ?? {},
+            maxContinuations:
+              (input as RunWorkflowAgentBackendInput).maxContinuations ?? 0,
             agentRun: serializableAgentRunOptions({
               prompt: inputPrompt,
               timeoutMs: (input as RunWorkflowAgentBackendInput).timeoutMs,
+              reasoningEffort: (input as RunWorkflowAgentBackendInput).reasoningEffort,
+              maxToolIterations: (input as RunWorkflowAgentBackendInput).maxToolIterations,
             }),
             }
           : {
@@ -954,9 +968,9 @@ function makeSandboxCore(
         // dies as the backend's honest timeout error — not an opaque
         // exec-stream kill from out here.
         opts.execTimeoutMs ??
-          (jobInput?.run.timeoutMs ??
-            (kind === "workflow" ? (input as RunWorkflowAgentBackendInput).timeoutMs : undefined) ??
-            agentTurnTimeoutMs()) + 120_000,
+          (kind === "workflow"
+            ? workflowExecBudgetMs(input as RunWorkflowAgentBackendInput)
+            : (jobInput?.run.timeoutMs ?? agentTurnTimeoutMs())) + 120_000,
         signal,
         (present) => { artifactsPresent = present; },
       ));
@@ -1002,6 +1016,15 @@ function makeSandboxCore(
       }));
     }
   };
+}
+
+/** Script steps, then the first turn and every continuation, back to back. */
+export function workflowExecBudgetMs(input: RunWorkflowAgentBackendInput): number {
+  const turnMs = input.timeoutMs ?? agentTurnTimeoutMs();
+  const stepsMs = (input.steps ?? [])
+    .filter((step) => step.script)
+    .reduce((sum, step) => sum + (step.script!.timeoutSeconds ?? 1_200) * 1_000, 0);
+  return stepsMs + turnMs * (1 + (input.maxContinuations ?? 0));
 }
 
 /** `policy update` adding the model endpoint(s) scoped to the backend binary. */
