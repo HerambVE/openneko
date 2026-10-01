@@ -27,7 +27,7 @@ ambiguous paths, and encrypted entries are rejected. Limits are 16 MiB compresse
 be replaced by uploads.
 
 Custom API connectors support bundled OpenAPI with local references and optional
-bearer authentication. Credentials must use declared `{{secret.<key>}}`
+bearer or API-key authentication. Credentials must use declared `{{secret.<key>}}`
 references; never put credentials in the archive. A pack may declare a
 customer-owned OAuth client, reviewed consent scopes, and required network hosts.
 OpenNeko handles browser consent and token refresh without installing a plugin

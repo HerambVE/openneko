@@ -129,6 +129,18 @@ sources:
       token: "{{secret.my-pack.api_token}}"
 ```
 
+For a provider that expects an API key, send it in a named header or query
+parameter. `key_in` accepts `header` (the default) or `query`. Prefer a header,
+because a query value can appear in provider and proxy logs:
+
+```yaml
+    auth:
+      type: api_key
+      key_name: Api-Key
+      key_in: header
+      key_value: "{{secret.my-pack.api_token}}"
+```
+
 Declare `my-pack.base_url` in `inputs` and `my-pack.api_token` in `secrets`, with
 purpose `graphjin_api_auth`. The installer supplies configuration and resolves
 secret references through the encrypted secret store. Keep credentials out of

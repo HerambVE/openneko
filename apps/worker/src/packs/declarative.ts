@@ -22,6 +22,21 @@ export function packValue(value: unknown, inputs: Record<string, unknown>, secre
   return value;
 }
 
+const HTTP_TOKEN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,128}$/;
+
+/** Map a pack API auth declaration to its GraphJin spec auth. */
+function packApiAuth(auth: Record<string, unknown>, requestHeader?: string): Record<string, unknown> {
+  const only = (keys: string[]) => Object.keys(auth).every(key => keys.includes(key));
+  if (auth.type === "bearer" && typeof auth.token === "string" && only(["type", "token"])) {
+    return { scheme: "bearer", ...(requestHeader ? { token_from_request: { header: requestHeader } } : { token: auth.token }) };
+  }
+  if (auth.type === "api_key" && typeof auth.key_value === "string" && typeof auth.key_name === "string" && HTTP_TOKEN.test(auth.key_name)
+    && [undefined, "header", "query"].includes(auth.key_in as string | undefined) && only(["type", "key_name", "key_value", "key_in"])) {
+    return { scheme: "api_key", key_name: auth.key_name, key_value: auth.key_value, key_in: auth.key_in ?? "header" };
+  }
+  throw new Error("custom API sources support bearer or api_key authentication only");
+}
+
 /** Custom connectors use the existing GraphJin source/spec contract. */
 export function declarativeGraphjinUpdate(
   bundle: SolutionPackBundle,
@@ -166,7 +181,7 @@ export function declarativeGraphjinUpdate(
       return [];
     }
     const authoredAuth = authored.auth as Record<string, unknown> | undefined;
-    for (const secret of [authored.password, authoredAuth?.token]) {
+    for (const secret of [authored.password, authoredAuth?.token, authoredAuth?.key_value]) {
       if (secret !== undefined && (typeof secret !== "string" || !/^\{\{secret\.[a-z][a-z0-9_.-]+}}$/.test(secret))) {
         throw new Error("pack credentials must use declared secret references");
       }
@@ -192,7 +207,7 @@ export function declarativeGraphjinUpdate(
     const url = new URL(String(source.base_url));
     if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) throw new Error("API base URL must be HTTP(S) without credentials");
     const auth = source.auth as Record<string, unknown> | undefined;
-    if (auth && (auth.type !== "bearer" || typeof auth.token !== "string" || Object.keys(auth).some(key => !["type", "token"].includes(key)))) throw new Error("custom API sources support bearer authentication only");
+    const specAuth = auth ? packApiAuth(auth, personal ? packConnectionHeader(bundle.manifest.metadata.id, personal.key) : undefined) : undefined;
     const requested = source.capabilities as Record<string, unknown> | undefined;
     if (requested && (Object.keys(requested).some(key => !["api.read", "api.write", "api.delete"].includes(key)) || Object.values(requested).some(value => typeof value !== "boolean"))) {
       throw new Error("custom API source capabilities must be boolean api.read, api.write, or api.delete values");
@@ -218,7 +233,7 @@ export function declarativeGraphjinUpdate(
       specs_dir: "/config/specs",
       specs: { [basename(spec.path, extname(spec.path))]: {
         base_url: url.toString().replace(/\/$/, ""),
-        ...(auth ? { auth: { scheme: "bearer", ...(personal ? { token_from_request: { header: packConnectionHeader(bundle.manifest.metadata.id, personal.key) } } : { token: auth.token }) } } : {}),
+        ...(specAuth ? { auth: specAuth } : {}),
         ...(operationExposures.get(String(source.name))?.size
           ? { operations: Object.fromEntries(operationExposures.get(String(source.name))!) }
           : {}),
