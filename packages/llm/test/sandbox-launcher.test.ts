@@ -145,6 +145,7 @@ const {
   makeSandboxRunCore,
   prepareSandboxCapacity,
   closeSandboxPools,
+  reapStrandedSandboxes,
   makeSandboxJobRunCore,
   makeSandboxWorkflowRunCore,
   buildModelEgressArgs,
@@ -158,6 +159,30 @@ const {
   verifyOpenShellGateway,
   workflowExecBudgetMs,
 } = await import("../src/work/sandbox-launcher");
+
+describe("reapStrandedSandboxes", () => {
+  it("deletes only sandboxes owned by a previous boot", async () => {
+    const deleted: string[] = [];
+    const run = async (args: string[]) => {
+      if (args.includes("list")) return JSON.stringify([
+        { name: "old", labels: { "openneko.owner": "openneko-web", "openneko.boot": "previous" } },
+        { name: "current", labels: { "openneko.owner": "openneko-web", "openneko.boot": "current" } },
+      ]);
+      deleted.push(args.at(-1)!);
+      return "";
+    };
+    expect(await reapStrandedSandboxes(run, "openneko-web", "current")).toEqual(["old"]);
+    expect(deleted).toEqual(["old"]);
+  });
+
+  it("reports failed deletion so the periodic pass can retry", async () => {
+    const run = async (args: string[]) => {
+      if (args.includes("list")) return JSON.stringify([{ name: "old", labels: { "openneko.boot": "previous" } }]);
+      throw new Error("gateway unavailable");
+    };
+    await expect(reapStrandedSandboxes(run, "openneko-web", "current")).rejects.toThrow("could not delete 1 stranded sandboxes");
+  });
+});
 
 describe("sandboxLauncherOptionsFromEnv", () => {
   it("ignores a persisted operator binary and exposes only model hosts", () => {
@@ -1186,6 +1211,7 @@ describe("makeSandboxRunCore", () => {
     expect(h.calls.filter((c) => c.args.includes("upload"))).toHaveLength(0);
     const create = h.calls.find((c) => c.args.includes("create"));
     expect(create?.args).toContain("--upload");
+    expect(create?.args[create.args.indexOf("--name") + 1]).toMatch(/^neko-w-[0-9a-f]{12}$/);
     // the box reads the mirror, not a host path:
     const execCall = h.calls.find((c) => c.args.includes("exec"));
     expect(execCall?.args.join(" ")).toContain(
