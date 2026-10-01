@@ -596,6 +596,43 @@ func TestSourceAndPackagedComposeStateInventoryMatch(t *testing.T) {
 	}
 }
 
+func TestDevelopmentDatabasesRecycleWALWithoutArchiving(t *testing.T) {
+	root := repoRootForTest(t)
+	sourceCore, err := os.ReadFile(filepath.Join(root, "compose.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceDev, err := os.ReadFile(filepath.Join(root, "compose.dev.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	packagedCore, err := ComposeFS.ReadFile("compose/core.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	packagedDev, err := ComposeFS.ReadFile("compose/dev.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for label, pair := range map[string]struct{ core, dev []byte }{
+		"source":   {sourceCore, sourceDev},
+		"packaged": {packagedCore, packagedDev},
+	} {
+		core := loadComposeParityDocument(t, pair.core)
+		dev := loadComposeParityDocument(t, pair.dev)
+		for _, name := range []string{"neko-db", "records-db"} {
+			production := strings.Join(core.Services[name].Command, " ")
+			development := strings.Join(dev.Services[name].Command, " ")
+			if !strings.Contains(production, "archive_mode=on") || !strings.Contains(production, "archive_timeout=60s") {
+				t.Errorf("%s %s lost its production archive policy: %s", label, name, production)
+			}
+			if !strings.Contains(development, "archive_mode=off") || strings.Contains(development, "archive_timeout") || strings.Contains(development, "archive_command") {
+				t.Errorf("%s %s development archive policy is unsafe: %s", label, name, development)
+			}
+		}
+	}
+}
+
 func TestRecordsGraphJinEndpointsRemainPrivate(t *testing.T) {
 	rootRaw, err := os.ReadFile("../../../compose.yml")
 	if err != nil {
