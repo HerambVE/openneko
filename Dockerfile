@@ -60,7 +60,13 @@ FROM pgvector/pgvector:0.8.6-pg16-bookworm@sha256:ccc6e83d6e35e931dc7c5def202272
 LABEL org.openneko.storage-contract="1" \
       org.openneko.storage-owner="999:999"
 USER root
+# apt.postgresql.org keeps only current versions. The archive keeps the
+# pinned pgBackRest build installable after newer releases replace it.
 RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && echo "deb [ signed-by=/usr/local/share/keyrings/postgres.gpg.asc ] https://apt-archive.postgresql.org/pub/repos/apt bookworm-pgdg-archive main" \
+      > /etc/apt/sources.list.d/pgdg-archive.list \
+    && apt-get update \
     && apt-get install -y --no-install-recommends \
       libssh2-1=1.10.0-3+b1 \
       pgbackrest=2.58.0-1.pgdg12+1 \
