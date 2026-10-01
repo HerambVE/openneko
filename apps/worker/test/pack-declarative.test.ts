@@ -59,6 +59,30 @@ describe("declarative pack configuration", () => {
     expect(JSON.stringify(pack)).toBe(original);
   });
 
+  it("maps an API key credential to GraphJin api_key auth", () => {
+    const pack = bundle();
+    const source = pack.artifacts[0]!.content as Record<string, unknown>;
+    source.auth = { type: "api_key", key_name: "Api-Key", key_value: "{{secret.service.api_token}}" };
+    expect(declarativeGraphjinUpdate(pack, inputs, secrets)).toMatchObject({
+      update_sources: [{ specs: { "service-health": { auth: { scheme: "api_key", key_name: "Api-Key", key_value: secrets["service.api_token"], key_in: "header" } } } }],
+    });
+    source.auth = { type: "api_key", key_name: "api_key", key_value: "{{secret.service.api_token}}", key_in: "query" };
+    expect(declarativeGraphjinUpdate(pack, inputs, secrets)).toMatchObject({
+      update_sources: [{ specs: { "service-health": { auth: { scheme: "api_key", key_name: "api_key", key_in: "query" } } } }],
+    });
+    for (const auth of [
+      { type: "api_key", key_name: "Api-Key", key_value: "plaintext" },
+      { type: "api_key", key_name: "Api Key", key_value: "{{secret.service.api_token}}" },
+      { type: "api_key", key_name: "Api-Key", key_value: "{{secret.service.api_token}}", key_in: "cookie" },
+      { type: "api_key", key_name: "Api-Key", key_value: "{{secret.service.api_token}}", token: "{{secret.service.api_token}}" },
+      { type: "api_key", key_value: "{{secret.service.api_token}}" },
+      { type: "basic", username: "reader", password: "{{secret.service.api_token}}" },
+    ]) {
+      source.auth = auth;
+      expect(() => declarativeGraphjinUpdate(pack, inputs, secrets)).toThrow();
+    }
+  });
+
   it("preserves a pack API source write request while keeping undeclared operations blocked", () => {
     const pack = bundle();
     pack.artifacts[0]!.content = {
