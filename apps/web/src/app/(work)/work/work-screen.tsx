@@ -2003,7 +2003,7 @@ function isCanonicalAnswerSurface(messages: A2UIMessage[]): boolean {
     (component) => component.component === "Answer",
   );
   const carriesAnswer = [...components.values()].some((component) =>
-    ["Markdown", "Table", "KeyFigures", "MetricCard", "Callout"].includes(
+    ["Markdown", "Table", "Chart", "KeyFigures", "MetricCard", "Callout"].includes(
       String(component.component),
     ),
   );
