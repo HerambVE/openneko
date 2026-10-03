@@ -12,10 +12,24 @@ describe("structuredTurnSummary", () => {
     }] })).toContain("Affected orders: 12 (open; observed; source: GraphJin)");
   });
 
-  it("anchors a structured-only turn without inserting raw fences", () => {
-    const summary = structuredTurnSummary(null);
-    expect(summary).toContain("Structured result");
-    expect(summary).not.toContain("```");
+  it("saves nothing when the turn left no findings", () => {
+    expect(structuredTurnSummary(null)).toBe("");
+    expect(structuredTurnSummary(null, [], ["", "  "])).toBe("");
+  });
+
+  it("keeps the assistant's interim text beside its cards", () => {
+    const summary = structuredTurnSummary(null, [{
+      version: "v1.0",
+      createSurface: {
+        surfaceId: "tools",
+        components: [{ id: "root", component: "Answer", title: "Tool number to order relationship" }],
+      },
+    }], ["Tool numbers and orders are one-to-many.", "Tool numbers and orders are one-to-many."]);
+    expect(summary).toBe([
+      "Structured result from my previous turn:",
+      "- Tool numbers and orders are one-to-many.",
+      "- Tool number to order relationship",
+    ].join("\n"));
   });
 
   it("preserves visible card findings and bounded table data for a follow-up", () => {
