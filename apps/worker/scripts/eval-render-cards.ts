@@ -10,6 +10,9 @@
  *   OPENAI_API_KEY=… OPENAI_MODELS=gpt-5.2 \
  *   pnpm --filter @neko/worker eval:cards [--org <orgId>] [--out results.json]
  *
+ * --bridge offers the tool the way Hermes tool search does: a tool_call bridge
+ * whose arguments parameter is an open object, with the schema as text.
+ *
  * --org adds the organization's saved primary provider and model; --models
  * runs other comma-separated models with that saved key.
  */
@@ -17,12 +20,13 @@ import { writeFile } from "node:fs/promises";
 import { resolvePrimaryProviderConfig } from "@neko/llm";
 import {
   buildCardsSection,
+  normalizeRenderCardsInput,
   RENDER_CARDS_DESCRIPTION,
   RENDER_CARDS_INPUT_SCHEMA,
   validateRenderCardsInput,
 } from "@neko/llm/work";
 
-type Kind = "keyFigures" | "chart" | "table" | "markdown" | "callout" | "choices";
+type Kind = "keyFigures" | "chart" | "table" | "callout" | "followUps";
 type Case = {
   id: string;
   question: string;
@@ -132,12 +136,43 @@ const CASES: Case[] = [
 ];
 
 const TOOL_NAME = "render_cards";
+const BRIDGE = process.argv.includes("--bridge");
+const TOOL = BRIDGE
+  ? {
+      name: "tool_call",
+      description: "Invoke a deferred tool by name with the given arguments. Argument shape matches the tool's schema (see `tool_describe`).",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Exact tool name to invoke." },
+          arguments: { type: "object", description: "Arguments for the tool, matching its schema." },
+        },
+        required: ["name", "arguments"],
+      } as Record<string, unknown>,
+    }
+  : { name: TOOL_NAME, description: RENDER_CARDS_DESCRIPTION, parameters: RENDER_CARDS_INPUT_SCHEMA };
 const SYSTEM = [
   "You are OpenNeko, an operations analyst. The data query for this turn has already run;",
   "its result is in the operator's message. Answer the operator's question.",
   "",
   buildCardsSection(false),
+  ...(BRIDGE
+    ? ["", `tool_describe result: ${JSON.stringify({ name: TOOL_NAME, description: RENDER_CARDS_DESCRIPTION, parameters: RENDER_CARDS_INPUT_SCHEMA })}`]
+    : []),
 ].join("\n");
+
+/** Return the render_cards arguments from a direct or bridged call. */
+function unwrap(name: string | undefined, args: unknown): unknown | undefined {
+  if (!BRIDGE) return name === TOOL_NAME ? args : undefined;
+  const bridged = args as { name?: string; arguments?: unknown } | undefined;
+  if (name !== "tool_call" || !bridged?.name?.includes(TOOL_NAME)) return undefined;
+  if (typeof bridged.arguments !== "string") return bridged.arguments;
+  try {
+    return JSON.parse(bridged.arguments);
+  } catch {
+    return bridged.arguments;
+  }
+}
 
 function userMessage(testCase: Case): string {
   return `${testCase.question}\n\nSuccessful data tool result for this turn:\n${JSON.stringify(testCase.result, null, 2)}`;
@@ -193,13 +228,17 @@ const PROVIDERS: Record<string, (model: string, key: string, testCase: Case) => 
       {
         systemInstruction: { parts: [{ text: SYSTEM }] },
         contents: [{ role: "user", parts: [{ text: userMessage(testCase) }] }],
-        tools: [{ functionDeclarations: [{ name: TOOL_NAME, description: RENDER_CARDS_DESCRIPTION, parameters: geminiSchema(RENDER_CARDS_INPUT_SCHEMA) }] }],
+        tools: [{ functionDeclarations: [{ ...TOOL, parameters: geminiSchema(TOOL.parameters) }] }],
       },
     );
     const parts: any[] = json.candidates?.[0]?.content?.parts ?? [];
-    const call = parts.find((part) => part.functionCall?.name === TOOL_NAME)?.functionCall;
+    const args = parts.map((part) => unwrap(part.functionCall?.name, part.functionCall?.args)).find((value) => value !== undefined);
     const text = parts.map((part) => part.text ?? "").join("");
-    return { called: Boolean(call), args: call?.args, text: text || `finishReason=${json.candidates?.[0]?.finishReason}` };
+    return {
+      called: args !== undefined,
+      args,
+      text: text || `finishReason=${json.candidates?.[0]?.finishReason}`,
+    };
   },
   async anthropic(model, key, testCase) {
     const json = await post(
@@ -210,12 +249,13 @@ const PROVIDERS: Record<string, (model: string, key: string, testCase: Case) => 
         max_tokens: 4096,
         system: SYSTEM,
         messages: [{ role: "user", content: userMessage(testCase) }],
-        tools: [{ name: TOOL_NAME, description: RENDER_CARDS_DESCRIPTION, input_schema: RENDER_CARDS_INPUT_SCHEMA }],
+        tools: [{ name: TOOL.name, description: TOOL.description, input_schema: TOOL.parameters }],
       },
     );
     const blocks: any[] = json.content ?? [];
-    const call = blocks.find((block) => block.type === "tool_use" && block.name === TOOL_NAME);
-    return { called: Boolean(call), args: call?.input, text: blocks.map((block) => block.text ?? "").join("") };
+    const args = blocks.map((block) => block.type === "tool_use" ? unwrap(block.name, block.input) : undefined)
+      .find((value) => value !== undefined);
+    return { called: args !== undefined, args, text: blocks.map((block) => block.text ?? "").join("") };
   },
   async openai(model, key, testCase) {
     const base = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
@@ -225,18 +265,20 @@ const PROVIDERS: Record<string, (model: string, key: string, testCase: Case) => 
       {
         model,
         messages: [{ role: "system", content: SYSTEM }, { role: "user", content: userMessage(testCase) }],
-        tools: [{ type: "function", function: { name: TOOL_NAME, description: RENDER_CARDS_DESCRIPTION, parameters: RENDER_CARDS_INPUT_SCHEMA } }],
+        tools: [{ type: "function", function: TOOL }],
       },
     );
     const message = json.choices?.[0]?.message ?? {};
-    const call = (message.tool_calls ?? []).find((toolCall: any) => toolCall.function?.name === TOOL_NAME);
-    let args: unknown;
-    try {
-      args = call ? JSON.parse(call.function.arguments) : undefined;
-    } catch {
-      args = call?.function.arguments;
-    }
-    return { called: Boolean(call), args, text: message.content ?? "" };
+    const args = (message.tool_calls ?? []).map((toolCall: any) => {
+      let parsed: unknown = toolCall.function?.arguments;
+      try {
+        parsed = JSON.parse(toolCall.function.arguments);
+      } catch {
+        // Keep the raw text; validation reports it.
+      }
+      return unwrap(toolCall.function?.name, parsed);
+    }).find((value: unknown) => value !== undefined);
+    return { called: args !== undefined, args, text: message.content ?? "" };
   },
 };
 
@@ -249,18 +291,13 @@ function score(testCase: Case, call: Call) {
   if (!validation.success) {
     return { outcome: "invalid", detail: validation.issues.map((issue) => issue.message).join("; ").slice(0, 300) };
   }
-  const kindsOrder: Kind[] = ["keyFigures", "chart", "table", "markdown", "callout", "choices"];
-  const blocks = (call.args as { blocks: Array<Record<string, any>> }).blocks
-    .map((block) => ({ kind: kindsOrder.find((kind) => block[kind] !== undefined)!, value: block }));
-  const kinds = blocks.map((block) => block.kind);
+  const answer = normalizeRenderCardsInput(call.args) as Record<string, any>;
+  const kinds = (["keyFigures", "chart", "table", "callout", "followUps"] as Kind[]).filter((kind) => answer[kind] !== undefined);
   const missed = testCase.expect.filter((condition) => {
-    if (condition.callout) {
-      return !blocks.some((block) => block.kind === "callout" && condition.callout!.includes(block.value.callout.mood));
-    }
-    const matching = blocks.filter((block) => condition.kinds!.includes(block.kind));
-    if (matching.length === 0) return true;
-    if (condition.chartTypes) {
-      return !matching.some((block) => block.kind !== "chart" || condition.chartTypes!.includes(block.value.chart.type));
+    if (condition.callout) return !answer.callout || !condition.callout.includes(answer.mood ?? "watch");
+    if (!condition.kinds!.some((kind) => kinds.includes(kind))) return true;
+    if (condition.chartTypes && condition.kinds!.includes("chart") && kinds.includes("chart")) {
+      return !condition.chartTypes.includes(answer.chart);
     }
     return false;
   });

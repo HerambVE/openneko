@@ -90,75 +90,27 @@ const readableA2UIMessageSchema = messageSchema({ generated: false });
 
 const text = (max: number) => z.string().trim().min(1).max(max);
 
-const keyFiguresBlock = z.object({
-  items: z.array(z.object({
-    label: text(80),
-    value: text(40).describe("The value exactly as the tool result gives it, formatted for reading."),
-    sub: text(120).optional().describe("Short context, such as the period or a change."),
-    asOf: text(40).optional(),
-    source: text(80).optional(),
-  })).min(1).max(8).describe("A flat list with one object per figure."),
-});
-
-const chartBlock = z.object({
-  type: z.enum(["line", "bar", "area", "donut"]),
-  title: text(120),
-  valueLabel: text(60).describe("The measure and unit, such as Revenue (USD)."),
-  points: z.array(z.object({
-    label: text(40).describe("The x-axis or category label."),
-    value: z.number(),
-    baseline: z.number().optional().describe("An optional comparison value for the same label."),
-  })).min(2).max(60),
-  baselineLabel: text(60).optional(),
-  source: text(80).optional(),
-  asOf: text(40).optional(),
-});
-
-const tableBlock = z.object({
-  columns: z.array(z.object({
-    label: text(60),
-    align: z.enum(["left", "right", "center"]).optional(),
-  })).min(1).max(12),
-  rows: z.array(z.array(z.string().max(200)).describe("One cell per column, in column order."))
-    .min(1).max(200),
-  caption: text(200).optional(),
-});
-
-const markdownBlock = z.object({ text: text(4_000) });
-
-const calloutBlock = z.object({
-  mood: z.enum(["good", "watch", "act"]),
-  title: text(80).optional(),
-  text: text(600),
-});
-
-const choicesBlock = z.object({
-  options: z.array(z.object({
-    label: text(40),
-    prompt: text(300).describe("The follow-up request sent when the operator picks this option."),
-  })).min(1).max(4),
-});
-
-const ANSWER_BLOCK_KINDS = ["keyFigures", "chart", "table", "markdown", "callout", "choices"] as const;
-type AnswerBlockKind = (typeof ANSWER_BLOCK_KINDS)[number];
-
-const answerBlock = z.object({
-  keyFigures: keyFiguresBlock.optional(),
-  chart: chartBlock.optional(),
-  table: tableBlock.optional(),
-  markdown: markdownBlock.optional(),
-  callout: calloutBlock.optional(),
-  choices: choicesBlock.optional(),
-});
-
-/** Every field is declared, so each model provider receives the full structure. */
+/**
+ * Every argument is a string, a list of strings, or an enum. Some agent
+ * runtimes call deferred tools through a bridge whose arguments parameter is
+ * an open object; small models fill flat text fields reliably there and nested
+ * objects poorly. The host reads the text with plain string splitting.
+ */
 export const renderCardsArgsSchema = z.object({
   title: text(120),
-  subtitle: text(240).optional(),
-  blocks: z.array(answerBlock).min(1).max(12),
+  table: text(20_000).optional()
+    .describe("A pipe table: a header row, then one row per line, cells separated by |."),
+  chart: z.enum(["line", "bar", "area", "donut"]).optional()
+    .describe("Chart the table: the first column gives the labels, chartColumn the values."),
+  chartColumn: text(60).optional()
+    .describe("The table column to chart. Write its cells as plain numbers, such as 12699845.92."),
+  keyFigures: z.array(text(160)).min(1).max(6).optional()
+    .describe('Headline numbers, each written as "Label: value" with an optional "(note)".'),
+  callout: text(600).optional().describe("A status, risk, or recommended action."),
+  mood: z.enum(["good", "watch", "act"]).optional().describe("The callout's tone."),
+  followUps: z.array(text(200)).min(1).max(4).optional()
+    .describe("Follow-up questions the operator can ask next."),
 });
-
-export const RENDER_CARDS_INPUT_SHAPE = renderCardsArgsSchema.shape;
 
 /** JSON Schema is generated from the validator instead of maintained by hand. */
 export const RENDER_CARDS_INPUT_SCHEMA = z.toJSONSchema(
@@ -174,91 +126,140 @@ export type RenderInputValidation =
       issues: Array<{ path: string; code: string; message: string }>;
     };
 
-function blockKind(block: RenderCardsArgs["blocks"][number]): AnswerBlockKind {
-  return ANSWER_BLOCK_KINDS.find((kind) => block[kind] !== undefined)!;
+type Issue = { path: string; code: string; message: string };
+type Table = { columns: string[]; rows: string[][] };
+type Built<T> = { value: T } | { issue: Issue };
+
+const SECTIONS = ["table", "keyFigures", "callout", "followUps"] as const;
+const NUMBER_FORMAT = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
+
+/** A plain number with optional thousands separators, such as 1,250 or -3.5. */
+function plainNumber(cell: string): number | undefined {
+  const compact = cell.trim().replaceAll(",", "");
+  if (compact === "") return undefined;
+  const value = Number(compact);
+  return Number.isFinite(value) ? value : undefined;
 }
 
-function blockIssues(blocks: RenderCardsArgs["blocks"]) {
-  const issues: Array<{ path: string; code: string; message: string }> = [];
-  blocks.forEach((block, index) => {
-    const path = `blocks.${index}`;
-    const filled = ANSWER_BLOCK_KINDS.filter((kind) => block[kind] !== undefined);
-    if (filled.length !== 1) {
-      issues.push({
-        path,
-        code: "block_field_count",
-        message: filled.length === 0
-          ? `${path} fills no field; fill exactly one of ${ANSWER_BLOCK_KINDS.join(", ")}.`
-          : `${path} fills ${filled.join(" and ")}; put each in its own block.`,
-      });
-      return;
-    }
-    if (block.table) {
-      const columns = block.table.columns.length;
-      const row = block.table.rows.findIndex((cells) => cells.length !== columns);
-      if (row >= 0) {
-        issues.push({
-          path: `${path}.table.rows.${row}`,
-          code: "table_row_width",
-          message: `${path}.table.rows.${row} needs ${columns} cells, one per column.`,
-        });
-      }
-    }
-    if (block.chart?.type === "donut") {
-      const points = block.chart.points;
-      if (points.length > 8 || points.some((point) => point.value < 0) ||
-        points.reduce((sum, point) => sum + point.value, 0) <= 0) {
-        issues.push({
-          path: `${path}.chart.points`,
-          code: "donut_parts",
-          message: `${path}.chart is a donut; give 2 to 8 parts with nonnegative values and a positive total.`,
-        });
-      }
-    }
-  });
-  return issues;
+function cells(line: string): string[] {
+  let row = line.trim();
+  if (row.startsWith("|")) row = row.slice(1);
+  if (row.endsWith("|")) row = row.slice(0, -1);
+  return row.split("|").map((cell) => cell.trim());
 }
 
-function blockComponent(block: RenderCardsArgs["blocks"][number], id: string): Record<string, unknown> {
-  switch (blockKind(block)) {
-    case "keyFigures":
-      return { id, component: "KeyFigures", items: block.keyFigures!.items };
-    case "chart": {
-      const { points, ...chart } = block.chart!;
-      return {
-        id,
-        component: "Chart",
-        ...chart,
-        data: points.map((point) => ({
-          d: point.label,
-          v: point.value,
-          ...(point.baseline !== undefined ? { t: point.baseline } : {}),
-        })),
-      };
-    }
-    case "table": {
-      const { columns, rows, caption } = block.table!;
-      const keys = columns.map((_, index) => `c${index}`);
-      return {
-        id,
-        component: "Table",
-        columns: columns.map((column, index) => ({ key: keys[index], ...column })),
-        rows: rows.map((cells) => Object.fromEntries(keys.map((key, index) => [key, cells[index]]))),
-        ...(caption ? { caption } : {}),
-      };
-    }
-    case "markdown":
-      return { id, component: "Markdown", text: block.markdown!.text };
-    case "callout":
-      return { id, component: "Callout", ...block.callout! };
-    case "choices":
-      return { id, component: "Choice", options: block.choices!.options };
+function isDivider(line: string): boolean {
+  return [...line].every((char) => "|-: ".includes(char));
+}
+
+/** Split text into lines. Some models write the two characters \ and n for a line break. */
+function lines(source: string): string[] {
+  return source.replaceAll("\\n", "\n").split("\n");
+}
+
+function readTable(source: string): Built<Table> {
+  const rowsText = lines(source).filter((line) => line.trim() !== "" && !isDivider(line));
+  if (rowsText.length < 2) {
+    return { issue: { path: "table", code: "table_shape", message: "table needs a header row and at least one data row." } };
   }
+  const columns = cells(rowsText[0]!);
+  const rows = rowsText.slice(1).map(cells);
+  const short = rows.findIndex((row) => row.length !== columns.length);
+  if (short >= 0) {
+    return { issue: { path: "table", code: "table_row_width", message: `table row ${short + 1} needs ${columns.length} cells, one per column.` } };
+  }
+  return { value: { columns, rows } };
 }
 
-/** Build one A2UI v1.0 answer surface from validated render_cards arguments. */
-export function buildAnswerSurface(args: RenderCardsArgs, surfaceId: string): AgentSurfaceMessage[] {
-  const children = args.blocks.map((_, index) => `b${index}`);
+function numericColumn(table: Table, index: number): boolean {
+  return index > 0 && table.rows.every((row) => plainNumber(row[index]!) !== undefined);
+}
+
+function chartFromTable(args: RenderCardsArgs, table: Table): Built<Record<string, unknown>> {
+  const requested = args.chartColumn
+    ? table.columns.findIndex((name) => name.toLowerCase() === args.chartColumn!.trim().toLowerCase())
+    : -1;
+  if (args.chartColumn && requested < 1) {
+    return { issue: { path: "chartColumn", code: "chart_column", message: `chartColumn must be one of the table's value columns: ${table.columns.slice(1).join(", ")}.` } };
+  }
+  const column = requested >= 1 ? requested : table.columns.findIndex((_, index) => numericColumn(table, index));
+  if (column < 1) {
+    return { issue: { path: "chartColumn", code: "chart_column", message: "chart needs a table column of plain numbers, such as 12699845.92; name it in chartColumn." } };
+  }
+  const bad = table.rows.findIndex((row) => plainNumber(row[column]!) === undefined);
+  if (bad >= 0) {
+    return { issue: { path: "table", code: "chart_value", message: `table row ${bad + 1} needs a plain number in the ${table.columns[column]} column, such as 12699845.92.` } };
+  }
+  const data = table.rows.map((row) => ({ d: row[0]!, v: plainNumber(row[column]!)! }));
+  if (data.length < 2 || data.length > 60) {
+    return { issue: { path: "chart", code: "chart_points", message: "chart needs 2 to 60 table rows." } };
+  }
+  if (args.chart === "donut" && (data.length > 8 || data.some((point) => point.v < 0))) {
+    return { issue: { path: "chart", code: "donut_parts", message: "a donut needs 2 to 8 rows with nonnegative values." } };
+  }
+  return {
+    value: { id: "chart", component: "Chart", type: args.chart, title: args.title, valueLabel: table.columns[column], data },
+  };
+}
+
+function tableComponent(table: Table): Record<string, unknown> {
+  const numeric = table.columns.map((_, index) => numericColumn(table, index));
+  return {
+    id: "table",
+    component: "Table",
+    columns: table.columns.map((label, index) => ({ key: `c${index}`, label, ...(numeric[index] ? { align: "right" } : {}) })),
+    rows: table.rows.map((row) => Object.fromEntries(row.map((cell, index) => [
+      `c${index}`,
+      numeric[index] ? NUMBER_FORMAT.format(plainNumber(cell)!) : cell,
+    ]))),
+  };
+}
+
+function keyFigure(line: string, index: number): Built<Record<string, string>> {
+  const colon = line.indexOf(":");
+  let value = colon > 0 ? line.slice(colon + 1).trim() : "";
+  let sub: string | undefined;
+  const open = value.lastIndexOf("(");
+  if (open > 0 && value.endsWith(")")) {
+    sub = value.slice(open + 1, -1).trim();
+    value = value.slice(0, open).trim();
+  }
+  if (!value) {
+    return { issue: { path: `keyFigures.${index}`, code: "key_figure", message: `keyFigures.${index} needs the form "Label: value".` } };
+  }
+  return { value: { label: line.slice(0, colon).trim(), value, ...(sub ? { sub } : {}) } };
+}
+
+function answerComponents(args: RenderCardsArgs): { components: Array<Record<string, unknown>>; issues: Issue[] } {
+  const components: Array<Record<string, unknown>> = [];
+  const issues: Issue[] = [];
+  if (SECTIONS.every((section) => args[section] === undefined)) {
+    issues.push({ path: "", code: "empty_answer", message: `Fill at least one of ${SECTIONS.join(", ")}.` });
+  }
+  if (args.keyFigures) {
+    const figures = args.keyFigures.map(keyFigure);
+    for (const figure of figures) if ("issue" in figure) issues.push(figure.issue);
+    components.push({ id: "keyFigures", component: "KeyFigures", items: figures.flatMap((figure) => "value" in figure ? [figure.value] : []) });
+  }
+  const table = args.table ? readTable(args.table) : undefined;
+  if (table && "issue" in table) issues.push(table.issue);
+  if (args.chart && !table) {
+    issues.push({ path: "chart", code: "chart_table", message: "chart draws from table; add a table." });
+  }
+  if (args.chart && table && "value" in table) {
+    const chart = chartFromTable(args, table.value);
+    if ("issue" in chart) issues.push(chart.issue);
+    else components.push(chart.value);
+  }
+  if (table && "value" in table) components.push(tableComponent(table.value));
+  if (args.callout) components.push({ id: "callout", component: "Callout", mood: args.mood ?? "watch", text: args.callout });
+  if (args.followUps) {
+    components.push({ id: "followUps", component: "Choice", options: args.followUps.map((prompt) => ({ label: prompt, prompt })) });
+  }
+  return { components, issues };
+}
+
+function answerSurface(title: string, sections: Array<Record<string, unknown>>, surfaceId: string): AgentSurfaceMessage[] {
   return [{
     version: A2UI_VERSION,
     createSurface: {
@@ -266,17 +267,55 @@ export function buildAnswerSurface(args: RenderCardsArgs, surfaceId: string): Ag
       catalogId: A2UI_CATALOG_ID,
       dataModel: {},
       components: [
-        {
-          id: "root",
-          component: "Answer",
-          title: args.title,
-          ...(args.subtitle ? { subtitle: args.subtitle } : {}),
-          children,
-        },
-        ...args.blocks.map((block, index) => blockComponent(block, children[index])),
+        { id: "root", component: "Answer", title, children: sections.map((section) => section.id) },
+        ...sections,
       ],
     },
   } as AgentSurfaceMessage];
+}
+
+const ANSWER_FIELDS = new Set(["title", "table", "chart", "chartColumn", "keyFigures", "callout", "mood", "followUps"]);
+const LIST_FIELDS = new Set(["keyFigures", "followUps"]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function parseJsonObject(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return isRecord(parsed) ? parsed : value;
+  } catch {
+    return value;
+  }
+}
+
+/**
+ * Some agent runtimes call deferred tools through a bridge whose arguments
+ * parameter is an open object. Models then nest the call again, send it as
+ * JSON text, write a list as lines, or fill unused fields with null, false or
+ * "". Recover the answer object; validation still decides what is accepted.
+ */
+export function normalizeRenderCardsInput(value: unknown): unknown {
+  let answer = parseJsonObject(value);
+  for (let depth = 0; depth < 3 && isRecord(answer) && !("title" in answer); depth += 1) {
+    const nested = parseJsonObject("arguments" in answer
+      ? answer.arguments
+      : Object.keys(answer).length === 1 ? Object.values(answer)[0] : undefined);
+    if (!isRecord(nested)) break;
+    answer = nested;
+  }
+  if (!isRecord(answer)) return answer;
+  const normalized: Record<string, unknown> = {};
+  for (const [field, raw] of Object.entries(answer)) {
+    if (!ANSWER_FIELDS.has(field) || raw === null || raw === false || raw === "" ||
+      (Array.isArray(raw) && raw.length === 0)) continue;
+    normalized[field] = LIST_FIELDS.has(field) && typeof raw === "string"
+      ? lines(raw).map((line) => line.trim()).filter(Boolean)
+      : raw;
+  }
+  return normalized;
 }
 
 /** Validate the complete tool argument object and build its surface. */
@@ -284,7 +323,7 @@ export function validateRenderCardsInput(
   value: unknown,
   surfaceId = `answer-${randomUUID()}`,
 ): RenderInputValidation {
-  const parsed = renderCardsArgsSchema.safeParse(value);
+  const parsed = renderCardsArgsSchema.safeParse(normalizeRenderCardsInput(value));
   if (!parsed.success) {
     return {
       success: false,
@@ -295,9 +334,9 @@ export function validateRenderCardsInput(
       })),
     };
   }
-  const issues = blockIssues(parsed.data.blocks);
+  const { components, issues } = answerComponents(parsed.data);
   if (issues.length > 0) return { success: false, issues };
-  return { success: true, messages: buildAnswerSurface(parsed.data, surfaceId) };
+  return { success: true, messages: answerSurface(parsed.data.title, components, surfaceId) };
 }
 
 /** Validate parsed reader input while retaining v0.9 history compatibility. */

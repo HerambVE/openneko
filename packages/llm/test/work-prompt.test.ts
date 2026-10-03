@@ -249,8 +249,9 @@ describe("per-channel rendering gate", () => {
     expect(hermesMcp).toContain("<cards>");
     expect(hermesMcp).toContain("mcp__neko__ui_render_cards");
     expect(hermesMcp).not.toContain("mcp_neko_ui_render_cards");
-    expect(hermesMcp).toContain("Three or more time periods: a line chart");
-    expect(hermesMcp).toContain("A breakdown by category: a bar chart");
+    expect(hermesMcp).toContain('Three or more time periods: a table of the periods with chart "line"');
+    expect(hermesMcp).toContain('A breakdown by category: a table with chart "bar"');
+    expect(hermesMcp).toContain('{"title": "Website sessions by month", "table": "Month | Sessions\\nMarch | 39800');
     expect(hermesMcp).toContain("add a watch callout");
     expect(hermesMcp).not.toMatch(/A2UI|createSurface|surfaceId|envelope/);
     expect(hermesMcp).not.toContain("BriefingCard");

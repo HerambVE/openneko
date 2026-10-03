@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  normalizeRenderCardsInput,
   RENDER_CARDS_INPUT_SCHEMA,
   validateRenderCardsInput,
 } from "../src/work/a2ui-contract";
@@ -8,28 +9,17 @@ import { portableSchemaIssues } from "../src/tool-schema-portability";
 
 const quarters = {
   title: "Revenue over the last four quarters",
-  blocks: [
-    {
-      keyFigures: { items: [{ label: "2026 Q3", value: "$88.42M", sub: "up from $13.85M" }] },
-    },
-    {
-      chart: {
-        type: "line",
-        title: "Revenue by quarter",
-        valueLabel: "Revenue (USD)",
-        points: [
-          { label: "2025 Q4", value: 12_699_845.92 },
-          { label: "2026 Q1", value: 11_565_433.28, baseline: 12_000_000 },
-        ],
-      },
-    },
-    {
-      table: {
-        columns: [{ label: "Quarter" }, { label: "Revenue", align: "right" }],
-        rows: [["2025 Q4", "$12,699,845.92"], ["2026 Q1", "$11,565,433.28"]],
-      },
-    },
-  ],
+  table: [
+    "| Quarter | Revenue (USD) | Orders |",
+    "| --- | --- | --- |",
+    "| 2025 Q4 | 12,699,845.92 | 5571 |",
+    "| 2026 Q1 | 11565433.28 | 6161 |",
+  ].join("\n"),
+  chart: "line",
+  chartColumn: "Revenue (USD)",
+  keyFigures: ["2026 Q1: $11.57M (down 9% on Q4)", "Orders: 6,161"],
+  callout: "Q1 revenue fell while orders rose.",
+  followUps: ["Break 2026 Q1 down by region"],
 };
 
 function components(input: unknown) {
@@ -44,112 +34,124 @@ function components(input: unknown) {
   return message.createSurface.components as Array<Record<string, unknown>>;
 }
 
+function issues(input: unknown) {
+  const result = validateRenderCardsInput(input);
+  expect(result.success).toBe(false);
+  return result.success ? [] : result.issues.map((issue) => issue.message);
+}
+
 describe("render_cards contract", () => {
-  it("builds an Answer surface whose root lists every block in order", () => {
-    const [root, figures, chart, table] = components(quarters);
+  it("builds key figures, a chart drawn from the table, the table, a callout and follow-ups", () => {
+    const [root, figures, chart, table, callout, followUps] = components(quarters);
     expect(root).toEqual({
       id: "root",
       component: "Answer",
       title: "Revenue over the last four quarters",
-      children: ["b0", "b1", "b2"],
+      children: ["keyFigures", "chart", "table", "callout", "followUps"],
     });
-    expect(figures).toMatchObject({ id: "b0", component: "KeyFigures" });
+    expect(figures).toEqual({
+      id: "keyFigures",
+      component: "KeyFigures",
+      items: [
+        { label: "2026 Q1", value: "$11.57M", sub: "down 9% on Q4" },
+        { label: "Orders", value: "6,161" },
+      ],
+    });
     expect(chart).toEqual({
-      id: "b1",
+      id: "chart",
       component: "Chart",
       type: "line",
-      title: "Revenue by quarter",
+      title: "Revenue over the last four quarters",
       valueLabel: "Revenue (USD)",
       data: [
         { d: "2025 Q4", v: 12_699_845.92 },
-        { d: "2026 Q1", v: 11_565_433.28, t: 12_000_000 },
+        { d: "2026 Q1", v: 11_565_433.28 },
       ],
     });
     expect(table).toEqual({
-      id: "b2",
+      id: "table",
       component: "Table",
       columns: [
         { key: "c0", label: "Quarter" },
-        { key: "c1", label: "Revenue", align: "right" },
+        { key: "c1", label: "Revenue (USD)", align: "right" },
+        { key: "c2", label: "Orders", align: "right" },
       ],
       rows: [
-        { c0: "2025 Q4", c1: "$12,699,845.92" },
-        { c0: "2026 Q1", c1: "$11,565,433.28" },
+        { c0: "2025 Q4", c1: "12,699,845.92", c2: "5,571" },
+        { c0: "2026 Q1", c1: "11,565,433.28", c2: "6,161" },
       ],
     });
-  });
-
-  it("maps markdown, callout and choices blocks to their components", () => {
-    const [, markdown, callout, choices] = components({
-      title: "Supplier risk",
-      blocks: [
-        { markdown: { text: "Two suppliers are late." } },
-        { callout: { mood: "watch", title: "Q3 spike", text: "Q3 may include duplicated orders." } },
-        { choices: { options: [{ label: "By supplier", prompt: "Break this down by supplier" }] } },
-      ],
-    });
-    expect(markdown).toEqual({ id: "b0", component: "Markdown", text: "Two suppliers are late." });
-    expect(callout).toEqual({ id: "b1", component: "Callout", mood: "watch", title: "Q3 spike", text: "Q3 may include duplicated orders." });
-    expect(choices).toEqual({ id: "b2", component: "Choice", options: [{ label: "By supplier", prompt: "Break this down by supplier" }] });
-  });
-
-  it("names the fix when a block fills no field or more than one", () => {
-    expect(validateRenderCardsInput({ title: "Orders", blocks: [{}] })).toMatchObject({
-      success: false,
-      issues: [{ path: "blocks.0", message: "blocks.0 fills no field; fill exactly one of keyFigures, chart, table, markdown, callout, choices." }],
-    });
-    expect(validateRenderCardsInput({
-      title: "Orders",
-      blocks: [{ markdown: { text: "A" }, callout: { mood: "good", text: "B" } }],
-    })).toMatchObject({
-      success: false,
-      issues: [{ message: "blocks.0 fills markdown and callout; put each in its own block." }],
+    expect(callout).toEqual({ id: "callout", component: "Callout", mood: "watch", text: "Q1 revenue fell while orders rose." });
+    expect(followUps).toEqual({
+      id: "followUps",
+      component: "Choice",
+      options: [{ label: "Break 2026 Q1 down by region", prompt: "Break 2026 Q1 down by region" }],
     });
   });
 
-  it("requires one table cell per column", () => {
-    const result = validateRenderCardsInput({
-      title: "Orders",
-      blocks: [{ table: { columns: [{ label: "A" }, { label: "B" }], rows: [["1", "2"], ["3"]] } }],
+  it("charts the first column of plain numbers when chartColumn is absent", () => {
+    const [, chart] = components({
+      title: "Tickets",
+      table: "Priority | Owner | Tickets\nHigh | Ana | 18\nLow | Raj | 102",
+      chart: "donut",
     });
-    expect(result).toMatchObject({
-      success: false,
-      issues: [{ message: "blocks.0.table.rows.1 needs 2 cells, one per column." }],
+    expect(chart).toMatchObject({ type: "donut", valueLabel: "Tickets", data: [{ d: "High", v: 18 }, { d: "Low", v: 102 }] });
+  });
+
+  it("keeps formatted cells as written in columns that are not plain numbers", () => {
+    const [, table] = components({ title: "Revenue", table: "Region | Revenue\nNorth | $1.2M\nSouth | $0.9M" });
+    expect(table).toMatchObject({
+      columns: [{ key: "c0", label: "Region" }, { key: "c1", label: "Revenue" }],
+      rows: [{ c0: "North", c1: "$1.2M" }, { c0: "South", c1: "$0.9M" }],
     });
   });
 
-  it("requires a donut to be 2 to 8 nonnegative parts of a positive whole", () => {
-    const donut = (values: number[]) => validateRenderCardsInput({
-      title: "Mix",
-      blocks: [{
-        chart: { type: "donut", title: "Mix", valueLabel: "Share", points: values.map((value, index) => ({ label: `p${index}`, value })) },
-      }],
-    });
-    expect(donut([3, 4]).success).toBe(true);
-    expect(donut([3, -1]).success).toBe(false);
-    expect(donut([0, 0]).success).toBe(false);
-    expect(donut([1, 1, 1, 1, 1, 1, 1, 1, 1]).success).toBe(false);
+  it("names the row and column when a charted cell is not a plain number", () => {
+    expect(issues({ title: "Revenue", table: "Region | Revenue\nNorth | 1200000\nSouth | $0.9M", chart: "bar", chartColumn: "Revenue" }))
+      .toEqual(["table row 2 needs a plain number in the Revenue column, such as 12699845.92."]);
   });
 
-  it("rejects a chart with fewer than two points or a non-numeric value", () => {
-    const chart = (points: unknown[]) => validateRenderCardsInput({
-      title: "Orders",
-      blocks: [{ chart: { type: "line", title: "Orders", valueLabel: "Orders", points } }],
-    });
-    expect(chart([{ label: "Sep 7", value: 42 }]).success).toBe(false);
-    expect(chart([{ label: "Sep 7", value: "42" }, { label: "Sep 14", value: 47 }]).success).toBe(false);
+  it("lists the value columns when chartColumn names none of them", () => {
+    expect(issues({ title: "Revenue", table: "Region | Revenue\nNorth | 1\nSouth | 2", chart: "bar", chartColumn: "Sales" }))
+      .toEqual(["chartColumn must be one of the table's value columns: Revenue."]);
   });
 
-  it("rejects the production payload shapes that the previous envelope invited", () => {
-    const stringified = validateRenderCardsInput({
-      messages: [{ version: "v1.0", createSurface: "{\"catalogId\": \"urn:openneko:catalog:work:v2\"}" }],
-    });
-    expect(stringified.success).toBe(false);
-    const placeholders = validateRenderCardsInput({
-      title: "Revenue",
-      blocks: [{ table: true }],
-    });
-    expect(placeholders.success).toBe(false);
+  it("reads a literal backslash-n as a line break", () => {
+    const [, chart] = components({ title: "Orders", table: "Day | Orders\\nMon | 3\\nTue | 5", chart: "bar" });
+    expect(chart).toMatchObject({ component: "Chart", data: [{ d: "Mon", v: 3 }, { d: "Tue", v: 5 }] });
+  });
+
+  it("requires one cell per column and a table for a chart", () => {
+    expect(issues({ title: "Orders", table: "A | B\n1 | 2\n3" })).toEqual(["table row 2 needs 2 cells, one per column."]);
+    expect(issues({ title: "Orders", chart: "line", keyFigures: ["Orders: 3"] })).toEqual(["chart draws from table; add a table."]);
+  });
+
+  it("requires a donut to have 2 to 8 nonnegative parts", () => {
+    const rows = Array.from({ length: 9 }, (_, index) => `p${index} | ${index + 1}`).join("\n");
+    expect(issues({ title: "Mix", table: `Part | Share\n${rows}`, chart: "donut" }))
+      .toEqual(["a donut needs 2 to 8 rows with nonnegative values."]);
+  });
+
+  it("requires key figures in the form Label: value", () => {
+    expect(issues({ title: "Orders", keyFigures: ["214 orders"] })).toEqual(['keyFigures.0 needs the form "Label: value".']);
+  });
+
+  it("requires at least one section", () => {
+    expect(issues({ title: "Orders" })).toEqual(["Fill at least one of table, keyFigures, callout, followUps."]);
+  });
+
+  it("recovers answers from the call shapes a tool bridge produces", () => {
+    const answer = { title: "Orders", keyFigures: ["Orders: 214"] };
+    expect(normalizeRenderCardsInput({ name: "render_cards", arguments: answer })).toEqual(answer);
+    expect(normalizeRenderCardsInput({ arguments: JSON.stringify(answer) })).toEqual(answer);
+    expect(normalizeRenderCardsInput({ cards: answer })).toEqual(answer);
+    expect(normalizeRenderCardsInput({ ...answer, chart: null, table: false, callout: "", followUps: [] })).toEqual(answer);
+    expect(normalizeRenderCardsInput({ title: "Orders", followUps: "By region\nBy channel" }))
+      .toEqual({ title: "Orders", followUps: ["By region", "By channel"] });
+  });
+
+  it("rejects the previous message envelope", () => {
+    expect(validateRenderCardsInput({ messages: [{ version: "v1.0", createSurface: "{}" }] }).success).toBe(false);
   });
 
   it("advertises a schema every provider can read in full", () => {
@@ -157,7 +159,7 @@ describe("render_cards contract", () => {
   });
 
   it("keeps the tool description short and free of protocol vocabulary", () => {
-    expect(RENDER_CARDS_DESCRIPTION.length).toBeLessThan(800);
+    expect(RENDER_CARDS_DESCRIPTION.length).toBeLessThan(300);
     expect(RENDER_CARDS_DESCRIPTION).not.toMatch(/A2UI|createSurface|surfaceId|catalog/i);
   });
 });

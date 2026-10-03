@@ -6,6 +6,7 @@ export * from "./deployment-profile";
 export * from "./data-surface";
 export { buildCardsSection, buildWorkPrompt } from "./prompt";
 export {
+  normalizeRenderCardsInput,
   RENDER_CARDS_INPUT_SCHEMA,
   validateRenderCardsInput,
 } from "./a2ui-contract";

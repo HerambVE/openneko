@@ -4,6 +4,7 @@ import {
   createMcpServer,
   defineMcpTool,
 } from "../mcp-server";
+import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { writeWorkSkillFiles } from "./skill-files";
 import { RENDER_CARDS_DESCRIPTION } from "./render-catalog";
@@ -19,8 +20,7 @@ import type { AgentControlPlane } from "./control-plane";
 import {
   A2UI_RENDER_SERVER_NAME,
   A2UI_RENDER_TOOL_NAME,
-  RENDER_CARDS_INPUT_SHAPE,
-  type RenderCardsArgs,
+  RENDER_CARDS_INPUT_SCHEMA,
   validateRenderCardsInput,
 } from "./a2ui-contract";
 import { OPENNEKO_GRAPHJIN_MCP_SERVER_NAME } from "../graphjin/mcp-names";
@@ -42,37 +42,33 @@ function requireControlPlane(
 export function buildRenderCardsServer(
   emit: (event: AgentEvent) => Promise<void> | void,
 ) {
-  const renderCards = defineMcpTool(
-    A2UI_RENDER_TOOL_NAME,
-    RENDER_CARDS_DESCRIPTION,
-    RENDER_CARDS_INPUT_SHAPE,
-    async (args: RenderCardsArgs) => {
+  // Raw arguments reach the handler so bridge-shaped calls can be normalized
+  // before validation. The advertised schema is still the typed contract.
+  return createDynamicMcpServer({
+    name: A2UI_RENDER_SERVER_NAME,
+    version: "1.0.0",
+    listTools: async () => [{
+      name: A2UI_RENDER_TOOL_NAME,
+      description: RENDER_CARDS_DESCRIPTION,
+      inputSchema: RENDER_CARDS_INPUT_SCHEMA as Tool["inputSchema"],
+    }],
+    callTool: async ({ name, arguments: args }) => {
+      if (name !== A2UI_RENDER_TOOL_NAME) {
+        return { isError: true, content: [{ type: "text", text: `Unknown tool: ${name}` }] };
+      }
       const validated = validateRenderCardsInput(args);
       if (!validated.success) {
         return {
           isError: true,
-          content: [
-            {
-              type: "text" as const,
-              text: `Cards not shown. Fix and call again:\n${validated.issues.map((issue) => `- ${issue.message}`).join("\n")}`,
-            },
-          ],
+          content: [{
+            type: "text",
+            text: `Cards not shown. Fix and call again:\n${validated.issues.map((issue) => `- ${issue.message}`).join("\n")}`,
+          }],
         };
       }
-      await emit({
-        type: "surface",
-        messages: validated.messages,
-      });
-      return {
-        content: [{ type: "text" as const, text: "Cards shown." }],
-      };
+      await emit({ type: "surface", messages: validated.messages });
+      return { content: [{ type: "text", text: "Cards shown." }] };
     },
-  );
-
-  return createMcpServer({
-    name: A2UI_RENDER_SERVER_NAME,
-    version: "1.0.0",
-    tools: [renderCards],
   });
 }
 
