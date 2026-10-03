@@ -33,6 +33,7 @@ const h = vi.hoisted(() => {
     deleteMissing: false,
     collideOnNextCreate: false,
     failProviderReconcile: false,
+    legacyProvider: false,
     execLines: undefined as string[] | undefined,
   };
   function spawn(_cmd: string, args: string[]) {
@@ -47,6 +48,11 @@ const h = vi.hoisted(() => {
     const providerFailure = state.failProviderReconcile && args.includes("provider") &&
       (args.includes("import") || args.includes("create") || args.includes("update"));
     if (createCollision) state.collideOnNextCreate = false;
+    // A provider stored before OpenShell 0.1.2 exists and rejects updates
+    // until it is deleted.
+    const legacyProviderFailure = state.legacyProvider && args.includes("provider") &&
+      (args.includes("create") || args.includes("update"));
+    if (state.legacyProvider && args.includes("provider") && args.includes("delete")) state.legacyProvider = false;
     const reg = (store: Record<string, Array<(...a: unknown[]) => void>>) =>
       (ev: string, cb: (...a: unknown[]) => void) => {
         (store[ev] ??= []).push(cb);
@@ -58,6 +64,7 @@ const h = vi.hoisted(() => {
     ) => (store[ev] ?? []).forEach((cb) => cb(...a));
     const ch: Record<string, Array<(...a: unknown[]) => void>> = {};
     const stderr = Readable.from(
+      legacyProviderFailure ? [args.includes("update") ? "provider update failed (Client specified an invalid argument)" : "provider already exists"] :
       providerFailure ? [`INVALID_ARGUMENT ${args.includes("update") ? "update rejected" : "other failure"}: SECRET-KEY`] :
       missingDelete ? ["sandbox not found"] : createCollision
         ? ["Error: × sandbox 'work-run-1' already exists\n"]
@@ -75,7 +82,7 @@ const h = vi.hoisted(() => {
     const closeOnce = () => {
       if (closed) return;
       closed = true;
-      fire(ch, "close", providerFailure || createCollision || failedPolicy || missingDelete ? 1 : 0);
+      fire(ch, "close", providerFailure || legacyProviderFailure || createCollision || failedPolicy || missingDelete ? 1 : 0);
     };
     const stdout = reconciliation < 0 ? Readable.from(lines) : new Readable({ read() {} });
     const stdin = new Writable({
@@ -1277,8 +1284,21 @@ describe("ensureOpenShellProvider", () => {
   beforeEach(() => {
     h.calls.length = 0;
     h.state.failProviderReconcile = false;
+    h.state.legacyProvider = false;
   });
   afterEach(() => vi.restoreAllMocks());
+
+  it("recreates a provider whose legacy credential key OpenShell 0.1.2 cannot update", async () => {
+    h.state.legacyProvider = true;
+    await ensureOpenShellProvider({ providerName: "org-x", apiKey: "SECRET-KEY" });
+    const lines = h.calls.map((c) => c.args.join(" ")).filter((l) => !l.includes("profile import"));
+    expect(lines).toEqual([
+      "provider create --name org-x --type openneko-agent --credential MODEL_API_KEY=SECRET-KEY",
+      "provider update org-x --credential MODEL_API_KEY=SECRET-KEY",
+      "provider delete org-x",
+      "provider create --name org-x --type openneko-agent --credential MODEL_API_KEY=SECRET-KEY",
+    ]);
+  });
 
   it("registers the generic profile and creates the provider with the key", async () => {
     await ensureOpenShellProvider({ providerName: "org-x", apiKey: "SECRET-KEY" });

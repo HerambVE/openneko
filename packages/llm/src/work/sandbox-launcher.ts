@@ -1324,7 +1324,16 @@ export async function ensureOpenShellProvider(opts: {
     ]);
   } catch (createError) {
     try {
-      await run(["provider", "update", opts.providerName, "--credential", credential]);
+      await run(["provider", "update", opts.providerName, "--credential", credential]).catch(async (updateError) => {
+        // A provider created before OpenShell 0.1.2 stores the legacy
+        // `api_key` credential key, which 0.1.2 cannot update. Recreate it.
+        if (!describeError(updateError).includes("invalid argument")) throw updateError;
+        await run(["provider", "delete", opts.providerName]);
+        await run([
+          "provider", "create", "--name", opts.providerName,
+          "--type", OPENNEKO_AGENT_PROFILE_ID, "--credential", credential,
+        ]);
+      });
     } catch (updateError) {
       // A profile may already exist, so an import failure is not necessarily
       // the cause. Preserve the decisive update validation error and both
