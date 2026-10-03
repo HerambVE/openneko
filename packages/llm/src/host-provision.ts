@@ -554,8 +554,12 @@ function agentRuntimeLaunchConfig(args: {
 }): AgentRuntimeLaunchConfig {
   const derivedEndpoints = args.derivedEndpoints ?? [];
   const keyEnv = OPERATOR_AGENT_ENV.keyEnv || args.derivedKeyEnv || "";
+  // OpenShell 0.1.2 addresses profile credentials by their injected env var.
+  const configuredCredential = process.env.OPENNEKO_AGENT_MODEL_CREDENTIAL;
   const credentialName =
-    process.env.OPENNEKO_AGENT_MODEL_CREDENTIAL || "api_key";
+    !configuredCredential || configuredCredential === "api_key"
+      ? "MODEL_API_KEY"
+      : configuredCredential;
   const modelProvider =
     OPERATOR_AGENT_ENV.provider ||
     (args.hasApiKey ? gatewayProviderName(args.orgId) : "");

@@ -24,6 +24,20 @@ def client(ping=False):
         return int(status) if status else 1
 
 
+def kill_turn_children(group):
+    # OpenShell rejects negative PID signals (killpg). Match the turn's own
+    # process group and signal its remaining members by positive PID instead.
+    for entry in os.scandir('/proc'):
+        if not entry.name.isdecimal():
+            continue
+        pid = int(entry.name)
+        try:
+            if os.getpgid(pid) == group:
+                os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
 def serve():
     os.makedirs(HOME, mode=0o700, exist_ok=True)
     # Imports can cache home paths. Every fork uses this same slot-local path;
@@ -40,7 +54,9 @@ def serve():
         server.bind(SOCKET)
         os.chmod(SOCKET, 0o600)
         server.listen(1)
-        server.settimeout(int(sys.argv[2]))
+        # Initial preload and the first remote checkout need the same bounded
+        # grace as checkout. Assigned turns still restore their requested idle TTL.
+        server.settimeout(max(180, int(sys.argv[2])))
         print('__openneko_warm_ready__', flush=True)
         while True:
             try:
@@ -91,10 +107,9 @@ def serve():
             # Checkout renews the lease before policy sync/upload, which can
             # take longer than a deliberately short idle timeout in tests.
             server.settimeout(max(180, int(sys.argv[2])) if code == 75 else int(sys.argv[2]))
-            try:
-                os.killpg(pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
+            # A checkout ping never starts a turn or descendants.
+            if code != 75:
+                kill_turn_children(pid)
             try:
                 conn.sendall(str(0 if code == 75 else code).encode())
             except BrokenPipeError:
