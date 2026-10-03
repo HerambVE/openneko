@@ -32,6 +32,7 @@ const h = vi.hoisted(() => {
     failReconcile: false,
     deleteMissing: false,
     collideOnNextCreate: false,
+    failProviderReconcile: false,
     execLines: undefined as string[] | undefined,
   };
   function spawn(_cmd: string, args: string[]) {
@@ -43,6 +44,8 @@ const h = vi.hoisted(() => {
     const missingDelete = args.includes("delete") && state.deleteMissing;
     const createCollision =
       args.includes("create") && state.collideOnNextCreate;
+    const providerFailure = state.failProviderReconcile && args.includes("provider") &&
+      (args.includes("import") || args.includes("create") || args.includes("update"));
     if (createCollision) state.collideOnNextCreate = false;
     const reg = (store: Record<string, Array<(...a: unknown[]) => void>>) =>
       (ev: string, cb: (...a: unknown[]) => void) => {
@@ -55,6 +58,7 @@ const h = vi.hoisted(() => {
     ) => (store[ev] ?? []).forEach((cb) => cb(...a));
     const ch: Record<string, Array<(...a: unknown[]) => void>> = {};
     const stderr = Readable.from(
+      providerFailure ? [`INVALID_ARGUMENT ${args.includes("update") ? "update rejected" : "other failure"}: SECRET-KEY`] :
       missingDelete ? ["sandbox not found"] : createCollision
         ? ["Error: × sandbox 'work-run-1' already exists\n"]
         : [],
@@ -71,7 +75,7 @@ const h = vi.hoisted(() => {
     const closeOnce = () => {
       if (closed) return;
       closed = true;
-      fire(ch, "close", createCollision || failedPolicy || missingDelete ? 1 : 0);
+      fire(ch, "close", providerFailure || createCollision || failedPolicy || missingDelete ? 1 : 0);
     };
     const stdout = reconciliation < 0 ? Readable.from(lines) : new Readable({ read() {} });
     const stdin = new Writable({
@@ -146,6 +150,7 @@ const {
   prepareSandboxCapacity,
   closeSandboxPools,
   reapStrandedSandboxes,
+  sandboxOwnerLabelArgs,
   makeSandboxJobRunCore,
   makeSandboxWorkflowRunCore,
   buildModelEgressArgs,
@@ -161,6 +166,13 @@ const {
 } = await import("../src/work/sandbox-launcher");
 
 describe("reapStrandedSandboxes", () => {
+  it("shares one boot label across module instances in the same process", async () => {
+    const current = sandboxOwnerLabelArgs("openneko-web");
+    vi.resetModules();
+    const reloaded = await import("../src/work/sandbox-launcher");
+    expect(reloaded.sandboxOwnerLabelArgs("openneko-web")).toEqual(current);
+  });
+
   it("deletes only sandboxes owned by a previous boot", async () => {
     const deleted: string[] = [];
     const run = async (args: string[]) => {
@@ -185,6 +197,18 @@ describe("reapStrandedSandboxes", () => {
 });
 
 describe("sandboxLauncherOptionsFromEnv", () => {
+  it("accepts the legacy api_key setting on OpenShell 0.1.2", () => {
+    vi.stubEnv("OPENNEKO_AGENT_MODEL_CREDENTIAL", "api_key");
+    vi.stubEnv("OPENNEKO_AGENT_MODEL_KEY_ENV", "GEMINI_API_KEY");
+    try {
+      expect(sandboxLauncherOptionsFromEnv().keyAliases).toEqual([
+        { from: "MODEL_API_KEY", to: "GEMINI_API_KEY" },
+      ]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("ignores a persisted operator binary and exposes only model hosts", () => {
     vi.stubEnv("OPENNEKO_AGENT_MODEL_HOST", "models.example.com,models.dev");
     vi.stubEnv(
@@ -409,7 +433,7 @@ describe("buildModelEgressArgs", () => {
 describe("buildSandboxPolicy", () => {
   it("builds the complete creation policy with executable-scoped endpoints", () => {
     const policy = buildSandboxPolicy([
-      { host: "models.example.com", binary: "/bin/model" },
+      { host: "models.example.com", binary: "/bin/model", credentialProvider: "model-provider" },
       { host: "models.example.com", binary: "/bin/model" },
       { host: "graphjin.internal", binary: "/bin/graphjin", port: 8080 },
     ]);
@@ -424,6 +448,7 @@ describe("buildSandboxPolicy", () => {
       port: 443,
       protocol: "rest",
       enforcement: "enforce",
+      credential_binding: { provider: "model-provider" },
     });
     expect(model.endpoints.some((endpoint) => endpoint.host === "graphjin.internal"))
       .toBe(false);
@@ -566,7 +591,14 @@ describe("makeSandboxRunCore", () => {
     const commands = h.calls.map(call => call.args);
     const policies = commands.filter(args => args.includes("set"));
     expect(policies).toHaveLength(2);
-    expect(commands.findIndex(args => args.includes("attach"))).toBeLessThan(commands.findIndex(args => args.includes("set")));
+    const attachedAt = commands.findIndex(args => args.includes("attach"));
+    const readyAt = commands.findIndex(args => args.includes("status") && args.includes("--wait"));
+    const policyAt = commands.findIndex(args => args.includes("set"));
+    const uploadAt = commands.findIndex((args, index) => index > attachedAt && args.includes("upload"));
+    expect(attachedAt).toBeLessThan(readyAt);
+    expect(attachedAt).toBeLessThan(policyAt);
+    expect(policyAt).toBeLessThan(readyAt);
+    expect(readyAt).toBeLessThan(uploadAt);
     expect(commands.filter(args => args.includes("create")).every(args => !args.includes("--provider"))).toBe(true);
   });
 
@@ -693,9 +725,20 @@ describe("makeSandboxRunCore", () => {
     expect(h.calls.at(-1)?.args).toContain("delete");
     const phases = logs.filter((line) => line.startsWith("{")).map((line) => JSON.parse(line));
     expect(phases.map((p) => p.phase)).toEqual([
-      "stage", "create_upload", "exec", ...(download ? ["download"] : []), "delete", "total",
+      "stage", "create", "workspace_upload", "exec", ...(download ? ["download"] : []), "delete", "total",
     ]);
     expect(phases.every((p) => p.durationMs >= 0)).toBe(true);
+  });
+
+  it("creates a running sandbox before uploading its workspace", async () => {
+    await makeSandboxRunCore({ warmPoolSize: 0, agentImage: "test", onLog: () => {} })(fakeInput(async () => {}));
+    const createIndex = h.calls.findIndex(call => call.args.includes("create"));
+    const uploadIndex = h.calls.findIndex(call => call.args.includes("upload"));
+    expect(createIndex).toBeGreaterThanOrEqual(0);
+    expect(uploadIndex).toBeGreaterThan(createIndex);
+    expect(h.calls[createIndex]?.args).toEqual(expect.arrayContaining(["--", "sleep", "infinity"]));
+    expect(h.calls[createIndex]?.args).not.toContain("--upload");
+    expect(h.calls[uploadIndex]?.args).toContain("--no-git-ignore");
   });
 
   it("recovers partial artifacts when the agent fails without a filesystem hint", async () => {
@@ -730,7 +773,7 @@ describe("makeSandboxRunCore", () => {
 
     const verbs = h.calls.map((c) => c.args.find((a) => ["create", "update", "upload", "exec", "download", "delete"].includes(a)));
     // artifacts are pulled back from the box (download) before it's deleted
-    expect(verbs).toEqual(["create", "exec", "download", "delete"]);
+    expect(verbs).toEqual(["create", "upload", "exec", "download", "delete"]);
     const download = h.calls.find((c) => c.args.includes("download"));
     expect(download?.args.at(-1)).toBe(fakeInput().workspace.artifactRoot);
     // streamed event reached emit:
@@ -746,7 +789,7 @@ describe("makeSandboxRunCore", () => {
     // The detached main process keeps the box ready; exec runs the bundle:
     expect(h.calls[0]?.args).toContain("ghcr.io/open-neko/agent:test");
     expect(h.calls[0]?.args).toContain("--policy");
-    expect(h.calls[0]?.args).toContain("--upload");
+    expect(h.calls[0]?.args).not.toContain("--upload");
     const modelPolicy = Object.values(
       (jobCapture.policies.at(-1)?.network_policies ?? {}) as Record<
         string,
@@ -1207,11 +1250,10 @@ describe("makeSandboxRunCore", () => {
     });
     await runCore(fakeInput(async () => {}));
 
-    // The minimal workspace, job descriptor, and keyless Hermes config cross
-    // the boundary together in the create transaction.
-    expect(h.calls.filter((c) => c.args.includes("upload"))).toHaveLength(0);
+    // OpenShell 0.1.2 requires a live sandbox before workspace upload.
+    expect(h.calls.filter((c) => c.args.includes("upload"))).toHaveLength(1);
     const create = h.calls.find((c) => c.args.includes("create"));
-    expect(create?.args).toContain("--upload");
+    expect(create?.args).not.toContain("--upload");
     expect(create?.args).toContain("--detach");
     expect(create?.args.slice(-2)).toEqual(["sleep", "infinity"]);
     expect(create?.args[create.args.indexOf("--name") + 1]).toMatch(/^neko-w-[0-9a-f]{12}$/);
@@ -1234,6 +1276,7 @@ describe("makeSandboxRunCore", () => {
 describe("ensureOpenShellProvider", () => {
   beforeEach(() => {
     h.calls.length = 0;
+    h.state.failProviderReconcile = false;
   });
   afterEach(() => vi.restoreAllMocks());
 
@@ -1246,7 +1289,16 @@ describe("ensureOpenShellProvider", () => {
     const create = lines.find((l) => l.startsWith("provider create"));
     expect(create).toContain("--name org-x");
     expect(create).toContain("--type openneko-agent");
-    expect(create).toContain("--credential api_key=SECRET-KEY");
+    expect(create).toContain("--credential MODEL_API_KEY=SECRET-KEY");
+  });
+
+  it("reports the update rejection even if profile import also failed, without leaking the key", async () => {
+    h.state.failProviderReconcile = true;
+    await expect(ensureOpenShellProvider({ providerName: "org-x", apiKey: "SECRET-KEY" }))
+      .rejects.toThrow(/update: .*INVALID_ARGUMENT update rejected/);
+    await expect(ensureOpenShellProvider({ providerName: "org-x", apiKey: "SECRET-KEY" }))
+      .rejects.not.toThrow(/SECRET-KEY/);
+    expect(h.calls.some((call) => call.args.includes("update"))).toBe(true);
   });
 });
 

@@ -60,6 +60,7 @@ import type { PluginActionDescriptor } from "./tools";
 import { createToolOutputRecorder } from "./tool-output/metrics";
 import { runAgentBackend } from "./agent-core";
 import { createAgentEventTelemetry } from "./agent-event-telemetry";
+import { structuredTurnSummary } from "./structured-turn-summary";
 import {
   parseAppWorkContext,
   parseRecordWorkContext,
@@ -293,6 +294,7 @@ async function runChatTurnTraced(
     : await startupPhase("knowledge.read_pack", () => readKnowledgePack(knowledgePackPaths(workspace.knowledgeRoot)));
 
   let assistantText = "";
+  const surfaceMessages: Extract<AgentEvent, { type: "surface" }>["messages"] = [];
   let firstOutputLogged = false;
   let needsInputEvent: Extract<
     AgentEvent,
@@ -325,6 +327,7 @@ async function runChatTurnTraced(
     if (event.type === "message" && event.role === "assistant") {
       assistantText += event.content;
     }
+    if (event.type === "surface") surfaceMessages.push(...event.messages);
     if (event.type === "needs_input" && !needsInputEvent) {
       needsInputEvent = event;
     }
@@ -619,8 +622,6 @@ async function runChatTurnTraced(
       }
     }
 
-    await finishWorkRun(runId, result.status, result.error ?? null);
-
     // Hermes /work emits plugin action calls as `neko_action_request`
     // fences (no MCP tool registry to use). Parse them out and route
     // each through the same policy + DB + emit path the MCP tools
@@ -827,6 +828,11 @@ async function runChatTurnTraced(
     // surface that — strip it so a broken turn degrades to its prose (or empty,
     // which delivery + persistence then skip) instead of leaking a raw call.
     persistedText = stripDanglingToolCalls(persistedText);
+    // Structured-only turns used to leave no assistant row at all. The next
+    // turn then saw only the user's previous question and lost the result.
+    if (!persistedText && result.status === "completed") {
+      persistedText = structuredTurnSummary(vitals.payload, surfaceMessages);
+    }
     if (persistedText) {
       await saveAssistantWorkMessage({
         orgId,
@@ -835,6 +841,11 @@ async function runChatTurnTraced(
         content: persistedText,
       });
     }
+
+    // A terminal run is visible to the next turn. Publish that state only
+    // after its final assistant context has been saved, including a summary
+    // for structured-only answers.
+    await finishWorkRun(runId, result.status, result.error ?? null);
 
     await wrappedEmit({
       type: "done",

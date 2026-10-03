@@ -43,7 +43,11 @@ const SANDBOX_RUNTIME_DIR = ".openneko";
 
 const SANDBOX_OWNER_LABEL = "openneko.owner";
 const SANDBOX_BOOT_LABEL = "openneko.boot";
-const SANDBOX_BOOT_ID = randomUUID();
+// Next may evaluate this module in separate instrumentation and route bundles
+// inside one process. Those bundles share the warm pool via globalThis, so
+// they must also share its boot label or one reaper deletes another's box.
+const sandboxBootHost = globalThis as typeof globalThis & { __opennekoSandboxBootId?: string };
+const SANDBOX_BOOT_ID = sandboxBootHost.__opennekoSandboxBootId ??= randomUUID();
 
 /** web or worker; each host deletes only boxes it owns. */
 function sandboxOwner(): string {
@@ -126,7 +130,7 @@ export interface SandboxLauncherOptions {
   /**
    * Alias the OpenShell-injected credential env var (holds the
    * `openshell:resolve:env:…` placeholder) to the env var the backend reads —
-   * e.g. {from:"api_key", to:"GEMINI_API_KEY"} for hermes-gemini. The proxy
+   * e.g. {from:"MODEL_API_KEY", to:"GEMINI_API_KEY"} for hermes-gemini. The proxy
    * still substitutes the real key on egress, so the box only sees the
    * placeholder. `to` comes from the exhaustive Admin-provider runtime contract.
    */
@@ -195,7 +199,7 @@ type SandboxRunInput =
   | RunJobAgentBackendInput;
 
 const SHELL_KEY_RX = /^[A-Z_][A-Z0-9_]*$/;
-// Shell var names allow lowercase — the OpenShell credential is injected as `api_key`.
+// Shell variable names also support the profile's uppercase MODEL_API_KEY.
 const SHELL_VARNAME_RX = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function shellQuote(value: string): string {
@@ -241,7 +245,7 @@ function serializableAgentRunOptions(
   };
 }
 
-type SandboxEgressRule = { host: string; binary: string; port?: number };
+type SandboxEgressRule = { host: string; binary: string; port?: number; credentialProvider?: string };
 
 export type OpenShellSandboxPolicy = {
   version: 1;
@@ -262,6 +266,7 @@ export type OpenShellSandboxPolicy = {
         port: number;
         protocol: "rest";
         enforcement: "enforce";
+        credential_binding?: { provider: string };
         rules: Array<{ allow: { method: "*"; path: "/**" } }>;
       }>;
     }
@@ -278,12 +283,20 @@ export function buildSandboxPolicy(
 ): OpenShellSandboxPolicy {
   const byBinary = new Map<
     string,
-    Map<string, { host: string; port: number }>
+    Map<string, { host: string; port: number; credentialProvider?: string }>
   >();
   for (const rule of egress) {
     const port = rule.port ?? 443;
     const endpoints = byBinary.get(rule.binary) ?? new Map();
-    endpoints.set(`${rule.host}\0${port}`, { host: rule.host, port });
+    const key = `${rule.host}\0${port}`;
+    const previous = endpoints.get(key);
+    endpoints.set(key, {
+      host: rule.host,
+      port,
+      ...(rule.credentialProvider || previous?.credentialProvider
+        ? { credentialProvider: rule.credentialProvider ?? previous!.credentialProvider }
+        : {}),
+    });
     byBinary.set(rule.binary, endpoints);
   }
 
@@ -301,11 +314,12 @@ export function buildSandboxPolicy(
       binaries: [{ path: binary }],
       endpoints: [...endpoints.values()]
         .sort((a, b) => a.host.localeCompare(b.host) || a.port - b.port)
-        .map(({ host, port }) => ({
+        .map(({ host, port, credentialProvider }) => ({
           host,
           port,
           protocol: "rest",
           enforcement: "enforce",
+          ...(credentialProvider ? { credential_binding: { provider: credentialProvider } } : {}),
           rules: [{ allow: { method: "*", path: "/**" } }],
         })),
     };
@@ -776,9 +790,12 @@ function makeSandboxCore(
         })()
       : [];
     const egressRules: SandboxEgressRule[] = [
-      ...(opts.modelHosts ?? []).map((endpoint) => ({
+      ...(opts.modelHosts ?? []).map((endpoint, index) => ({
         ...endpoint,
         binary: VENDORED_HERMES_MODEL_BINARY,
+        ...(index === 0 && opts.modelProvider
+          ? { credentialProvider: opts.modelProvider }
+          : {}),
       })),
       ...(kind === "workflow"
         ? ((input as RunWorkflowAgentBackendInput).networkHosts ?? []).map((host) => ({
@@ -879,6 +896,14 @@ function makeSandboxCore(
               await timed("warm_provider", () => run(["sandbox", "provider", "attach", name, opts.modelProvider!], 60_000));
             }
             await timed("warm_policy", () => run(["policy", "set", name, "--policy", policyFile, "--wait", "--timeout", "60"], 65_000));
+            if (opts.modelProvider) {
+              // Endpointless profile credentials remain withheld until the
+              // policy binds this provider to the model endpoint.
+              await timed("warm_provider_ready", () => run([
+                "sandbox", "provider", "status", name, opts.modelProvider!,
+                "--wait", "--timeout", "60",
+              ], 65_000));
+            }
           };
           const syncInputs = async () => {
             const phases = ["workspace", "config"];
@@ -900,10 +925,11 @@ function makeSandboxCore(
             }));
             results.forEach((result, index) => startupEvent(`sandbox.${phases[index]}_delta`, result));
           };
-          // Wait for both even on failure: cleanup must not race an in-flight
-          // policy update or upload. No agent execution until both succeed.
-          const bound = await Promise.allSettled([bindPolicy(), syncInputs()]);
-          for (const result of bound) if (result.status === "rejected") throw result.reason;
+          // OpenShell 0.1.2 rejects concurrent sandbox mutations with
+          // "sandbox was modified by another operation". Attach the provider
+          // and policy before syncing files against the settled revision.
+          await bindPolicy();
+          await syncInputs();
         });
         log(JSON.stringify({ type: "sandbox_warm", runId: input.runId, sandboxName: name,
           mode: lease.reused ? "user" : lease.slot ? "generic" : "miss" }));
@@ -926,10 +952,6 @@ function makeSandboxCore(
           ...(opts.modelProvider ? ["--provider", opts.modelProvider] : []),
           "--policy",
           policyFile,
-          "--upload",
-          // OpenShell nests basename(LOCAL_PATH) under SANDBOX_PATH.
-          `${staged.orgRoot}:${path.posix.dirname(boxOrgRoot)}`,
-          "--no-git-ignore",
           "--",
           "sleep",
           "infinity",
@@ -941,10 +963,10 @@ function makeSandboxCore(
           // path own cleanup for the newly created instance.
           log(`replacing stale agent sandbox after name collision: ${name}`);
           await runCleanup(["sandbox", "delete", name], 60_000);
-          await timed("create_upload", () => run(createArgs, 180_000));
+          await timed("create", () => run(createArgs, 180_000));
         };
         try {
-          await timed("create_upload", () => run(createArgs, 180_000));
+          await timed("create", () => run(createArgs, 180_000));
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           if (message.includes("already exists")) {
@@ -961,7 +983,7 @@ function makeSandboxCore(
             );
             await new Promise((resolve) => setTimeout(resolve, 3_000));
             try {
-              await timed("create_upload", () => run(createArgs, 180_000));
+              await timed("create", () => run(createArgs, 180_000));
             } catch (retryError) {
               const retryMessage =
                 retryError instanceof Error ? retryError.message : String(retryError);
@@ -971,6 +993,18 @@ function makeSandboxCore(
           }
         }
         sandboxCreated = true;
+        // OpenShell 0.1.2 rejects --upload together with a create command.
+        // Keep the sandbox alive, then upload after creation has settled.
+        await timed("workspace_upload", () => run([
+          "sandbox", "upload", name, staged.orgRoot,
+          path.posix.dirname(boxOrgRoot), "--no-git-ignore",
+        ], 120_000));
+        if (opts.modelProvider) {
+          await timed("provider_ready", () => run([
+            "sandbox", "provider", "status", name, opts.modelProvider!,
+            "--wait", "--timeout", "60",
+          ], 65_000));
+        }
       }
 
       log(
@@ -1184,11 +1218,15 @@ export function sandboxLauncherOptionsFromEnv(
     .map((h) => h.trim())
     .filter(Boolean);
   // OpenShell injects the credential under the credential NAME (default
-  // `api_key`); alias it to the env var the backend reads (the hermes
+  // `MODEL_API_KEY`); alias it to the env var the backend reads (the hermes
   // provider→key map, e.g. GEMINI_API_KEY). The proxy swaps in the real key on
   // egress, so the box only ever holds the placeholder.
   const keyEnv = process.env.OPENNEKO_AGENT_MODEL_KEY_ENV;
-  const credName = process.env.OPENNEKO_AGENT_MODEL_CREDENTIAL || "api_key";
+  const configuredCredential = process.env.OPENNEKO_AGENT_MODEL_CREDENTIAL;
+  const credName =
+    !configuredCredential || configuredCredential === "api_key"
+      ? "MODEL_API_KEY"
+      : configuredCredential;
   return sandboxLauncherOptionsFromConfig({
     modelProvider: process.env.OPENNEKO_AGENT_MODEL_PROVIDER || undefined,
     modelHosts: hosts.map((host) => ({ host })),
@@ -1204,6 +1242,7 @@ export function sandboxLauncherOptionsFromEnv(
 // per-run by the launcher using the vendored executable. One profile covers
 // every provider.
 const OPENNEKO_AGENT_PROFILE_ID = "openneko-agent";
+const OPENNEKO_AGENT_CREDENTIAL = "MODEL_API_KEY";
 const OPENNEKO_AGENT_PROFILE_YAML = `id: ${OPENNEKO_AGENT_PROFILE_ID}
 display_name: OpenNeko Agent
 description: OpenNeko agent model credential (generic; egress applied per-run)
@@ -1266,7 +1305,11 @@ export async function ensureOpenShellProvider(opts: {
     await rm(dir, { recursive: true, force: true });
   }
 
-  const credential = `api_key=${opts.apiKey}`;
+  const credential = `${OPENNEKO_AGENT_CREDENTIAL}=${opts.apiKey}`;
+  const safeError = (error: unknown): string =>
+    opts.apiKey
+      ? describeError(error).replaceAll(opts.apiKey, "[REDACTED_SECRET]")
+      : describeError(error);
   // create on first run; update (refresh key) when it already exists.
   try {
     await run([
@@ -1283,10 +1326,15 @@ export async function ensureOpenShellProvider(opts: {
     try {
       await run(["provider", "update", opts.providerName, "--credential", credential]);
     } catch (updateError) {
-      // Neither path landed: prefer the profile-import failure as the root
-      // cause when there was one (the create's unknown-profile error is a
-      // symptom of it).
-      throw profileImportError ?? updateError ?? createError;
+      // A profile may already exist, so an import failure is not necessarily
+      // the cause. Preserve the decisive update validation error and both
+      // earlier attempts without exposing the credential in an exception.
+      throw new Error(
+        `OpenShell provider ${opts.providerName} reconciliation failed: ` +
+        `update: ${safeError(updateError)}; ` +
+        `create: ${safeError(createError)}` +
+        (profileImportError ? `; profile import: ${safeError(profileImportError)}` : ""),
+      );
     }
   }
 }
