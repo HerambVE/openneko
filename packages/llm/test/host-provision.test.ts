@@ -589,7 +589,7 @@ describeIfDb("provisionHostConfig", () => {
         { host: "generativelanguage.googleapis.com" },
         { host: "models.dev" },
       ],
-      keyAliases: [{ from: "api_key", to: "GEMINI_API_KEY" }],
+      keyAliases: [{ from: "MODEL_API_KEY", to: "GEMINI_API_KEY" }],
     });
 
     // Operator switches provider; the old `||=` writes pinned the first
@@ -609,7 +609,7 @@ describeIfDb("provisionHostConfig", () => {
         { host: "api.anthropic.com" },
         { host: "models.dev" },
       ],
-      keyAliases: [{ from: "api_key", to: "ANTHROPIC_API_KEY" }],
+      keyAliases: [{ from: "MODEL_API_KEY", to: "ANTHROPIC_API_KEY" }],
       hermesHomeHostPath: hermesHomeForOrg(orgId),
     });
 
@@ -748,7 +748,7 @@ describeIfDb("provisionHostConfig", () => {
           { host: "api.anthropic.com" },
           { host: "models.dev" },
         ],
-        keyAliases: [{ from: "api_key", to: "ANTHROPIC_API_KEY" }],
+        keyAliases: [{ from: "MODEL_API_KEY", to: "ANTHROPIC_API_KEY" }],
       });
 
       // Removing the saved key must not leave the previous gateway provider
@@ -814,7 +814,7 @@ describeIfDb("provisionHostConfig", () => {
       ensureOpenShellProviderMock.mockResolvedValue(undefined);
       await expect(ensureHostConfigProvisioned(retryOrgId)).resolves.toMatchObject({
         modelProvider: expect.stringMatching(/^openneko-agent-[a-f0-9]{16}$/),
-        keyAliases: [{ from: "api_key", to: "GEMINI_API_KEY" }],
+        keyAliases: [{ from: "MODEL_API_KEY", to: "GEMINI_API_KEY" }],
       });
       expect(ensureOpenShellProviderMock).toHaveBeenCalledTimes(4);
       delete process.env.OPENNEKO_PROVISION_RETRY_BASE_MS;
