@@ -23,17 +23,14 @@ const text = (result: Awaited<ReturnType<Client["callTool"]>>) =>
   (result.content as Array<{ text: string }>)[0]?.text;
 
 describe("brokered neko_ui render MCP server", () => {
-  it("emits one Answer surface for valid blocks", async () => {
+  it("emits one Answer surface for a valid answer", async () => {
     const emit = vi.fn(async () => {});
     await withServer(buildRenderCardsServer(emit), async (client) => {
       const listed = await client.listTools();
       expect(listed.tools.map((tool) => tool.name)).toEqual(["render_cards"]);
       const result = await client.callTool({
         name: "render_cards",
-        arguments: {
-          title: "Orders",
-          blocks: [{ keyFigures: { items: [{ label: "Orders", value: "42" }] } }],
-        },
+        arguments: { title: "Orders", keyFigures: ["Orders: 42"] },
       });
       expect(result.isError).toBeFalsy();
       expect(text(result)).toBe("Cards shown.");
@@ -45,8 +42,8 @@ describe("brokered neko_ui render MCP server", () => {
           createSurface: {
             surfaceId: expect.stringMatching(/^answer-/),
             components: [
-              { id: "root", component: "Answer", title: "Orders", children: ["b0"] },
-              { id: "b0", component: "KeyFigures", items: [{ label: "Orders", value: "42" }] },
+              { id: "root", component: "Answer", title: "Orders", children: ["keyFigures"] },
+              { id: "keyFigures", component: "KeyFigures", items: [{ label: "Orders", value: "42" }] },
             ],
           },
         }],
@@ -59,14 +56,11 @@ describe("brokered neko_ui render MCP server", () => {
     await withServer(buildRenderCardsServer(emit), async (client) => {
       const result = await client.callTool({
         name: "render_cards",
-        arguments: {
-          title: "Orders",
-          blocks: [{ table: { columns: [{ label: "A" }, { label: "B" }], rows: [["1"]] } }],
-        },
+        arguments: { title: "Orders", table: "A | B\n1" },
       });
       expect(result.isError).toBe(true);
       expect(text(result)).toBe(
-        "Cards not shown. Fix and call again:\n- blocks.0.table.rows.0 needs 2 cells, one per column.",
+        "Cards not shown. Fix and call again:\n- table row 1 needs 2 cells, one per column.",
       );
       expect(emit).not.toHaveBeenCalled();
     });

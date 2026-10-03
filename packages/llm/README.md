@@ -120,25 +120,37 @@ fence path; the brokered server validates the call and solely emits the
 surface.
 
 [`src/work/a2ui-contract.ts`](src/work/a2ui-contract.ts) is the source of truth
-for the names, the Zod validator, and the JSON Schema generated from it. The
-model sends a title and typed blocks; the host builds the A2UI v1.0 surface,
-including its version, catalog, surface ID, `Answer` root and component IDs.
-Persisted A2UI v0.9 messages retain reader-only compatibility.
+for the names, the Zod validator, and the JSON Schema generated from it. Every
+argument is a string, a list of strings, or an enum. The host builds the A2UI
+v1.0 surface, including its version, catalog, surface ID, `Answer` root and
+component IDs. Persisted A2UI v0.9 messages retain reader-only compatibility.
 
 ```json
 {
-  "title": "Revenue over the last four quarters",
-  "blocks": [
-    { "keyFigures": { "items": [{ "label": "2026 Q3", "value": "$13.85M" }] } },
-    { "chart": { "type": "line", "title": "Revenue by quarter", "valueLabel": "Revenue (USD)",
-      "points": [{ "label": "2026 Q2", "value": 13848055.85 }, { "label": "2026 Q3", "value": 13950000 }] } }
-  ]
+  "title": "Revenue by quarter",
+  "table": "Quarter | Revenue (USD)\n2026 Q2 | 13848055.85\n2026 Q3 | 13950000",
+  "chart": "line",
+  "chartColumn": "Revenue (USD)",
+  "keyFigures": ["2026 Q3: $13.95M (up 1% on Q2)"],
+  "followUps": ["Break 2026 Q3 down by region"]
 }
 ```
 
-Each block fills exactly one of `keyFigures`, `chart`, `table`, `markdown`,
-`callout` and `choices`. Table rows are arrays of cells in column order. The source
-configuration form is a separate tool, `present_source_form`, on the
+`table` is a pipe table. The chart draws the `chartColumn` values from the
+table, so a charted figure is written once. The host reads the text with plain
+string splitting: rows on line breaks (or a literal `\n`), cells on `|`, and
+numbers with `Number()` after removing thousands separators. `keyFigures`
+entries are `Label: value` with an optional trailing `(note)`.
+
+Flat text fields matter because Hermes defers MCP tools behind a `tool_call`
+bridge whose `arguments` parameter is an open object. The model then sees the
+schema only as text and gets no structural guidance, so small models fill flat
+strings reliably and nested objects poorly. `normalizeRenderCardsInput`
+recovers the bridge's call shapes: a second `{name, arguments}` wrapper, the
+call sent as JSON text, and `null` / `false` / `""` placeholders.
+`pnpm --filter @neko/worker eval:cards --bridge` reproduces that path.
+
+The source configuration form is a separate tool, `present_source_form`, on the
 `neko_source_config_manager` server; the host builds that form from the
 agent's prefill values.
 

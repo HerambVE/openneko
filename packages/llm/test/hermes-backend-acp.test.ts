@@ -933,7 +933,7 @@ describe("HermesBackend ACP behavior", () => {
     const sessionId = "sess-render";
     const cards = {
       title: "Test",
-      blocks: [{ keyFigures: { items: [{ label: "Test", value: "42" }] } }],
+      keyFigures: ["Test: 42"],
     };
     controller.setScript({
       responders: {

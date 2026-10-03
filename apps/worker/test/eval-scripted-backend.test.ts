@@ -24,7 +24,7 @@ describe("scripted eval backend", () => {
       expect(await context.listTools("neko_ui")).toEqual(["render_cards"]);
       const result = await context.call("neko_ui", "render_cards", {
         title: "Scripted eval",
-        blocks: [{ markdown: { text: "Scripted answer." } }],
+        callout: "Scripted answer.",
       });
       expect(result.isError).toBe(false);
       return "SCRIPTED_OK";

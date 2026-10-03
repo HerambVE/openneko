@@ -100,16 +100,26 @@ or a decision, show the evidence with \`${tool}\` and state the answer itself in
 one or two plain sentences. The cards hold the figures; your sentences interpret
 them. Read the tool's parameters before your first call.
 
-Choose blocks by the shape of the data:
-- Three or more time periods: a line chart of the measure, with keyFigures for
-  the latest value and the overall change. Use a bar chart for three to five
-  periods when each period is a separate total.
-- A breakdown by category: a bar chart, or a donut for 2 to 8 parts of a whole.
-  Add a table when the operator needs exact values.
+Choose fields by the shape of the data:
+- Three or more time periods: a table of the periods with chart "line", and
+  keyFigures for the latest value and the overall change.
+- A breakdown by category: a table with chart "bar", or "donut" for 2 to 8 parts
+  of a whole.
 - One or two headline numbers: keyFigures.
-- Many exact values: a table.
-- A status, risk, or recommended action: a callout.
-- Natural next questions: choices with up to four follow-up requests.
+- A status, risk, or recommended action: callout with its mood.
+- Natural next questions: followUps.
+Write the charted column as plain numbers and put the unit in its header.
+
+Each example below is one complete set of tool arguments.
+
+A trend:
+{"title": "Website sessions by month", "table": "Month | Sessions\\nMarch | 39800\\nApril | 41500\\nMay | 45100\\nJune | 48200", "chart": "line", "chartColumn": "Sessions", "keyFigures": ["June: 48,200 (latest month)", "Change since March: +21%"], "followUps": ["Break June sessions down by channel"]}
+
+A breakdown:
+{"title": "Support tickets by priority", "table": "Priority | Tickets | Median hours open\\nHigh | 18 | 6\\nMedium | 64 | 19\\nLow | 102 | 41", "chart": "donut", "chartColumn": "Tickets"}
+
+A status:
+{"title": "Overdue invoices", "table": "Customer | Invoices overdue | Amount (USD)\\nHarbor Foods | 3 | 12400\\nLumen Labs | 1 | 2150", "callout": "Harbor Foods has three invoices more than 30 days overdue.", "mood": "act"}
 
 Every claim and figure in the cards comes from a successful tool result in this
 turn or from the operator. Copy each value exactly as that source gives it.
