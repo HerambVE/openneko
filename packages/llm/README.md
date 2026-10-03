@@ -120,30 +120,36 @@ fence path; the brokered server validates the call and solely emits the
 surface.
 
 [`src/work/a2ui-contract.ts`](src/work/a2ui-contract.ts) is the source of truth
-for the names, A2UI identifiers, Zod validator, and the JSON Schema generated
-from that validator. Persisted A2UI v0.9 messages retain reader-only
-compatibility.
-
-The accepted envelope is:
+for the names, the Zod validator, and the JSON Schema generated from it. The
+model sends a title and typed blocks; the host builds the A2UI v1.0 surface,
+including its version, catalog, surface ID, `Answer` root and component IDs.
+Persisted A2UI v0.9 messages retain reader-only compatibility.
 
 ```json
 {
-  "messages": [
-    {
-      "version": "v1.0",
-      "createSurface": {
-        "surfaceId": "answer-unique-id",
-        "catalogId": "urn:openneko:catalog:work:v2",
-        "components": [
-          { "id": "root", "component": "Answer", "children": [] }
-        ]
-      }
-    }
+  "title": "Revenue over the last four quarters",
+  "blocks": [
+    { "keyFigures": { "items": [{ "label": "2026 Q3", "value": "$13.85M" }] } },
+    { "chart": { "type": "line", "title": "Revenue by quarter", "valueLabel": "Revenue (USD)",
+      "points": [{ "label": "2026 Q2", "value": 13848055.85 }, { "label": "2026 Q3", "value": 13950000 }] } }
   ]
 }
 ```
 
-Accepted calls remain visually quiet because the surface is the answer.
+Each block fills exactly one of `keyFigures`, `chart`, `table`, `markdown`,
+`callout` and `choices`. Table rows are arrays of cells in column order. The source
+configuration form is a separate tool, `present_source_form`, on the
+`neko_source_config_manager` server; the host builds that form from the
+agent's prefill values.
+
+Every tool schema uses the portable JSON Schema subset in
+[`src/tool-schema-portability.ts`](src/tool-schema-portability.ts): declared
+object properties, typed array items and string enums. Providers drop or
+reject open objects, unions and `const`, so a schema that relies on them loses
+its structure on some models. `test/tool-schema-portability.test.ts` checks
+every static tool.
+
+Accepted calls remain visually quiet because the cards carry the evidence.
 Rejected calls emit a correlated `tool_start` containing the exact `rawInput`,
 canonical title, and validation issues, followed by `tool_end`. This preserves
 diagnostic evidence without showing successful render-tool pills.
@@ -152,5 +158,5 @@ diagnostic evidence without showing successful render-tool pills.
 
 Tests cover future/unknown GraphJin tools across both broker hops, native schema
 and result preservation, the no-`initialize` contract, one canonical render
-server/tool, generated-schema validation, one surface emission for valid calls,
+server/tool, portable tool schemas, one surface emission for valid calls,
 and exact rejected render input in telemetry.

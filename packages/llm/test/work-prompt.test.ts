@@ -176,8 +176,8 @@ describe("buildWorkPrompt conversation contract", () => {
       supportsCardTool: true,
     });
     expect(prompt).toContain("ongoing working conversation");
-    expect(prompt).toContain("surface supports the conversation");
-    expect(prompt).toContain("concise direct answer");
+    expect(prompt).toContain("The cards hold the figures; your sentences interpret");
+    expect(prompt).toContain("state the answer itself in\none or two plain sentences");
     expect(prompt).not.toMatch(/emit (?:an )?(?:interim|progress) update/i);
     expect(prompt).not.toMatch(/before (?:each|every) tool/i);
   });
@@ -246,14 +246,17 @@ describe("buildWorkPrompt action scopes", () => {
 describe("per-channel rendering gate", () => {
   it("renders via the render_cards tool on web turns (wantsCards)", () => {
     const hermesMcp = build("hermes", { wantsCards: true, supportsCardTool: true });
-    expect(hermesMcp).toContain("<rendering>");
+    expect(hermesMcp).toContain("<cards>");
     expect(hermesMcp).toContain("mcp__neko__ui_render_cards");
     expect(hermesMcp).not.toContain("mcp_neko_ui_render_cards");
-    expect(hermesMcp).toContain("interface that fits the current request");
+    expect(hermesMcp).toContain("Three or more time periods: a line chart");
+    expect(hermesMcp).toContain("A breakdown by category: a bar chart");
+    expect(hermesMcp).toContain("add a watch callout");
+    expect(hermesMcp).not.toMatch(/A2UI|createSurface|surfaceId|envelope/);
     expect(hermesMcp).not.toContain("BriefingCard");
 
     const hermesWeb = build("hermes", { wantsCards: true, supportsCardTool: false });
-    expect(hermesWeb).toContain("<rendering>");
+    expect(hermesWeb).toContain("<cards>");
     expect(hermesWeb).toContain("render_cards");
     // The web-UI-coupled fence is gone from the prompt entirely.
     expect(hermesWeb).not.toContain("neko_a2ui");
@@ -261,7 +264,7 @@ describe("per-channel rendering gate", () => {
 
   it("omits all rendering vocabulary on non-web turns", () => {
     const prompt = build("hermes", { wantsCards: false, supportsCardTool: true });
-    expect(prompt).not.toContain("<rendering>");
+    expect(prompt).not.toContain("<cards>");
     expect(prompt).not.toContain("neko_a2ui");
     expect(prompt).not.toContain("render_cards");
   });
@@ -282,7 +285,8 @@ describe("tool-result grounding", () => {
     expect(prompt).toContain("available fetch or detail action");
     expect(prompt).toContain("state the exact");
     expect(prompt).toContain("coverage obtained");
-    expect(prompt).toContain("Every claim and figure in the");
+    expect(prompt).toContain("Every claim and figure in the cards comes from a successful tool result");
+    expect(prompt).toContain("Report a failed tool call as an error.");
     expect(prompt).toContain("Omit unsupported numbers");
     expect(prompt).toContain("attribute each claim, figure, or row");
     expect(prompt).toContain("use a shared source label only when every named");
@@ -341,8 +345,8 @@ describe("buildWorkPrompt workflow + policy management", () => {
     expect(enabled).toContain("Call `ask_graphjin_config_agent`");
     expect(enabled).toContain("Success for a view or explanation");
     expect(enabled).toContain("source_config_admin");
-    expect(enabled).toContain("Database, API,\nand Files");
-    expect(enabled).toContain("Conditional groups");
+    expect(enabled).toContain("call `present_source_form` with the values you already know");
+    expect(enabled).toContain("mcp_neko_source_config_manager_present_source_form");
     expect(enabled).toContain("imported OpenAPI asset ID");
     expect(enabled).toContain("managed local-file manifest or object-store bucket");
     expect(enabled).not.toContain("trusted host");

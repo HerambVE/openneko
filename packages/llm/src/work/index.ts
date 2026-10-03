@@ -4,7 +4,12 @@ export * from "./sandbox-net";
 export * from "./behavior-monitor";
 export * from "./deployment-profile";
 export * from "./data-surface";
-export { buildWorkPrompt } from "./prompt";
+export { buildCardsSection, buildWorkPrompt } from "./prompt";
+export {
+  RENDER_CARDS_INPUT_SCHEMA,
+  validateRenderCardsInput,
+} from "./a2ui-contract";
+export { RENDER_CARDS_DESCRIPTION } from "./render-catalog";
 export {
   ASK_USER_SERVER_NAME,
   ASK_USER_TOOL_NAME,
