@@ -931,16 +931,10 @@ describe("HermesBackend ACP behavior", () => {
     process.env.OPENNEKO_MCP_BRIDGE = "/app/mcp-bridge.js";
     const cap = captureRequests();
     const sessionId = "sess-render";
-    const a2ui = [
-      {
-        version: "v1.0",
-        createSurface: {
-          surfaceId: "s1",
-          catalogId: "urn:openneko:catalog:work:v2",
-          components: [{ id: "root", component: "MetricCard", metric: "42", label: "Test" }],
-        },
-      },
-    ];
+    const cards = {
+      title: "Test",
+      blocks: [{ keyFigures: { items: [{ label: "Test", value: "42" }] } }],
+    };
     controller.setScript({
       responders: {
         "session/new": (p) => { cap.record("session/new", p); return { sessionId }; },
@@ -955,14 +949,14 @@ describe("HermesBackend ACP behavior", () => {
                 toolCallId: "tc-render",
                 kind: "other",
                 title: "mcp_neko_ui_render_cards",
-                rawInput: { messages: a2ui },
+                rawInput: cards,
               },
             },
           });
           ctx.emitNotification(
             toolCallUpdateNotification(sessionId, "tc-render", {
               status: "completed",
-              content: '{"ok":true,"accepted":1}',
+              content: "Cards shown.",
             }),
           );
           return { stopReason: "end_turn" };

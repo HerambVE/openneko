@@ -88,40 +88,43 @@ heuristic as urgency, priority, or overdue status.
 </records_access>`;
 }
 
-// Web-only (callers gate this behind wantsCards). Rendering uses a
-// `render_cards` tool mounted via the single brokered neko_ui MCP server. The
-// component catalog + generated message schema live on
-// the tool's messages parameter schema (ST1: the channel supplies its own rendering
-// vocabulary; the base prompt stays channel-neutral). See
-// docs/PER_CHANNEL_RENDERING.md.
-function buildRenderingSection(supportsCardTool: boolean): string {
+// Web-only (callers gate this behind wantsCards). The neko_ui render_cards tool
+// declares the block fields; this section says which block fits which data.
+export function buildCardsSection(supportsCardTool: boolean): string {
   const tool = supportsCardTool
     ? A2UI_RENDER_MCP_TOOL_NAME
     : A2UI_RENDER_TOOL_NAME;
-  return `<rendering>
-Call \`${tool}\` for every web answer that contains two or more figures, a
-comparison, a table, findings, a decision, a form, or an error-recovery path.
-Use \`tool_describe\` for this name if deferred; its messages schema carries the
-available components, example, and protocol. Compose an
-interface that fits the current request, using the smallest useful combination
-of narrative, data, layout, inputs, and actions.
-Choose a chart when verified multi-point data reveals a useful trend,
-comparison, or category mix. Do not chart a single value or invent points.
-The surface supports the conversation; it does not replace your assistant
-message. Give the operator a concise direct answer, interpretation, or focused
-question in natural prose. Do not recite every table row or figure again.
-Every claim and figure in the surface must come from a successful tool result
-in this turn or content the operator supplied. A failed tool is an error state,
-not a data source. A short prose-only answer may skip the tool. Check the render
-tool result: if it rejects the surface, correct the envelope and retry. Never
-say a surface was rendered unless the tool accepted it.
-</rendering>`;
+  return `<cards>
+When an answer rests on two or more figures, a comparison, a table, findings,
+or a decision, show the evidence with \`${tool}\` and state the answer itself in
+one or two plain sentences. The cards hold the figures; your sentences interpret
+them. Read the tool's parameters before your first call.
+
+Choose blocks by the shape of the data:
+- Three or more time periods: a line chart of the measure, with keyFigures for
+  the latest value and the overall change. Use a bar chart for three to five
+  periods when each period is a separate total.
+- A breakdown by category: a bar chart, or a donut for 2 to 8 parts of a whole.
+  Add a table when the operator needs exact values.
+- One or two headline numbers: keyFigures.
+- Many exact values: a table.
+- A status, risk, or recommended action: a callout.
+- Natural next questions: choices with up to four follow-up requests.
+
+Every claim and figure in the cards comes from a successful tool result in this
+turn or from the operator. Copy each value exactly as that source gives it.
+Report a failed tool call as an error. When one period differs from its
+neighbours by more than three times, add a watch callout that names the likely
+cause, such as incomplete data or a one-off event. A single fact needs only a
+sentence. When the tool reports a problem, fix the named fields and call it
+again. Refer to the cards in your answer only after the tool confirms them.
+</cards>`;
 }
 
 const CONVERSATION_SECTION = `<conversation>
 Treat this as an ongoing working conversation, not a report generator. Respond
 to the operator's actual wording and prior turns, lead with what matters now,
-and use natural prose even when a structured surface carries supporting data.
+and use natural prose even when cards carry the supporting data.
 When a material choice belongs to the operator, ask a focused question instead
 of silently choosing for them.
 </conversation>`;
@@ -458,12 +461,11 @@ runtime, or reload impact, complete these steps in order:
    status.
 
 When an edit needs operator input, call \`list_source_secret_names\` as needed,
-then use \`${A2UI_RENDER_MCP_TOOL_NAME}\` to present a bound A2UI v1.0 form with the relevant
-fields and one proposal action. In the next turn, validate the submitted values
-and call \`request_source_config_change\`. The source form offers Database, API,
-and Files. Use Conditional groups so the selected kind shows its own fields.
-ChoicePicker values arrive as one-item arrays; pass their selected item to the
-proposal tool. Use stored \`secretRef\` names for database credentials.
+then call \`present_source_form\` with the values you already know. In the next
+turn, validate the submitted values and call \`request_source_config_change\`.
+The submitted kind and backend arrive as one-item arrays; pass their selected
+item to the proposal tool. Use stored \`secretRef\` names for database
+credentials.
 
 Success for a view or explanation is a response containing the redacted result
 from step 2. Success for an edit is a response containing the proposal result
@@ -476,6 +478,8 @@ requiring attention.
   selected GraphJin to explain its redacted configuration and plan a change.
 - \`mcp_neko_source_config_manager_list_source_secret_names\` — list only
   stored connection secret names for use as \`secretRef\` values.
+- \`mcp_neko_source_config_manager_present_source_form\` — show the admin the
+  source form, prefilled with the values you already know.
 - \`mcp_neko_source_config_manager_import_openapi_spec\` — import and validate
   an OpenAPI document from an admin-provided hosted HTTPS URL.
 - \`mcp_neko_source_config_manager_list_openapi_specs\` — list managed
@@ -838,7 +842,7 @@ that flags churn risk every Monday."
     buildClarificationSection(supportsClarificationTool),
     dataSurface === "customer" ? buildSelectedMentionsSection(workspace) : "",
     dataSurface === "customer" && wantsCards
-      ? buildRenderingSection(supportsCardTool)
+      ? buildCardsSection(supportsCardTool)
       : "",
     buildSkillsSection(
       dataSurface === "customer" && supportsSkillTool,

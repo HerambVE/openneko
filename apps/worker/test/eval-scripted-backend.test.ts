@@ -23,16 +23,8 @@ describe("scripted eval backend", () => {
     const backend = new ScriptedEvalBackend("scripted-good", async (context) => {
       expect(await context.listTools("neko_ui")).toEqual(["render_cards"]);
       const result = await context.call("neko_ui", "render_cards", {
-        messages: [
-          {
-            version: "v1.0",
-            createSurface: {
-              surfaceId: "scripted-eval",
-              catalogId: "urn:openneko:catalog:work:v2",
-              components: [{ id: "root", component: "Answer" }],
-            },
-          },
-        ],
+        title: "Scripted eval",
+        blocks: [{ markdown: { text: "Scripted answer." } }],
       });
       expect(result.isError).toBe(false);
       return "SCRIPTED_OK";

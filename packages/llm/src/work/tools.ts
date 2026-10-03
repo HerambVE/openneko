@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   createDynamicMcpServer,
   createMcpServer,
@@ -6,6 +7,11 @@ import {
 import { z } from "zod";
 import { writeWorkSkillFiles } from "./skill-files";
 import { RENDER_CARDS_DESCRIPTION } from "./render-catalog";
+import {
+  buildSourceFormSurface,
+  SOURCE_FORM_PREFILL_SHAPE,
+  type SourceFormPrefill,
+} from "./source-form";
 import type { AgentEvent } from "../agent-backend";
 import { WORK_MEMORY_KINDS, type WorkMemoryContext } from "./memory-types";
 import type { RiskLevel } from "../workflows";
@@ -48,11 +54,7 @@ export function buildRenderCardsServer(
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify({
-                ok: false,
-                error: "Invalid A2UI surface graph",
-                issues: validated.issues,
-              }),
+              text: `Cards not shown. Fix and call again:\n${validated.issues.map((issue) => `- ${issue.message}`).join("\n")}`,
             },
           ],
         };
@@ -62,15 +64,7 @@ export function buildRenderCardsServer(
         messages: validated.messages,
       });
       return {
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify({
-              ok: true,
-              accepted: validated.messages.length,
-            }),
-          },
-        ],
+        content: [{ type: "text" as const, text: "Cards shown." }],
       };
     },
   );
@@ -748,6 +742,24 @@ export function buildSourceConfigManagerServer(opts: {
     }),
   );
 
+  const presentSourceForm = defineMcpTool(
+    "present_source_form",
+    [
+      "Show the admin the source configuration form for a new or changed",
+      "Database, API or Files source. Pass any values you already know; the",
+      "admin completes the rest and submits it for review. The submitted values",
+      "arrive in the next turn for request_source_config_change.",
+    ].join(" "),
+    SOURCE_FORM_PREFILL_SHAPE,
+    async (args: SourceFormPrefill) => {
+      await opts.emit({
+        type: "surface",
+        messages: buildSourceFormSurface(args, `source-form-${randomUUID()}`),
+      });
+      return { content: [{ type: "text" as const, text: "Form shown." }] };
+    },
+  );
+
   const askConfigAgent = defineMcpTool(
     "ask_graphjin_config_agent",
     [
@@ -1000,6 +1012,7 @@ export function buildSourceConfigManagerServer(opts: {
       describe,
       askConfigAgent,
       listSecretNames,
+      presentSourceForm,
       importOpenApi,
       listOpenApi,
       requestChange,
