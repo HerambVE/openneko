@@ -49,6 +49,7 @@ import { compactIfNeeded, type ThreadCompaction } from "./compact-transcript";
 import { discoverRunArtifacts } from "./artifacts";
 import {
   finishWorkRun,
+  getWorkRunEvents,
   getWorkThreadBundle,
   markWorkRunRunning,
   saveAssistantWorkMessage,
@@ -831,7 +832,18 @@ async function runChatTurnTraced(
     // Structured-only turns used to leave no assistant row at all. The next
     // turn then saw only the user's previous question and lost the result.
     if (!persistedText && result.status === "completed") {
-      persistedText = structuredTurnSummary(vitals.payload, surfaceMessages);
+      // Sandboxed MCP tools post their cards through the broker, which
+      // persists them without passing through this turn's emit.
+      const stored = await getWorkRunEvents(orgId, runId).catch(() => []);
+      const streamed = stripDanglingToolCalls(stored
+        .map(event => event.type === "message" && event.role === "assistant" ? event.content : "")
+        .join(""));
+      const interim = stored.flatMap(event => event.type === "interim" ? [stripDanglingToolCalls(event.content)] : []);
+      persistedText = structuredTurnSummary(
+        vitals.payload,
+        [...surfaceMessages, ...stored.flatMap(event => event.type === "surface" ? event.messages : [])],
+        [...interim, streamed],
+      );
     }
     if (persistedText) {
       await saveAssistantWorkMessage({

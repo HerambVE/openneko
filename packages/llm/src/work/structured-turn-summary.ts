@@ -84,10 +84,11 @@ function surfaceFacts(messages: readonly AgentSurfaceMessage[]): string[] {
   return facts;
 }
 
-/** A display-safe transcript anchor when the agent returned only UI fences. */
+/** A display-safe transcript anchor when the agent returned no final text. */
 export function structuredTurnSummary(
   vitals: VitalsPayload | null,
   surfaces: readonly AgentSurfaceMessage[] = [],
+  notes: readonly string[] = [],
 ): string {
   const facts = vitals?.vitals.map(({ label, value, sub, basis, asOf, source }) => {
     const qualifiers = [sub, basis, asOf && `as of ${asOf}`, source && `source: ${source}`]
@@ -95,7 +96,8 @@ export function structuredTurnSummary(
       .join("; ");
     return `- ${label}: ${value}${qualifiers ? ` (${qualifiers})` : ""}`;
   }) ?? [];
-  const content = surfaceFacts(surfaces);
+  const content = [...new Set(notes.map(note => note.trim()).filter(Boolean)), ...surfaceFacts(surfaces)];
+  if (!content.length && !facts.length) return "";
   const summary = [
     "Structured result from my previous turn:",
     ...content.map(value => `- ${value}`),
