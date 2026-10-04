@@ -25,6 +25,14 @@ import { VENDORED_HERMES_MODEL_BINARY } from "../agent-runtime-contract";
 import type { RunBinding } from "./broker";
 import type { RunChatTurnDeps } from "./run-chat-turn";
 import { copySkillOverrides } from "./workspace";
+import {
+  captureSandboxSkillEdits,
+  hashSkillTree,
+  readPersonalSkillFiles,
+  SANDBOX_SKILL_HASH_COMMAND,
+  skillFileHash,
+  type SkillFileHashes,
+} from "../config-vcs/skill-capture";
 import { KNOWLEDGE_FILES, readKnowledgeSnapshot } from "../knowledge-cache";
 
 // Wire protocol shared with the in-image entrypoint. The agent runs in a
@@ -814,6 +822,8 @@ function makeSandboxCore(
     // Unknown (old image, timeout, crash) must preserve partial artifacts.
     let artifactsPresent: boolean | undefined;
     let stableInputs: StagedSandboxWorkspace["stable"];
+    let skillActor: { userId: string | null; role: string | null } | null = null;
+    let skillBaseline: SkillFileHashes | undefined;
     try {
       await input.emit({
         type: "status",
@@ -828,6 +838,22 @@ function makeSandboxCore(
         cached: Boolean(pool),
       }));
       stableInputs = staged.stable;
+      if (!isJob) {
+        // Skill edits made in the box are saved when the turn ends; a member
+        // runs with their own saved skill versions laid over the company's.
+        const { getWorkRunActor } = await import("./personas");
+        skillActor = await getWorkRunActor(input.runId, input.orgId).catch(() => null);
+        const personal = skillActor?.userId && skillActor.role !== "admin"
+          ? await readPersonalSkillFiles(hostOrgRoot, skillActor.userId).catch(() => [])
+          : [];
+        for (const file of personal) {
+          const target = path.join(staged.workspace.skillsRoot, file.path);
+          await mkdir(path.dirname(target), { recursive: true });
+          await writeFile(target, file.content);
+        }
+        skillBaseline = await hashSkillTree(input.workspace.skillsRoot);
+        for (const file of personal) skillBaseline.set(file.path, skillFileHash(file.content));
+      }
       if (stableInputs) startupEvent("sandbox.staging_cache", { outcome: stableInputs.hit ? "hit" : "miss" });
       const stageRuntimeRoot = path.join(
         staged.workspace.runRoot,
@@ -1071,6 +1097,26 @@ function makeSandboxCore(
           ],
           120_000,
         )).catch((e) => log(`artifact pull-back skipped: ${(e as Error).message}`));
+      }
+      if (sandboxCreated && skillActor && skillBaseline) {
+        await timed("skill_capture", () => captureSandboxSkillEdits({
+          listSandboxHashes: () => runCleanup([
+            "sandbox", "exec", "-n", name, "--no-tty", "--",
+            "/usr/local/uv/tools/hermes-agent/bin/python", "-c", SANDBOX_SKILL_HASH_COMMAND, boxWorkspace.skillsRoot,
+          ], 60_000),
+          downloadSkill: (skill, destination) => runCleanup([
+            "sandbox", "download", name, path.posix.join(boxWorkspace.skillsRoot, skill), destination,
+          ], 120_000).then(() => {}),
+          orgRoot: hostOrgRoot,
+          orgId: input.orgId,
+          runId: input.runId,
+          actor: skillActor!,
+          baseline: skillBaseline!,
+        }))
+          .then((saved) => {
+            if (saved) log(JSON.stringify({ type: "skill_capture", runId: input.runId, ...saved }));
+          })
+          .catch((e) => log(`skill capture failed: ${(e as Error).message}`));
       }
       // The sandbox is the process-tree boundary. Deleting it terminates the
       // backend plus every child/sub-agent, and cleanup must not inherit the

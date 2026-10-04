@@ -113,6 +113,7 @@ import {
 } from "@neko/llm/workflows";
 import { resolveDeclarativePackActionAdapter, registerPackConnectionPreflight } from "./packs/declarative-action-runtime.js";
 import { ensureOrgWorkspace, getOrgAgentRoot, reportDeploymentProfile } from "@neko/llm/work";
+import { checkOrgUpdates } from "@neko/llm/config-vcs/updates";
 import { ensureQueueExists } from "./pg-boss-helpers.js";
 import { PluginRegistry } from "./plugins/plugin-registry.js";
 import { setPluginRegistryInstance } from "./plugins/registry-instance.js";
@@ -664,6 +665,10 @@ const server = createServer(
       },
     },
     packs: {
+      checkContextUpdates: async () => {
+        const orgId = await getOrgId();
+        return checkOrgUpdates(orgId, getOrgAgentRoot(orgId));
+      },
       upload: (bytes, input) => packService.upload(bytes, input),
       review: (packId, input, operation) => packService.review(packId, input, operation),
       list: () => packService.list(),

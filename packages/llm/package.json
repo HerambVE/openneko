@@ -15,6 +15,7 @@
     "./secrets": "./src/secrets.ts",
     "./work": "./src/work/index.ts",
     "./config-vcs": "./src/config-vcs/public.ts",
+    "./config-vcs/updates": "./src/config-vcs/updates.ts",
     "./interaction": "./src/interaction/index.ts",
     "./workflows": "./src/workflows/index.ts",
     "./workflows/fences": "./src/workflows/fence-parsers.ts",

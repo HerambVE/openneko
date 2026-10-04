@@ -271,6 +271,7 @@ describe("worker solution-pack admin routes", () => {
         status: "removed",
         input,
       })),
+      checkContextUpdates: vi.fn(async () => ({ tip: "abc", skills: [{ name: "shortfall", status: "update" }], packs: [] })),
       upload: vi.fn(async () => ({ packId: "service-health", version: "0.1.0" })),
       review: vi.fn(async () => ({ reviewHash: "reviewed" })),
       oauthStatus: vi.fn(async () => ({ connected: true, account: { label: "owner@example.test" } })),
@@ -282,6 +283,14 @@ describe("worker solution-pack admin routes", () => {
     };
     const srv = await startServer(createAdminHandler({ packs: surface }));
     try {
+      const updates = await fetch(`http://127.0.0.1:${srv.port}/admin/context-remote/updates`);
+      expect(updates.status).toBe(200);
+      expect(await updates.json()).toEqual({ updates: { tip: "abc", skills: [{ name: "shortfall", status: "update" }], packs: [] } });
+      surface.checkContextUpdates.mockRejectedValueOnce(new Error("Connect a remote repository first."));
+      const refused = await fetch(`http://127.0.0.1:${srv.port}/admin/context-remote/updates`);
+      expect(refused.status).toBe(400);
+      expect(await refused.json()).toEqual({ error: "Connect a remote repository first." });
+
       const list = await fetch(`http://127.0.0.1:${srv.port}/admin/packs`);
       expect(list.status).toBe(200);
       expect(await list.json()).toEqual({ packs: [{ id: "magento", installed: false }] });
@@ -436,6 +445,7 @@ describe("worker solution-pack admin routes", () => {
         configure: async () => ({}),
         upgrade: async () => ({}),
         uninstall: async () => ({}),
+        checkContextUpdates: async () => ({}),
         upload: async () => ({}),
         review: async () => ({}),
         magentoStoreManagement: async () => ({}),
