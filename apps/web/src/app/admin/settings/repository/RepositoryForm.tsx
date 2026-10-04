@@ -60,7 +60,9 @@ export default function RepositoryForm({ initial }: { initial: ContextRemoteSett
   }, []);
 
   useEffect(() => {
-    if (remote) void loadPreview();
+    if (!remote) return;
+    const id = window.setTimeout(() => void loadPreview(), 0);
+    return () => window.clearTimeout(id);
   }, [remote, loadPreview]);
 
   async function save(event: React.FormEvent) {
