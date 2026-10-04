@@ -1312,7 +1312,13 @@ textarea.work-a2ui-input { resize: vertical; }
   font-variant-numeric: tabular-nums;
 }
 .work-bubble-time { margin-right: 4px; align-self: center; }
-.work-answer-time { margin-left: 6px; }
+.work-answer-evidence .work-answer-time {
+  display: inline;
+  margin-left: 6px;
+  font-family: inherit;
+  font-weight: 400;
+}
+.work-answer-evidence .work-answer-time::before { content: "· "; }
 .work-status-elapsed { margin-left: auto; }
 
 /* A finished run's working trail, folded above the answer. */

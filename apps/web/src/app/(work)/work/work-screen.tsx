@@ -3046,7 +3046,8 @@ function RunTimeline({
     return <WorkFailureNotice key={`error-${index}`} message={item.message} />;
   };
   // A finished answer folds its working trail (reasoning, tool calls and
-  // interim notes) into one row, so the answer leads.
+  // interim notes) into one row, so the answer leads. Its last reasoning note
+  // stays open beside the answer.
   const trail = presentation.items
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => TRAIL_KINDS.has(item.kind));
@@ -3056,9 +3057,11 @@ function RunTimeline({
     <div className="work-timeline flex flex-col gap-2.5 mt-1">
       {foldTrail ? (
         <WorkTrail run={run} items={trail.map(({ item }) => item)}>
-          {trail.map(({ item, index }) => renderItem(item, index))}
+          {trail.filter(({ index }) => index !== lastProgress).map(({ item, index }) => renderItem(item, index))}
         </WorkTrail>
       ) : null}
+      {/* The last reasoning note stays open above the answer. */}
+      {foldTrail && lastProgress >= 0 ? renderItem(presentation.items[lastProgress]!, lastProgress) : null}
       {presentation.items.map((item, index) =>
         foldTrail && TRAIL_KINDS.has(item.kind) ? null : renderItem(item, index),
       )}
@@ -3297,8 +3300,10 @@ function AnswerRunFooter({
           {answeredIn && run?.finishedAt ? (
             <div>
               <span>Answered in</span>
-              <strong>{answeredIn}</strong>
-              <LocalDateTime value={run.finishedAt} className="work-answer-time" />
+              <strong>
+                {answeredIn}
+                <LocalDateTime value={run.finishedAt} className="work-answer-time" />
+              </strong>
             </div>
           ) : null}
           {saved ? (
