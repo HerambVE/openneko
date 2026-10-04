@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { checkRemoteUpdates } from "../src/config-vcs/updates";
 import {
   bringInRemoteSkills,
+  localOnlyPath,
   openPullRequest,
   parseRemoteUrl,
   publishContext,
@@ -186,3 +187,83 @@ describe("updates from the remote", () => {
     ]);
   });
 });
+
+describe("publish and compare rules for skills", () => {
+  async function remoteCommit(change: (clone: string) => Promise<void>) {
+    const clone = join(root, `clone-${Math.random().toString(36).slice(2)}`);
+    git(root, "clone", "-q", bare, clone);
+    await change(clone);
+    git(clone, "add", "-A");
+    git(clone, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "Remote change");
+    git(clone, "push", "-q", "origin", "main");
+  }
+  const publishSkills = (opts: { excludeSkills?: string[]; skillBases?: Record<string, string> } = {}) =>
+    publishContext({ orgRoot, access: { url: remoteUrl }, mode: "push", branch: "main", kinds: ["skills"], ...opts });
+
+  it("treats paths with a dot segment as local-only", () => {
+    expect(localOnlyPath("skills/a/.protoexpress-agent-assets.json")).toBe(true);
+    expect(localOnlyPath("skills/a/references/x.md")).toBe(false);
+  });
+
+  it("publishes only the org's own skill files", async () => {
+    await write("skills/shortfall/.protoexpress-agent-assets.json", "{}");
+    await write("skills/.reckon-openneko-port-manifest.json", "{}");
+    await write("skills/xlsx/SKILL.md", "# Built-in\n");
+    await commitConfigChange({ workspaceRoot: orgRoot, paths: ["skills"], message: "Markers" });
+
+    await publishSkills({ excludeSkills: ["xlsx"] });
+    expect(remoteFiles("main")).toEqual(["skills/shortfall/SKILL.md"]);
+  });
+
+  it("keeps a file only the repository has, until OpenNeko removes one it had synced", async () => {
+    await publishSkills();
+    await remoteCommit(async (clone) => {
+      await mkdir(join(clone, "skills/shortfall/runtimes/reckon"), { recursive: true });
+      await writeFile(join(clone, "skills/shortfall/runtimes/reckon/SKILL.md"), "# Reckon\n");
+    });
+    await write("skills/shortfall/SKILL.md", "# Edited\n");
+    await commitConfigChange({ workspaceRoot: orgRoot, paths: ["skills"], message: "Edit" });
+
+    await publishSkills();
+    expect(remoteFiles("main")).toContain("skills/shortfall/runtimes/reckon/SKILL.md");
+
+    await write("skills/shortfall/notes.md", "temporary\n");
+    await commitConfigChange({ workspaceRoot: orgRoot, paths: ["skills"], message: "Add notes" });
+    const withNotes = await publishSkills();
+    const remoteTrees = await skillTreesAt(orgRoot, withNotes.sha!);
+    const localTrees = await skillTreesAt(orgRoot, withNotes.head!);
+    await rm(join(orgRoot, "skills/shortfall/notes.md"));
+    await commitConfigChange({ workspaceRoot: orgRoot, paths: ["skills"], message: "Remove notes" });
+    await publishSkills({ skillBases: { shortfall: { remote: remoteTrees.shortfall!, local: localTrees.shortfall! } } });
+    expect(remoteFiles("main")).not.toContain("skills/shortfall/notes.md");
+    expect(remoteFiles("main")).toContain("skills/shortfall/runtimes/reckon/SKILL.md");
+  });
+
+  it("finds no difference from deploy markers or repository-only files, and records the skill as in sync", async () => {
+    await publishSkills();
+    await remoteCommit(async (clone) => {
+      await mkdir(join(clone, "skills/shortfall/runtimes"), { recursive: true });
+      await writeFile(join(clone, "skills/shortfall/runtimes/x.md"), "x\n");
+    });
+    await write("skills/shortfall/.protoexpress-agent-assets.json", "{}");
+    await commitConfigChange({ workspaceRoot: orgRoot, paths: ["skills"], message: "Marker" });
+
+    const updates = await checkRemoteUpdates({ orgRoot, access: { url: remoteUrl }, branch: "main", skillBases: {}, uploadedPacks: new Map() });
+    expect(updates.skills).toEqual([]);
+    expect(Object.keys(updates.inSync)).toEqual(["shortfall"]);
+    expect(updates.inSync.shortfall).toEqual({ remote: expect.any(String), local: expect.any(String) });
+  });
+
+  it("keeps local-only files when bringing in the repository's skill", async () => {
+    await publishSkills();
+    await write("skills/shortfall/.protoexpress-agent-assets.json", "{}");
+    await commitConfigChange({ workspaceRoot: orgRoot, paths: ["skills"], message: "Marker" });
+    await remoteCommit((clone) => writeFile(join(clone, "skills/shortfall/SKILL.md"), "# Upstream\n"));
+    const updates = await checkRemoteUpdates({ orgRoot, access: { url: remoteUrl }, branch: "main", skillBases: {}, uploadedPacks: new Map() });
+
+    await bringInRemoteSkills({ orgRoot, tip: updates.tip!, names: ["shortfall"], message: "Bring in" });
+    expect(git(orgRoot, "show", "HEAD:skills/shortfall/SKILL.md")).toBe("# Upstream");
+    expect(git(orgRoot, "show", "HEAD:skills/shortfall/.protoexpress-agent-assets.json")).toBe("{}");
+  });
+});
+

@@ -2,6 +2,7 @@ import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { hashPackFiles, stagePackArchive } from "@neko/packs";
+import { context_remote, db, eq } from "@neko/db";
 import { git } from "./git-shell";
 import { withRepoLock } from "./lock";
 import { readRow, remoteAccess } from "./remote-settings";
@@ -12,9 +13,13 @@ import {
   parseRemoteUrl,
   remotePackArchive,
   remoteTransport,
+  skillBase,
+  skillFiles,
+  skillTreeFiles,
   type PackUpdate,
   type RemoteAccess,
   type RemoteUpdates,
+  type SkillBase,
   type SkillUpdate,
 } from "./remote";
 
@@ -33,25 +38,41 @@ export async function checkRemoteUpdates(opts: {
   orgRoot: string;
   access: RemoteAccess;
   branch: string;
-  skillBases: Record<string, string>;
+  skillBases: Record<string, string | SkillBase>;
   uploadedPacks: Map<string, Map<string, string>>;
   reservedPackIds?: string[];
-}): Promise<RemoteUpdates> {
+}): Promise<RemoteUpdates & { inSync: Record<string, SkillBase> }> {
   const root = resolve(opts.orgRoot);
   return withRepoLock(root, async () => {
     const tip = await fetchRemote(root, opts.access, opts.branch);
-    if (!tip) return { tip: null, skills: [], packs: [] };
+    if (!tip) return { tip: null, skills: [], packs: [], inSync: {} };
     const head = (await git(root, ["rev-parse", "--verify", "--quiet", "HEAD"]).catch(() => ({ stdout: "" }))).stdout.trim();
-    const local = head ? await folderTrees(root, head, "skills") : new Map<string, string>();
-    const remote = await folderTrees(root, tip, "skills");
+    const local = head ? await skillFiles(root, head) : new Map<string, Map<string, string>>();
+    const remote = await skillFiles(root, tip);
+    const remoteTrees = await folderTrees(root, tip, "skills");
+    const localTrees = head ? await folderTrees(root, head, "skills") : new Map<string, string>();
+    const fingerprint = (files: Map<string, string>) => [...files].sort(([a], [b]) => a.localeCompare(b)).map(([path, sha]) => `${path} ${sha}`).join("\n");
 
     const skills: SkillUpdate[] = [];
-    for (const [name, remoteTree] of [...remote].sort(([a], [b]) => a.localeCompare(b))) {
-      const localTree = local.get(name);
-      const base = opts.skillBases[name];
-      if (localTree === remoteTree) continue;
-      if (base && remoteTree === base) continue;
-      skills.push({ name, remoteTree, status: localTree === undefined || (base && localTree === base) ? "update" : "both_changed" });
+    const inSync: Record<string, SkillBase> = {};
+    for (const [name, remoteFiles] of [...remote].sort(([a], [b]) => a.localeCompare(b))) {
+      const remoteTree = remoteTrees.get(name)!;
+      const localFiles = local.get(name);
+      if (!localFiles) {
+        skills.push({ name, remoteTree, status: "update" });
+        continue;
+      }
+      const baseTree = skillBase(opts.skillBases[name])?.remote;
+      const base = baseTree ? await skillTreeFiles(root, baseTree) : null;
+      // Before the first sync, a file only the repository has (such as a
+      // runtime-specific copy) is not a difference.
+      const compared = base ? remoteFiles : new Map([...remoteFiles].filter(([path]) => localFiles.has(path)));
+      if (fingerprint(localFiles) === fingerprint(compared)) {
+        inSync[name] = { remote: remoteTree, local: localTrees.get(name)! };
+        continue;
+      }
+      if (base && fingerprint(remoteFiles) === fingerprint(base)) continue;
+      skills.push({ name, remoteTree, status: base && fingerprint(localFiles) === fingerprint(base) ? "update" : "both_changed" });
     }
 
     const packs: PackUpdate[] = [];
@@ -79,7 +100,7 @@ export async function checkRemoteUpdates(opts: {
     } finally {
       await rm(scratch, { recursive: true, force: true });
     }
-    return { tip, skills, packs };
+    return { tip, skills, packs, inSync };
   });
 }
 
@@ -103,12 +124,17 @@ async function uploadedPackVersions(orgRoot: string): Promise<Map<string, Map<st
 export async function checkOrgUpdates(orgId: string, orgRoot: string): Promise<RemoteUpdates> {
   const row = await readRow(orgId);
   if (!row) throw new ContextRemoteError("Connect a remote repository first.");
-  return checkRemoteUpdates({
+  const { inSync, ...updates } = await checkRemoteUpdates({
     orgRoot,
     access: remoteAccess(row),
     branch: row.branch,
     skillBases: row.skill_bases ?? {},
     uploadedPacks: await uploadedPackVersions(orgRoot),
   });
+  const bases = { ...row.skill_bases, ...inSync };
+  if (Object.entries(inSync).some(([name, base]) => JSON.stringify(row.skill_bases?.[name]) !== JSON.stringify(base))) {
+    await db().update(context_remote).set({ skill_bases: bases }).where(eq(context_remote.org_id, orgId));
+  }
+  return updates;
 }
 
