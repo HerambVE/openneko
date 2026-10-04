@@ -90,6 +90,31 @@ export default function RepositoryForm({ initial }: { initial: ContextRemoteSett
     toast.success("Repository disconnected.");
   }
 
+  const sshDraft = /^ssh:\/\//.test(draft.url.trim()) || /^[^\s@/]+@[^\s:/]+:(?!\/)/.test(draft.url.trim());
+
+  async function newKey() {
+    if (!remote) return;
+    setBusy("save");
+    setError(null);
+    const result = await adminApi<{ remote: ContextRemoteSettings }>("/api/admin/context-remote", "PUT", {
+      url: remote.url, mode: remote.mode, branch: remote.branch, kinds: remote.kinds, username: remote.username, newSshKey: true,
+    });
+    setBusy(null);
+    if (!result.ok) return setError(result.error);
+    setRemote(result.body.remote);
+    toast.success("New deploy key created. Replace the old key in the repository.");
+  }
+
+  async function confirmHostKey() {
+    setBusy("save");
+    setError(null);
+    const result = await adminApi<{ remote: ContextRemoteSettings }>("/api/admin/context-remote/host-key", "POST");
+    setBusy(null);
+    if (!result.ok) return setError(result.error);
+    setRemote(result.body.remote);
+    toast.success("Host key confirmed.");
+  }
+
   const toggle = (kind: ContextRemoteKind, on: boolean) =>
     setDraft((d) => ({ ...d, kinds: on ? [...d.kinds, kind] : d.kinds.filter((k) => k !== kind) }));
 
@@ -134,6 +159,49 @@ export default function RepositoryForm({ initial }: { initial: ContextRemoteSett
           </section>
         ) : null}
 
+        {remote?.ssh ? (
+          <section className="settings-card mb-6 flex flex-col gap-4" aria-label="SSH access">
+            <div>
+              <h2 className="settings-card-title">SSH access</h2>
+              <p className="settings-card-copy">
+                Add this key to the repository as a deploy key with write access. On GitHub: Settings, Deploy keys. On GitLab: Settings, Repository, Deploy keys.
+              </p>
+            </div>
+            <div className="flex items-start gap-2 max-[720px]:flex-col">
+              <code className="min-w-0 flex-1 break-all rounded-[4px] bg-neutral px-2 py-1.5 font-mono text-ui-caption text-text2">
+                {remote.ssh.publicKey}
+              </code>
+              <Button type="button" size="sm" variant="secondary"
+                onClick={() => void navigator.clipboard.writeText(remote.ssh!.publicKey).then(() => toast.success("Key copied."))}>
+                Copy
+              </Button>
+              <Button type="button" size="sm" variant="secondary" disabled={busy !== null} onClick={() => void newKey()}>
+                Create a new key
+              </Button>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-ui-body-sm text-text">Server host keys</span>
+              <ul className="flex flex-col gap-0.5">
+                {remote.ssh.hostFingerprints.map((fingerprint) => (
+                  <li key={fingerprint} className="font-mono text-ui-caption text-text2">{fingerprint}</li>
+                ))}
+              </ul>
+              {remote.ssh.hostConfirmed ? (
+                <p className="text-ui-caption text-success-mid">Confirmed. OpenNeko connects only to a server with these keys.</p>
+              ) : (
+                <div className="flex items-start justify-between gap-4 max-[720px]:flex-col">
+                  <p className="text-ui-caption text-warn-ink">
+                    Compare these fingerprints with the ones your git host publishes. OpenNeko does not connect until you confirm them.
+                  </p>
+                  <Button type="button" size="sm" variant="primary" disabled={busy !== null} onClick={() => void confirmHostKey()}>
+                    Confirm host key
+                  </Button>
+                </div>
+              )}
+            </div>
+          </section>
+        ) : null}
+
         {remote ? <Updates /> : null}
 
         <form onSubmit={save} className="settings-card flex flex-col gap-5">
@@ -145,10 +213,15 @@ export default function RepositoryForm({ initial }: { initial: ContextRemoteSett
           </div>
           <AdminError message={error} />
           <div className="grid grid-cols-2 gap-4 max-[720px]:grid-cols-1">
-            <Field label="Repository address" htmlFor="repo-url" hint="The HTTPS address, such as https://github.com/acme/openneko-context.git.">
+            <Field
+              label="Repository address"
+              htmlFor="repo-url"
+              hint="HTTPS, such as https://github.com/acme/openneko-context.git, or SSH, such as git@github.com:acme/openneko-context.git."
+            >
               <Input
                 id="repo-url"
-                type="url"
+                type="text"
+                spellCheck={false}
                 required
                 value={draft.url}
                 onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))}
@@ -163,11 +236,13 @@ export default function RepositoryForm({ initial }: { initial: ContextRemoteSett
               />
             </Field>
             <Field
-              label="Access token"
+              label={sshDraft ? "Access token for pull requests" : "Access token"}
               htmlFor="repo-token"
               hint={remote?.hasToken
                 ? "A token is saved. Enter a new one to replace it."
-                : "A token that can write to the repository and open pull requests. OpenNeko stores it encrypted."}
+                : sshDraft
+                  ? "Optional. OpenNeko pushes with its SSH deploy key. A token lets it also open pull requests on GitHub or GitLab."
+                  : "A token that can write to the repository and open pull requests. OpenNeko stores it encrypted."}
             >
               <Input
                 id="repo-token"
@@ -177,14 +252,16 @@ export default function RepositoryForm({ initial }: { initial: ContextRemoteSett
                 onChange={(e) => setDraft((d) => ({ ...d, token: e.target.value }))}
               />
             </Field>
-            <Field label="Username" htmlFor="repo-username" hint="Leave blank for GitHub and GitLab. Some hosts need the account name for the token.">
-              <Input
-                id="repo-username"
-                autoComplete="off"
-                value={draft.username}
-                onChange={(e) => setDraft((d) => ({ ...d, username: e.target.value }))}
-              />
-            </Field>
+            {sshDraft ? null : (
+              <Field label="Username" htmlFor="repo-username" hint="Leave blank for GitHub and GitLab. Some hosts need the account name for the token.">
+                <Input
+                  id="repo-username"
+                  autoComplete="off"
+                  value={draft.username}
+                  onChange={(e) => setDraft((d) => ({ ...d, username: e.target.value }))}
+                />
+              </Field>
+            )}
             <Field label="How to publish" htmlFor="repo-mode" hint="A pull request lets someone review the change on the git host first.">
               <NativeSelect
                 id="repo-mode"

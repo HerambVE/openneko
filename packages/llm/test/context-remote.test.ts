@@ -31,7 +31,7 @@ async function write(path: string, content: string) {
 }
 
 const publish = (mode: "push" | "pull_request" = "push") =>
-  publishContext({ orgRoot, url: remoteUrl, mode, branch: "main", kinds: ["skills", "workflows"], now: new Date("2026-10-04T09:30:00Z") });
+  publishContext({ orgRoot, access: { url: remoteUrl }, mode, branch: "main", kinds: ["skills", "workflows"], now: new Date("2026-10-04T09:30:00Z") });
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), "context-remote-"));
@@ -95,7 +95,7 @@ describe("publishContext", () => {
   it("keeps the token out of error messages", async () => {
     const token = "ghp_secretvalue123";
     const error = await publishContext({
-      orgRoot, url: pathToFileURL(join(root, "missing.git")), token, mode: "push", branch: "main", kinds: ["skills"],
+      orgRoot, access: { url: pathToFileURL(join(root, "missing.git")), token }, mode: "push", branch: "main", kinds: ["skills"],
     }).catch((caught: Error) => caught);
     expect(error).toBeInstanceOf(Error);
     expect(String(error)).not.toContain(token);
@@ -104,10 +104,12 @@ describe("publishContext", () => {
 });
 
 describe("remote settings validation", () => {
-  it("accepts an HTTPS repository address and rejects credentials or other schemes", () => {
+  it("accepts HTTPS and SSH repository addresses and rejects secrets or other schemes", () => {
     expect(parseRemoteUrl("https://github.com/acme/context.git").hostname).toBe("github.com");
+    expect(parseRemoteUrl("git@github.com:acme/context.git").toString()).toBe("ssh://git@github.com/acme/context.git");
+    expect(parseRemoteUrl("ssh://git@git.acme.local:2222/team/context.git").port).toBe("2222");
     expect(() => parseRemoteUrl("https://user:pw@github.com/acme/context.git")).toThrow("token field");
-    expect(() => parseRemoteUrl("git@github.com:acme/context.git")).toThrow();
+    expect(() => parseRemoteUrl("ssh://git:pw@github.com/acme/context.git")).toThrow("token field");
     expect(() => parseRemoteUrl("http://github.com/acme/context.git")).toThrow("https://");
     expect(validBranchName("main")).toBe(true);
     expect(validBranchName("../main")).toBe(false);
@@ -137,7 +139,7 @@ describe("updates from the remote", () => {
   }
 
   const check = (skillBases: Record<string, string>, uploadedPacks = new Map<string, Map<string, string>>()) =>
-    checkRemoteUpdates({ orgRoot, url: remoteUrl, branch: "main", skillBases, uploadedPacks });
+    checkRemoteUpdates({ orgRoot, access: { url: remoteUrl }, branch: "main", skillBases, uploadedPacks });
 
   it("offers a skill that changed only in the repository, and brings it in", async () => {
     const published = await publish();

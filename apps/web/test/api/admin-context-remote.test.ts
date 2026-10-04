@@ -44,7 +44,7 @@ const reachable = await dbReachable();
     expect(JSON.stringify(saved.body)).not.toContain("glpat-secret");
 
     const invalid = await callRoute(route.PUT, { method: "PUT", body: { url: "http://gitlab.com/a/b.git", mode: "push", branch: "main", kinds: ["skills"] } });
-    expect(invalid).toMatchObject({ status: 400, body: { error: "The repository address must start with https://." } });
+    expect(invalid).toMatchObject({ status: 400, body: { error: "The repository address must start with https:// or ssh://, or have the form git@host:org/repo.git." } });
 
     expect((await callRoute(route.DELETE, { method: "DELETE" })).body).toEqual({ remote: null });
   });
@@ -54,7 +54,9 @@ const reachable = await dbReachable();
     const route = await import("@/app/api/admin/context-remote/route");
     const publish = await import("@/app/api/admin/context-remote/publish/route");
     const updates = await import("@/app/api/admin/context-remote/updates/route");
+    const hostKey = await import("@/app/api/admin/context-remote/host-key/route");
     expect((await callRoute(route.GET)).status).toBe(403);
+    expect((await callRoute(hostKey.POST, { method: "POST" })).status).toBe(403);
     expect((await callRoute(updates.GET)).status).toBe(403);
     expect((await callRoute(updates.POST, { method: "POST", body: { skills: [], packs: [] } })).status).toBe(403);
     expect((await callRoute(publish.POST, { method: "POST" })).status).toBe(403);

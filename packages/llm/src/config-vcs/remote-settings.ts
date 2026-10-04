@@ -15,14 +15,17 @@ import {
   publishContext,
   remotePackArchive,
   remoteProvider,
+  remoteTransport,
   skillTreesAt,
   validBranchName,
   type ContextRemoteKind,
   type ContextRemoteMode,
   type ContextRemoteProvider,
   type PublishResult,
+  type RemoteAccess,
   type RemoteUpdates,
 } from "./remote";
+import { generateDeployKey, hostKeyFingerprints, scanHostKeys } from "./ssh";
 
 export type ContextRemoteSettings = {
   url: string;
@@ -32,6 +35,9 @@ export type ContextRemoteSettings = {
   kinds: ContextRemoteKind[];
   username: string | null;
   hasToken: boolean;
+  transport: "https" | "ssh";
+  /** SSH remotes: the deploy key to add to the repository, and the server host keys to confirm. */
+  ssh: { publicKey: string; hostFingerprints: string[]; hostConfirmed: boolean } | null;
   lastPublish: { at: string; status: "ok" | "failed"; detail: string; link: string | null } | null;
 };
 
@@ -43,13 +49,24 @@ export type ContextRemoteDraft = {
   username?: string | null;
   /** A new token. Omit to keep the saved token; null removes it. */
   token?: string | null;
+  /** SSH remotes: replace the deploy key with a new one. */
+  newSshKey?: boolean;
 };
 
 type Row = typeof context_remote.$inferSelect;
 
-function toSettings(row: Row): ContextRemoteSettings {
+async function toSettings(row: Row): Promise<ContextRemoteSettings> {
+  const transport = remoteTransport(new URL(row.url)) === "ssh" ? "ssh" : "https";
   return {
     url: row.url,
+    transport,
+    ssh: transport === "ssh" && row.ssh_public_key
+      ? {
+          publicKey: row.ssh_public_key,
+          hostFingerprints: await hostKeyFingerprints(row.ssh_known_hosts ?? ""),
+          hostConfirmed: row.ssh_host_confirmed,
+        }
+      : null,
     provider: remoteProvider(new URL(row.url)),
     mode: row.mode as ContextRemoteMode,
     branch: row.branch,
@@ -74,7 +91,7 @@ async function readRow(orgId: string): Promise<Row | null> {
 
 export async function getContextRemote(orgId: string): Promise<ContextRemoteSettings | null> {
   const row = await readRow(orgId);
-  return row ? toSettings(row) : null;
+  return row ? await toSettings(row) : null;
 }
 
 export async function saveContextRemote(
@@ -82,7 +99,8 @@ export async function saveContextRemote(
   actorUserId: string | null,
   draft: ContextRemoteDraft,
 ): Promise<ContextRemoteSettings> {
-  const url = parseRemoteUrl(String(draft.url ?? "")).toString();
+  const parsed = parseRemoteUrl(String(draft.url ?? ""));
+  const url = parsed.toString();
   if (draft.mode !== "push" && draft.mode !== "pull_request") {
     throw new ContextRemoteError("Choose push or pull request.");
   }
@@ -96,7 +114,28 @@ export async function saveContextRemote(
   const tokenUpdate = draft.token === undefined
     ? {}
     : { token: draft.token?.trim() ? maybeEncryptSecret(draft.token.trim()) : null };
-  const values = { url, mode: draft.mode, branch, kinds, username, updated_by_user_id: actorUserId, updated_at: new Date() };
+  const sshUpdate: Partial<Row> = {};
+  if (remoteTransport(parsed) === "ssh") {
+    const previous = await readRow(orgId);
+    if (!previous?.ssh_private_key || draft.newSshKey) {
+      const key = await generateDeployKey(`openneko-${orgId}`);
+      sshUpdate.ssh_private_key = maybeEncryptSecret(key.privateKey);
+      sshUpdate.ssh_public_key = key.publicKey;
+    }
+    const endpoint = (value: string) => {
+      const target = new URL(value);
+      return target.protocol === "ssh:" ? `${target.hostname}:${target.port || "22"}` : null;
+    };
+    if (!previous?.ssh_known_hosts || endpoint(previous.url) !== endpoint(url)) {
+      try {
+        sshUpdate.ssh_known_hosts = await scanHostKeys(parsed.hostname, Number(parsed.port || 22));
+      } catch (error) {
+        throw new ContextRemoteError((error as Error).message);
+      }
+      sshUpdate.ssh_host_confirmed = false;
+    }
+  }
+  const values = { url, mode: draft.mode, branch, kinds, username, ...sshUpdate, updated_by_user_id: actorUserId, updated_at: new Date() };
   await db()
     .insert(context_remote)
     .values({ org_id: orgId, ...values, ...tokenUpdate })
@@ -106,7 +145,27 @@ export async function saveContextRemote(
     entityKind: "context_remote",
     entityId: orgId,
     event: "context:remote_changed",
-    payload: { actorUserId, url, mode: draft.mode, branch, kinds, tokenChanged: draft.token !== undefined },
+    payload: {
+      actorUserId, url, mode: draft.mode, branch, kinds,
+      tokenChanged: draft.token !== undefined,
+      sshKeyChanged: Boolean(sshUpdate.ssh_public_key),
+      hostKeysChanged: sshUpdate.ssh_known_hosts !== undefined,
+    },
+  });
+  return (await getContextRemote(orgId))!;
+}
+
+/** The administrator confirms the SSH server host keys OpenNeko read on save. */
+export async function confirmContextRemoteHostKey(orgId: string, actorUserId: string | null): Promise<ContextRemoteSettings> {
+  const row = await readRow(orgId);
+  if (!row?.ssh_known_hosts) throw new ContextRemoteError("This remote has no SSH host key to confirm.");
+  await db().update(context_remote).set({ ssh_host_confirmed: true }).where(eq(context_remote.org_id, orgId));
+  await recordAuditEvent({
+    orgId,
+    entityKind: "context_remote",
+    entityId: orgId,
+    event: "context:host_key_confirmed",
+    payload: { actorUserId, fingerprints: await hostKeyFingerprints(row.ssh_known_hosts) },
   });
   return (await getContextRemote(orgId))!;
 }
@@ -140,9 +199,7 @@ export async function publishOrgContext(
   try {
     const result = await publishContext({
       orgRoot,
-      url: parseRemoteUrl(row.url),
-      ...(row.token ? { token: maybeDecryptSecret(row.token) } : {}),
-      ...(row.username ? { username: row.username } : {}),
+      access: remoteAccess(row),
       mode: row.mode as ContextRemoteMode,
       branch: row.branch,
       kinds: (row.kinds ?? DEFAULT_CONTEXT_REMOTE_KINDS) as ContextRemoteKind[],
@@ -184,11 +241,17 @@ async function uploadedPackVersions(orgRoot: string): Promise<Map<string, Map<st
   return packs;
 }
 
-function remoteAccess(row: Row) {
+function remoteAccess(row: Row): RemoteAccess {
+  const url = parseRemoteUrl(row.url);
+  const ssh = remoteTransport(url) === "ssh";
+  if (ssh && !row.ssh_host_confirmed) throw new ContextRemoteError("Confirm the server's SSH host key first.");
   return {
-    url: parseRemoteUrl(row.url),
+    url,
     ...(row.token ? { token: maybeDecryptSecret(row.token) } : {}),
     ...(row.username ? { username: row.username } : {}),
+    ...(ssh && row.ssh_private_key
+      ? { ssh: { privateKey: maybeDecryptSecret(row.ssh_private_key), knownHosts: row.ssh_known_hosts ?? "" } }
+      : {}),
   };
 }
 
@@ -198,7 +261,7 @@ export async function checkOrgUpdates(orgId: string, orgRoot: string): Promise<R
   if (!row) throw new ContextRemoteError("Connect a remote repository first.");
   return checkRemoteUpdates({
     orgRoot,
-    ...remoteAccess(row),
+    access: remoteAccess(row),
     branch: row.branch,
     skillBases: row.skill_bases ?? {},
     uploadedPacks: await uploadedPackVersions(orgRoot),

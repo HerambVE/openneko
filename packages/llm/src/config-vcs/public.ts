@@ -32,6 +32,7 @@ export {
 export {
   applyOrgUpdates,
   checkOrgUpdates,
+  confirmContextRemoteHostKey,
   deleteContextRemote,
   getContextRemote,
   publishOrgContext,
