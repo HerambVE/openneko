@@ -257,6 +257,26 @@ describe("publish and compare rules for skills", () => {
     expect(updates.inSync.shortfall).toEqual({ remote: expect.any(String), local: expect.any(String) });
   });
 
+  it("offers a repository change as an update after a sync, despite repository-only files", async () => {
+    await publishSkills();
+    await remoteCommit(async (clone) => {
+      await mkdir(join(clone, "skills/shortfall/runtimes/reckon"), { recursive: true });
+      await writeFile(join(clone, "skills/shortfall/runtimes/reckon/SKILL.md"), "# Reckon\n");
+    });
+    const first = await checkRemoteUpdates({ orgRoot, access: { url: remoteUrl }, branch: "main", skillBases: {}, uploadedPacks: new Map() });
+    expect(first.skills).toEqual([]);
+    const bases = first.inSync;
+
+    await remoteCommit((clone) => writeFile(join(clone, "skills/shortfall/SKILL.md"), "# Upstream edit\n"));
+    const second = await checkRemoteUpdates({ orgRoot, access: { url: remoteUrl }, branch: "main", skillBases: bases, uploadedPacks: new Map() });
+    expect(second.skills).toEqual([expect.objectContaining({ name: "shortfall", status: "update" })]);
+
+    await write("skills/shortfall/SKILL.md", "# Local edit\n");
+    await commitConfigChange({ workspaceRoot: orgRoot, paths: ["skills"], message: "Local" });
+    const third = await checkRemoteUpdates({ orgRoot, access: { url: remoteUrl }, branch: "main", skillBases: bases, uploadedPacks: new Map() });
+    expect(third.skills).toEqual([expect.objectContaining({ name: "shortfall", status: "both_changed" })]);
+  });
+
   it("keeps local-only files when bringing in the repository's skill", async () => {
     await publishSkills();
     await write("skills/shortfall/.protoexpress-agent-assets.json", "{}");

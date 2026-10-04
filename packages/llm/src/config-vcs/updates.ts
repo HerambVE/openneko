@@ -62,17 +62,30 @@ export async function checkRemoteUpdates(opts: {
         skills.push({ name, remoteTree, status: "update" });
         continue;
       }
-      const baseTree = skillBase(opts.skillBases[name])?.remote;
-      const base = baseTree ? await skillTreeFiles(root, baseTree) : null;
-      // Before the first sync, a file only the repository has (such as a
-      // runtime-specific copy) is not a difference.
-      const compared = base ? remoteFiles : new Map([...remoteFiles].filter(([path]) => localFiles.has(path)));
-      if (fingerprint(localFiles) === fingerprint(compared)) {
-        inSync[name] = { remote: remoteTree, local: localTrees.get(name)! };
+      // Repository-only files (such as a runtime-specific copy) are not a
+      // difference, because OpenNeko never publishes or removes them.
+      const onlyShared = (files: Map<string, string>) => new Map([...files].filter(([path]) => localFiles.has(path)));
+      const sync = skillBase(opts.skillBases[name]);
+      const inAgreement = fingerprint(localFiles) === fingerprint(onlyShared(remoteFiles));
+      const record = () => { inSync[name] = { remote: remoteTree, local: localTrees.get(name)! }; };
+      if (!sync) {
+        if (inAgreement) record();
+        else skills.push({ name, remoteTree, status: "both_changed" });
         continue;
       }
-      if (base && fingerprint(remoteFiles) === fingerprint(base)) continue;
-      skills.push({ name, remoteTree, status: base && fingerprint(localFiles) === fingerprint(base) ? "update" : "both_changed" });
+      // Each side is compared with its own tree at the last sync.
+      const remoteChanged = fingerprint(remoteFiles) !== fingerprint(await skillTreeFiles(root, sync.remote));
+      const localBase = sync.local
+        ? await skillTreeFiles(root, sync.local)
+        : onlyShared(await skillTreeFiles(root, sync.remote));
+      const localChanged = fingerprint(localFiles) !== fingerprint(localBase);
+      if (!remoteChanged) continue;
+      if (!localChanged) {
+        skills.push({ name, remoteTree, status: "update" });
+        continue;
+      }
+      if (inAgreement) record();
+      else skills.push({ name, remoteTree, status: "both_changed" });
     }
 
     const packs: PackUpdate[] = [];
