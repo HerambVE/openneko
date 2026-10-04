@@ -192,10 +192,10 @@ export async function recordConfigChange(opts: {
   artifactKind?: string;
   artifactRef?: string;
   actorUserId?: string | null;
-}): Promise<void> {
+}): Promise<string | null> {
   try {
     const sha = await commitConfigChange(opts);
-    if (!sha) return;
+    if (!sha) return null;
     const orgId = opts.orgId ?? basename(resolve(opts.workspaceRoot));
     await upsertTeamRef(orgId, sha);
     if (opts.artifactKind && opts.artifactRef) {
@@ -208,10 +208,12 @@ export async function recordConfigChange(opts: {
         summary: opts.message,
       });
     }
+    return sha;
   } catch (err) {
     console.warn(
       `[config-vcs] versioning failed (write succeeded): ${err instanceof Error ? err.message : err}`,
     );
+    return null;
   }
 }
 
