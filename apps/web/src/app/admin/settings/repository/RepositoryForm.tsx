@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
 import type {
   ContextRemoteKind,
   ContextRemoteMode,
   ContextRemoteSettings,
+  ItemDiff,
+  PublishPreviewItem,
   PublishResult,
   RemoteUpdates,
   UpdateChoices,
@@ -47,6 +49,19 @@ export default function RepositoryForm({ initial }: { initial: ContextRemoteSett
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial));
   const [busy, setBusy] = useState<"save" | "publish" | "remove" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ items: PublishPreviewItem[] | null; error: string | null; loading: boolean }>(
+    { items: null, error: null, loading: false },
+  );
+
+  const loadPreview = useCallback(async () => {
+    setPreview((p) => ({ ...p, loading: true, error: null }));
+    const result = await adminApi<{ items: PublishPreviewItem[] }>("/api/admin/context-remote/publish");
+    setPreview(result.ok ? { items: result.body.items, error: null, loading: false } : { items: null, error: result.error, loading: false });
+  }, []);
+
+  useEffect(() => {
+    if (remote) void loadPreview();
+  }, [remote, loadPreview]);
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
@@ -151,8 +166,14 @@ export default function RepositoryForm({ initial }: { initial: ContextRemoteSett
                     ) : null}
                   </p>
                 ) : null}
+                <PublishPreview {...preview} />
               </div>
-              <Button type="button" variant="primary" disabled={busy !== null} onClick={() => void publish()}>
+              <Button
+                type="button"
+                variant="primary"
+                disabled={busy !== null || preview.loading || preview.items?.length === 0}
+                onClick={() => void publish()}
+              >
                 {busy === "publish" ? "Publishing…" : remote.mode === "push" ? "Push now" : "Open pull request"}
               </Button>
             </div>
@@ -202,7 +223,7 @@ export default function RepositoryForm({ initial }: { initial: ContextRemoteSett
           </section>
         ) : null}
 
-        {remote ? <Updates /> : null}
+        {remote ? <Updates onApplied={() => void loadPreview()} /> : null}
 
         <form onSubmit={save} className="settings-card flex flex-col gap-5">
           <div>
@@ -306,7 +327,94 @@ export default function RepositoryForm({ initial }: { initial: ContextRemoteSett
   );
 }
 
-function Updates() {
+const KIND_LABELS: Record<ContextRemoteKind, string> = {
+  skills: "Skill",
+  "skill-overlays": "Skill learning",
+  workflows: "Workflow",
+  memory: "Memory",
+  library: "Library concept",
+};
+
+/** A unified diff, one file at a time, with added and removed lines tinted. */
+function DiffView({ diff, truncated }: ItemDiff) {
+  if (!diff.trim()) return <p className="text-ui-caption text-text3">No line changes.</p>;
+  const lines = diff.split("\n").filter((line) => !/^(index |--- |\+\+\+ |new file mode|deleted file mode|similarity |\\ No newline)/.test(line));
+  return (
+    <div className="max-h-96 overflow-auto rounded-[4px] border border-border bg-card">
+      <pre className="min-w-max font-mono text-ui-caption leading-5">
+        {lines.map((line, index) => {
+          if (line.startsWith("diff --git ")) {
+            const path = line.split(" b/").pop();
+            return <div key={index} className="sticky left-0 border-y border-border bg-neutral px-2 py-1 text-text">{path}</div>;
+          }
+          const tone = line.startsWith("@@") ? "text-text3"
+            : line.startsWith("+") ? "bg-success-soft text-text"
+            : line.startsWith("-") ? "bg-danger-soft text-text"
+            : "text-text2";
+          return <div key={index} className={`px-2 ${tone}`}>{line || " "}</div>;
+        })}
+      </pre>
+      {truncated ? <p className="px-2 py-1 text-ui-caption text-warn-ink">The diff is long. OpenNeko shows the first part only.</p> : null}
+    </div>
+  );
+}
+
+/** A "Show changes" toggle that loads a diff from the given address the first time it opens. */
+function ChangesToggle({ url }: { url: string }) {
+  const [open, setOpen] = useState(false);
+  const [state, setState] = useState<{ diff: ItemDiff | null; error: string | null }>({ diff: null, error: null });
+  async function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && !state.diff) {
+      const result = await adminApi<ItemDiff>(url);
+      setState(result.ok ? { diff: result.body, error: null } : { diff: null, error: result.error });
+    }
+  }
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Button type="button" size="sm" variant="ghost" className="self-start" onClick={() => void toggle()}>
+        {open ? "Hide changes" : "Show changes"}
+      </Button>
+      {open ? (
+        state.error ? <p className="text-ui-caption text-danger">{state.error}</p>
+          : state.diff ? <DiffView {...state.diff} />
+          : <p className="text-ui-caption text-text3">Loading…</p>
+      ) : null}
+    </div>
+  );
+}
+
+function PublishPreview({ items, error, loading }: { items: PublishPreviewItem[] | null; error: string | null; loading: boolean }) {
+  if (loading) return <p className="text-ui-body-sm text-text3">Checking what would be published…</p>;
+  if (error) return <p className="text-ui-body-sm text-danger">{error}</p>;
+  if (!items) return null;
+  if (items.length === 0) {
+    return <p className="text-ui-body-sm text-text2">Nothing to publish. The repository has OpenNeko&apos;s current version.</p>;
+  }
+  const total = (item: PublishPreviewItem) => item.added + item.changed + item.removed;
+  const counts = (item: PublishPreviewItem) =>
+    [
+      item.changed ? `${item.changed} changed` : "",
+      item.added ? `${item.added} new` : "",
+      item.removed ? `${item.removed} removed` : "",
+    ].filter(Boolean).join(", ");
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-ui-body-sm text-text">Not yet published</span>
+      <ul className="flex flex-col gap-0.5">
+        {items.map((item) => (
+          <li key={`${item.kind}/${item.name}`} className="flex flex-col gap-1 text-ui-body-sm text-text2">
+            <span>{KIND_LABELS[item.kind]}: {item.name} · {total(item)} {total(item) === 1 ? "file" : "files"} ({counts(item)})</span>
+            <ChangesToggle url={`/api/admin/context-remote/publish?kind=${encodeURIComponent(item.kind)}&name=${encodeURIComponent(item.name)}`} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function Updates({ onApplied }: { onApplied: () => void }) {
   const [updates, setUpdates] = useState<RemoteUpdates | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -335,6 +443,7 @@ function Updates() {
     const failed = result.body.packs.find((pack) => !pack.ok);
     if (failed) return setError(`Pack ${failed.id} was not added: ${failed.error}`);
     setAddedPacks((ids) => [...ids, ...result.body.packs.map((pack) => pack.id)]);
+    onApplied();
     toast.success(choices.packs.length ? "Pack added. Install it on the Packs page." : "Skills updated.");
   }
 
@@ -363,6 +472,7 @@ function Updates() {
                     ? "Changed in the repository."
                     : "Changed in both OpenNeko and the repository. Choose which version to keep."}
                 </span>
+                <ChangesToggle url={`/api/admin/context-remote/updates?skill=${encodeURIComponent(skill.name)}`} />
               </div>
               <div className="flex gap-2">
                 {skill.status === "both_changed" ? (

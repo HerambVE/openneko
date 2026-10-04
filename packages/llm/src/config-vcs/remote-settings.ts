@@ -11,7 +11,10 @@ import {
   ContextRemoteError,
   DEFAULT_CONTEXT_REMOTE_KINDS,
   parseRemoteUrl,
+  incomingSkillDiff,
+  previewPublish,
   publishContext,
+  publishItemDiff,
   remotePackArchive,
   remoteProvider,
   remoteTransport,
@@ -20,6 +23,8 @@ import {
   type ContextRemoteKind,
   type ContextRemoteMode,
   type ContextRemoteProvider,
+  type ItemDiff,
+  type PublishPreviewItem,
   type PublishResult,
   type RemoteAccess,
 } from "./remote";
@@ -177,6 +182,42 @@ export async function deleteContextRemote(orgId: string, actorUserId: string | n
     event: "context:remote_removed",
     payload: { actorUserId },
   });
+}
+
+async function previewOptions(row: Row, orgRoot: string) {
+  return {
+    orgRoot,
+    access: remoteAccess(row),
+    branch: row.branch,
+    kinds: (row.kinds ?? DEFAULT_CONTEXT_REMOTE_KINDS) as ContextRemoteKind[],
+    excludeSkills: await unmodifiedBuiltinSkills(join(orgRoot, "skills")),
+    skillBases: row.skill_bases ?? {},
+  };
+}
+
+async function requireRow(orgId: string): Promise<Row> {
+  const row = await readRow(orgId);
+  if (!row) throw new ContextRemoteError("Connect a remote repository first.");
+  return row;
+}
+
+/** What publishing would send to the org's remote now. */
+export async function previewOrgPublish(orgId: string, orgRoot: string): Promise<PublishPreviewItem[]> {
+  return previewPublish(await previewOptions(await requireRow(orgId), orgRoot));
+}
+
+/** The diff a publish would send for one item. */
+export async function diffOrgPublishItem(orgId: string, orgRoot: string, kind: string, name: string): Promise<ItemDiff> {
+  const row = await requireRow(orgId);
+  const options = await previewOptions(row, orgRoot);
+  if (!options.kinds.includes(kind as ContextRemoteKind)) throw new ContextRemoteError("This remote does not publish that kind.");
+  return publishItemDiff({ ...options, kind: kind as ContextRemoteKind, name });
+}
+
+/** The repository's version of a skill compared with OpenNeko's. */
+export async function diffOrgIncomingSkill(orgId: string, orgRoot: string, name: string): Promise<ItemDiff> {
+  const row = await requireRow(orgId);
+  return incomingSkillDiff({ orgRoot, branch: row.branch, name });
 }
 
 /** Publish the org's company context to its remote and record the outcome. */
