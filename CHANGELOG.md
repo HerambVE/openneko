@@ -1,5 +1,20 @@
 # Changelog
 
+## [3.16.0](https://github.com/open-neko/openneko/compare/v3.15.1...v3.16.0) (2026-10-04)
+
+
+### Features
+
+* calmer Work thread scrolling, reasoning you can fold, and answer times ([e2dc787](https://github.com/open-neko/openneko/commit/e2dc7875107060b93bb2fc0973aa348f8b06cc96))
+* context publish preview and diffs, calmer Work threads, foldable reasoning and answer times ([ec375ae](https://github.com/open-neko/openneko/commit/ec375aee81eb0a24e37c920406f441181a99da80))
+* keep the last reasoning note beside a finished answer, and the answer time on one line ([5bb11b8](https://github.com/open-neko/openneko/commit/5bb11b8e5c72c55aa68044d940e35c1417420aff))
+* preview and diff context changes before publishing or bringing them in ([639fff3](https://github.com/open-neko/openneko/commit/639fff36609ef964f8a2267b0bcd59f8eae3ae98))
+
+
+### Bug Fixes
+
+* classify a repository-only skill change as an update, not a change in both places ([3693d8c](https://github.com/open-neko/openneko/commit/3693d8cead11856b62aa9b5d0a3b2b2b74f8fd7f))
+
 ## [3.15.1](https://github.com/open-neko/openneko/compare/v3.15.0...v3.15.1) (2026-10-04)
 
 
