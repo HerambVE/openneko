@@ -90,7 +90,7 @@ if ! $SKIP_HERMES && ! hermes_matches_version; then
 
   hermes_tools_dir="$(uv tool dir)"
   hermes_tool_root="$hermes_tools_dir/hermes-agent"
-  hermes_source_root="$hermes_tools_dir/hermes-agent-openneko-${HERMES_AGENT_VERSION}-${HERMES_AGENT_REF:0:12}-patchset4"
+  hermes_source_root="$hermes_tools_dir/hermes-agent-openneko-${HERMES_AGENT_VERSION}-${HERMES_AGENT_REF:0:12}-patchset5"
   hermes_bin_dir="$(uv tool dir --bin)"
   case "$hermes_tools_dir" in
     ""|"/") echo "refusing unsafe uv tool directory: $hermes_tools_dir" >&2; exit 1 ;;

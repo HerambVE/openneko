@@ -154,6 +154,31 @@ describeIfDb("runChatTurn — answers without final text", () => {
     expect(answer.content).toContain("One tool number serves many orders.");
   });
 
+  it("records the last usage snapshot when a cancelled turn reports none", async () => {
+    const thread = await insertThread(orgId);
+    const run = await insertRun(orgId, thread.id);
+    mockBackendRun.mockImplementation(async (opts: { onEvent?: (event: AgentEvent) => Promise<void> }) => {
+      await opts.onEvent?.({
+        type: "tool_start",
+        id: "t1",
+        name: "terminal",
+        input: {},
+        usageSnapshot: { inputTokens: 900, outputTokens: 40, estimatedCostUsd: 0.42, costStatus: "estimated", coverage: "complete" },
+      });
+      return { finalText: "", status: "cancelled", backendState: {} };
+    });
+    const events: AgentEvent[] = [];
+
+    await runChatTurn({ orgId, threadId: thread.id, runId: run.id, message: "stop", emit: async (event) => { events.push(event); } }, makeDeps());
+
+    expect(events.filter((event) => event.type === "usage")).toEqual([
+      expect.objectContaining({
+        source: "outer",
+        usage: expect.objectContaining({ estimatedCostUsd: 0.42, coverage: "partial" }),
+      }),
+    ]);
+  });
+
   it("saves no answer when the turn left nothing to carry forward", async () => {
     const thread = await insertThread(orgId);
     const run = await insertRun(orgId, thread.id);

@@ -29,6 +29,14 @@ for model in ("gemini-3.7-flash", "gemini-3.8-flash"):
             assert result.pricing_version == version
 assert estimate_usage_cost("gemini-9-unpriced", usage, provider="google-gemini").amount_usd is None
 
+sonnet = estimate_usage_cost(
+    "claude-sonnet-5-5",
+    CanonicalUsage(input_tokens=1_000_000, output_tokens=1_000_000, cache_read_tokens=1_000_000, cache_write_tokens=1_000_000),
+    provider="anthropic",
+)
+assert sonnet.amount_usd == Decimal("14.70"), sonnet
+assert sonnet.pricing_version == "anthropic-pricing-2026-10-04"
+
 for path in (codex_runtime_file, conversation_loop_file):
     source = open(path, encoding="utf-8").read()
     assert "session_cost_unknown_calls" in source and "session_pricing_version" in source, path

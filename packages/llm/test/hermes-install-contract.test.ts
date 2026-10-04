@@ -128,7 +128,7 @@ describe("Hermes install contract", () => {
     expect(runBudgetPatch).toMatch(/^\+\s+\*\*_openneko_run_budget\(\),$/m);
   });
 
-  it("patches ACP to pass per-turn cost and prices Gemini 3.7 and 3.8 Flash", async () => {
+  it("patches ACP to pass per-turn cost and prices Gemini 3.7 and 3.8 Flash and Claude Sonnet 5.5", async () => {
     const [dockerfile, installer, costPatch] = await Promise.all([
       readFile(`${REPO_ROOT}Dockerfile`, "utf8"),
       readFile(`${REPO_ROOT}scripts/install-clis.sh`, "utf8"),
@@ -139,6 +139,7 @@ describe("Hermes install contract", () => {
     expect(costPatch).toContain("session_cost_unknown_calls");
     expect(costPatch).toContain('"gemini-3.7-flash", "gemini-3.8-flash"');
     expect(costPatch).toContain("datetime(2027, 1, 1, tzinfo=timezone.utc)");
+    expect(costPatch).toContain('("anthropic", "claude-sonnet-5-5")');
     for (const source of [dockerfile, installer]) {
       expect(source.indexOf("hermes-acp-tool-usage.patch")).toBeGreaterThan(-1);
       expect(source.indexOf("hermes-acp-cost.patch")).toBeGreaterThan(
