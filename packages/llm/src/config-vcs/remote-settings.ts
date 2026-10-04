@@ -1,4 +1,6 @@
+import { join } from "node:path";
 import { context_remote, db, eq } from "@neko/db";
+import { unmodifiedBuiltinSkills } from "../work/workspace";
 import { maybeDecryptSecret, maybeEncryptSecret } from "../secrets";
 import { recordAuditEvent } from "../workflows/audit-chain";
 import { git } from "./git-shell";
@@ -196,15 +198,19 @@ export async function publishOrgContext(
     const result = await publishContext({
       orgRoot,
       access: remoteAccess(row),
+      excludeSkills: await unmodifiedBuiltinSkills(join(orgRoot, "skills")),
+      skillBases: row.skill_bases ?? {},
       mode: row.mode as ContextRemoteMode,
       branch: row.branch,
       kinds: (row.kinds ?? DEFAULT_CONTEXT_REMOTE_KINDS) as ContextRemoteKind[],
     });
     await record("ok", result.detail, result.link);
-    if (result.status === "pushed" && result.sha) {
-      await db().update(context_remote)
-        .set({ skill_bases: { ...row.skill_bases, ...(await skillTreesAt(orgRoot, result.sha)) } })
-        .where(eq(context_remote.org_id, orgId));
+    if (result.status === "pushed" && result.sha && result.head) {
+      const remote = await skillTreesAt(orgRoot, result.sha);
+      const local = await skillTreesAt(orgRoot, result.head);
+      const bases = { ...row.skill_bases };
+      for (const [name, tree] of Object.entries(remote)) if (local[name]) bases[name] = { remote: tree, local: local[name] };
+      await db().update(context_remote).set({ skill_bases: bases }).where(eq(context_remote.org_id, orgId));
     }
     await recordAuditEvent({
       orgId,
@@ -271,8 +277,10 @@ export async function applyOrgUpdates(
   if (sha) {
     await insertConfigChangeRow({ orgId, artifactKind: "skill", artifactRef: bringIn.join(", "), actorUserId, commitSha: sha, summary: `Brought in from ${source}` });
   }
+  const head = (await git(orgRoot, ["rev-parse", "HEAD"])).stdout.trim();
+  const localSkills = await skillTreesAt(orgRoot, head);
   const bases = { ...row.skill_bases };
-  for (const { name } of choices.skills) bases[name] = remoteSkills[name]!;
+  for (const { name } of choices.skills) bases[name] = { remote: remoteSkills[name]!, ...(localSkills[name] ? { local: localSkills[name] } : {}) };
   await db().update(context_remote).set({ skill_bases: bases }).where(eq(context_remote.org_id, orgId));
 
   const packArchives = [];

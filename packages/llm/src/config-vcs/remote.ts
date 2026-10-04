@@ -18,6 +18,8 @@ export type PublishResult = {
   sha: string | null;
   link: string | null;
   detail: string;
+  /** OpenNeko's commit that was published. */
+  head?: string;
 };
 
 export class ContextRemoteError extends Error {
@@ -107,20 +109,93 @@ function scrub(message: string, access: RemoteAccess): string {
 }
 
 /**
- * The remote tree with each published folder replaced by OpenNeko's copy.
- * Files outside those folders, such as a README or CI config, stay as they are.
+ * A skill's state at its last sync with a remote: the repository's tree, and
+ * OpenNeko's own tree. An older record holds only the repository's tree.
  */
-async function publishTree(root: string, head: string, base: string | null, kinds: readonly ContextRemoteKind[]): Promise<string> {
+export type SkillBase = { remote: string; local?: string };
+
+export function skillBase(value: string | SkillBase | undefined): SkillBase | undefined {
+  return typeof value === "string" ? { remote: value } : value;
+}
+
+/** A path with a segment that starts with "." is local bookkeeping, such as a deploy marker. It is never published or compared. */
+export function localOnlyPath(path: string): boolean {
+  return path.split("/").some((part) => part.startsWith("."));
+}
+
+type TreeEntry = { line: string; sha: string; path: string };
+
+async function treeEntries(root: string, ref: string, paths: readonly string[] = []): Promise<TreeEntry[]> {
+  const { stdout } = await git(root, ["ls-tree", "-r", "--full-tree", ref, ...(paths.length ? ["--", ...paths] : [])]);
+  return stdout.split("\n").filter(Boolean).map((line) => {
+    const [meta, path] = line.split("\t");
+    return { line, sha: meta!.split(" ")[2]!, path: path! };
+  });
+}
+
+/** Files of each skill, keyed by path inside the skill, without local-only files or loose files in skills/. */
+export async function skillFiles(root: string, ref: string): Promise<Map<string, Map<string, string>>> {
+  const skills = new Map<string, Map<string, string>>();
+  for (const entry of await treeEntries(root, ref, ["skills"])) {
+    const [, name, ...rest] = entry.path.split("/");
+    if (!name || rest.length === 0 || localOnlyPath(entry.path)) continue;
+    if (!skills.has(name)) skills.set(name, new Map());
+    skills.get(name)!.set(rest.join("/"), entry.sha);
+  }
+  return skills;
+}
+
+/** Files of one skill tree object, keyed by path inside the skill. */
+export async function skillTreeFiles(root: string, tree: string | undefined): Promise<Map<string, string>> {
+  if (!tree) return new Map();
+  const { stdout } = await git(root, ["ls-tree", "-r", tree]).catch(() => ({ stdout: "" }));
+  const files = new Map<string, string>();
+  for (const line of stdout.split("\n").filter(Boolean)) {
+    const [meta, path] = line.split("\t");
+    if (path && !localOnlyPath(path)) files.set(path, meta!.split(" ")[2]!);
+  }
+  return files;
+}
+
+/**
+ * The remote tree with OpenNeko's copy of each published folder.
+ * - Files outside the published folders, such as a README or CI config, stay.
+ * - Local-only files and the excluded skills are not published.
+ * - A file that only the remote has stays, unless OpenNeko had it at the
+ *   skill's last sync and then removed it.
+ */
+async function publishTree(
+  root: string,
+  head: string,
+  base: string | null,
+  kinds: readonly ContextRemoteKind[],
+  skills: { exclude: ReadonlySet<string>; bases: Record<string, string | SkillBase> },
+): Promise<string> {
   const scratch = await mkdtemp(join(tmpdir(), "neko-export-"));
   const env = { GIT_INDEX_FILE: join(scratch, "index") };
   try {
-    const published = (line: string) => kinds.some((kind) => line.split("\t")[1]?.startsWith(`${kind}/`));
-    const kept = base
-      ? (await git(root, ["ls-tree", "-r", "--full-tree", base])).stdout.split("\n").filter((line) => line && !published(line))
-      : [];
-    const ours = (await git(root, ["ls-tree", "-r", "--full-tree", head, "--", ...kinds])).stdout.split("\n").filter(Boolean);
+    const published = (path: string) => kinds.some((kind) => path.startsWith(`${kind}/`));
+    const remote = base ? await treeEntries(root, base) : [];
+    const local = (await treeEntries(root, head, kinds)).filter((entry) => !localOnlyPath(entry.path));
+    const entries = remote.filter((entry) => !published(entry.path)).map((entry) => entry.line);
+    const skillName = (path: string) => path.split("/")[1]!;
+    for (const kind of kinds) {
+      const ours = local.filter((entry) => entry.path.startsWith(`${kind}/`) && (kind !== "skills" ||
+        (entry.path.split("/").length > 2 && !skills.exclude.has(skillName(entry.path)))));
+      entries.push(...ours.map((entry) => entry.line));
+      if (kind !== "skills") continue;
+      const ourPaths = new Set(ours.map((entry) => entry.path));
+      const synced = new Map<string, Map<string, string>>();
+      for (const entry of remote.filter((candidate) => candidate.path.startsWith("skills/"))) {
+        if (ourPaths.has(entry.path)) continue;
+        const name = skillName(entry.path);
+        if (!synced.has(name)) synced.set(name, await skillTreeFiles(root, skillBase(skills.bases[name])?.local));
+        const inSkill = entry.path.slice(`skills/${name}/`.length);
+        const removedByOpenNeko = !skills.exclude.has(name) && !localOnlyPath(entry.path) && synced.get(name)!.has(inSkill);
+        if (!removedByOpenNeko) entries.push(entry.line);
+      }
+    }
     await git(root, ["read-tree", "--empty"], { env });
-    const entries = [...kept, ...ours];
     if (entries.length) await git(root, ["update-index", "--index-info"], { env, input: `${entries.join("\n")}\n` });
     return (await git(root, ["write-tree"], { env })).stdout.trim();
   } finally {
@@ -176,6 +251,10 @@ export async function publishContext(opts: {
   mode: ContextRemoteMode;
   branch: string;
   kinds: readonly ContextRemoteKind[];
+  /** Skills never published, such as built-in skills nobody changed. */
+  excludeSkills?: readonly string[];
+  /** Each skill's state at its last sync with this remote. */
+  skillBases?: Record<string, string | SkillBase>;
   now?: Date;
   fetchImpl?: typeof fetch;
 }): Promise<PublishResult> {
@@ -199,9 +278,12 @@ export async function publishContext(opts: {
       if (!/couldn't find remote ref/i.test((error as Error).message)) throw error;
     }
 
-    const tree = await publishTree(root, head, base, opts.kinds);
+    const tree = await publishTree(root, head, base, opts.kinds, {
+      exclude: new Set(opts.excludeSkills ?? []),
+      bases: opts.skillBases ?? {},
+    });
     if (base && (await git(root, ["rev-parse", `${base}^{tree}`])).stdout.trim() === tree) {
-      return { status: "unchanged", branch: opts.branch, sha: base, link: null, detail: "The remote already has this version." };
+      return { status: "unchanged", branch: opts.branch, sha: base, link: null, detail: "The remote already has this version.", head };
     }
     const title = "Update OpenNeko context";
     const body = `Published from OpenNeko version ${head.slice(0, 12)}: ${opts.kinds.join(", ")}.`;
@@ -220,6 +302,7 @@ export async function publishContext(opts: {
         sha,
         link: remoteProvider(access.url) === "github" ? `https://github.com/${repositoryPath(access.url)}/tree/${opts.branch}` : null,
         detail: base ? `Pushed to ${opts.branch}.` : `Created ${opts.branch} on the remote.`,
+        head,
       };
     }
 
@@ -313,8 +396,11 @@ export async function bringInRemoteSkills(opts: { orgRoot: string; tip: string; 
   if (opts.names.length === 0) return null;
   return withRepoLock(root, async () => {
     const paths = opts.names.map((name) => `skills/${name}`);
+    const head = (await git(root, ["rev-parse", "--verify", "--quiet", "HEAD"]).catch(() => ({ stdout: "" }))).stdout.trim();
+    const keep = head ? (await treeEntries(root, head, paths)).filter((entry) => localOnlyPath(entry.path)).map((entry) => entry.path) : [];
     await git(root, ["rm", "-r", "-q", "--ignore-unmatch", "--", ...paths]);
     await git(root, ["checkout", opts.tip, "--", ...paths]);
+    if (keep.length) await git(root, ["checkout", head, "--", ...keep]);
     const { stdout: status } = await git(root, ["status", "--porcelain", "--", ...paths]);
     if (!status.trim()) return null;
     await git(root, ["commit", "-q", "-m", opts.message, "--", ...paths]);

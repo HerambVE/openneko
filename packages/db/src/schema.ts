@@ -3050,7 +3050,7 @@ export const context_remote = pgTable("context_remote", {
   ssh_public_key: text("ssh_public_key"),
   ssh_known_hosts: text("ssh_known_hosts"),
   ssh_host_confirmed: boolean("ssh_host_confirmed").notNull().default(false),
-  skill_bases: jsonb("skill_bases").$type<Record<string, string>>().notNull().default(sql`'{}'::jsonb`),
+  skill_bases: jsonb("skill_bases").$type<Record<string, string | { remote: string; local?: string }>>().notNull().default(sql`'{}'::jsonb`),
   last_published_at: timestamp("last_published_at", { withTimezone: true }),
   last_publish_status: text("last_publish_status"),
   last_publish_detail: text("last_publish_detail"),

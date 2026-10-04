@@ -335,6 +335,28 @@ function builtinFingerprint(name: string, root: string): Promise<string> {
   return pending;
 }
 
+/** Whether a workspace skill still matches the built-in copy it was seeded from. */
+async function isUnmodifiedBuiltin(skillDir: string, name: string): Promise<boolean> {
+  try {
+    const workspaceHash = await fingerprintSkillTree(skillDir);
+    const origin = await readSkillOrigin(skillDir);
+    if (origin?.kind === "builtin") return origin.sourceHash === workspaceHash;
+    return workspaceHash === (await builtinFingerprint(name, join(BUILTIN_SKILLS_ROOT, name)));
+  } catch {
+    return false;
+  }
+}
+
+/** Built-in skills in a workspace that nobody has changed. */
+export async function unmodifiedBuiltinSkills(skillsRoot: string): Promise<string[]> {
+  const builtins = await readdir(BUILTIN_SKILLS_ROOT, { withFileTypes: true }).catch(() => [] as Dirent[]);
+  const names: string[] = [];
+  for (const entry of builtins) {
+    if (entry.isDirectory() && (await isUnmodifiedBuiltin(join(skillsRoot, entry.name), entry.name))) names.push(entry.name);
+  }
+  return names.sort();
+}
+
 /**
  * Copy only skills that the agent image cannot reconstruct itself: custom
  * organization skills and locally modified built-ins. Full skill bodies stay
