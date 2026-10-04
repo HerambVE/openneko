@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.14.0](https://github.com/open-neko/openneko/compare/v3.13.2...v3.14.0) (2026-10-04)
+
+
+### Features
+
+* add an organization-wide metric refresh setting to spending limits ([03ab3f7](https://github.com/open-neko/openneko/commit/03ab3f72b9fa85461b6112f48dea9ef0451f661f))
+* metric refresh setting, usage for early-ended turns, and Sonnet 5.5 pricing ([0af293c](https://github.com/open-neko/openneko/commit/0af293cd303d5d6e179c083af35bd796ea839d60))
+
+
+### Bug Fixes
+
+* record usage for turns that end early, and price Claude Sonnet 5.5 ([283ab13](https://github.com/open-neko/openneko/commit/283ab1303b82aaa55190f7830ae5685adb429505))
+
 ## [3.13.2](https://github.com/open-neko/openneko/compare/v3.13.1...v3.13.2) (2026-10-03)
 
 
