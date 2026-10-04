@@ -267,7 +267,7 @@ export type RemoteUpdates = {
 };
 
 /** Tree id of each top-level folder under `prefix` at `ref`. */
-async function folderTrees(root: string, ref: string, prefix: string): Promise<Map<string, string>> {
+export async function folderTrees(root: string, ref: string, prefix: string): Promise<Map<string, string>> {
   const { stdout } = await git(root, ["ls-tree", ref, "--", `${prefix}/`]).catch(() => ({ stdout: "" }));
   const trees = new Map<string, string>();
   for (const line of stdout.split("\n").filter(Boolean)) {
@@ -279,7 +279,7 @@ async function folderTrees(root: string, ref: string, prefix: string): Promise<M
 }
 
 /** Fetch the remote branch into `refs/openneko/remote/<branch>`. Returns its tip, or null when the branch is missing. */
-async function fetchRemote(root: string, access: RemoteAccess, branch: string): Promise<string | null> {
+export async function fetchRemote(root: string, access: RemoteAccess, branch: string): Promise<string | null> {
   const tracking = `refs/openneko/remote/${branch}`;
   try {
     await withGitAuth(access, (env) => git(root, ["fetch", "--no-tags", "--quiet", access.url.toString(), `+refs/heads/${branch}:${tracking}`], { env }));
@@ -301,66 +301,6 @@ export async function remotePackArchive(orgRoot: string, tip: string, id: string
       { cwd: root, encoding: "buffer", maxBuffer: 32 * 1024 * 1024, env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" } },
       (error, stdout) => (error ? reject(new ContextRemoteError(`Could not package pack ${id}.`)) : resolvePromise(stdout)),
     );
-  });
-}
-
-/**
- * Compare the remote branch with OpenNeko's skills and packs.
- * `skillBases` holds each skill's tree at its last sync with this remote.
- * `uploadedPacks` maps a pack id to its uploaded versions and their content hashes.
- */
-export async function checkRemoteUpdates(opts: {
-  orgRoot: string;
-  access: RemoteAccess;
-  branch: string;
-  skillBases: Record<string, string>;
-  uploadedPacks: Map<string, Map<string, string>>;
-  reservedPackIds?: string[];
-}): Promise<RemoteUpdates> {
-  const root = resolve(opts.orgRoot);
-  return withRepoLock(root, async () => {
-    const tip = await fetchRemote(root, opts.access, opts.branch);
-    if (!tip) return { tip: null, skills: [], packs: [] };
-    const head = (await git(root, ["rev-parse", "--verify", "--quiet", "HEAD"]).catch(() => ({ stdout: "" }))).stdout.trim();
-    const local = head ? await folderTrees(root, head, "skills") : new Map<string, string>();
-    const remote = await folderTrees(root, tip, "skills");
-
-    const skills: SkillUpdate[] = [];
-    for (const [name, remoteTree] of [...remote].sort(([a], [b]) => a.localeCompare(b))) {
-      const localTree = local.get(name);
-      const base = opts.skillBases[name];
-      if (localTree === remoteTree) continue;
-      if (base && remoteTree === base) continue;
-      skills.push({ name, remoteTree, status: localTree === undefined || (base && localTree === base) ? "update" : "both_changed" });
-    }
-
-    const { hashPackFiles, stagePackArchive } = await import("@neko/packs");
-    const packs: PackUpdate[] = [];
-    const scratch = await mkdtemp(join(tmpdir(), "neko-remote-pack-"));
-    try {
-      for (const id of [...(await folderTrees(root, tip, "packs")).keys()].sort()) {
-        try {
-          const staged = await stagePackArchive(await remotePackArchive(root, tip, id), scratch, { reservedIds: opts.reservedPackIds ?? [] });
-          try {
-            const version = staged.bundle.manifest.metadata.version;
-            const contentHash = await hashPackFiles(staged.bundle.root);
-            const versions = opts.uploadedPacks.get(id);
-            const existing = versions?.get(version);
-            if (existing === contentHash) continue;
-            packs.push(existing
-              ? { id, version, status: "invalid", detail: `Version ${version} changed in the repository. Raise the version number in pack.yaml.` }
-              : { id, version, status: versions ? "new_version" : "new_pack", detail: versions ? `Version ${version} is available.` : `New pack, version ${version}.` });
-          } finally {
-            await staged.cleanup();
-          }
-        } catch (error) {
-          packs.push({ id, version: null, status: "invalid", detail: (error as Error).message });
-        }
-      }
-    } finally {
-      await rm(scratch, { recursive: true, force: true });
-    }
-    return { tip, skills, packs };
   });
 }
 

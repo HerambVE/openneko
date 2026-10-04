@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { applyOrgUpdates, checkOrgUpdates, ContextRemoteError, type UpdateChoices } from "@neko/llm/config-vcs";
+import { applyOrgUpdates, ContextRemoteError, getContextRemote, type RemoteUpdates, type UpdateChoices } from "@neko/llm/config-vcs";
 import { getOrgAgentRoot } from "@neko/llm/work";
 import { isDenied, requireAdminActor } from "@/lib/admin-auth";
 import { getOrgId } from "@/lib/db";
@@ -8,6 +8,14 @@ import { requestPackWorker } from "@/lib/solution-packs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** The worker checks the repository, because it validates packs. */
+async function checkUpdates(orgId: string): Promise<RemoteUpdates> {
+  if (!(await getContextRemote(orgId))) throw new ContextRemoteError("Connect a remote repository first.");
+  const result = await requestPackWorker("/admin/context-remote/updates");
+  if (result.status >= 400) throw new ContextRemoteError((result.body as { error?: string })?.error ?? `Update check failed (${result.status})`);
+  return (result.body as { updates: RemoteUpdates }).updates;
+}
 
 function failure(error: unknown) {
   if (error instanceof ContextRemoteError) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -20,7 +28,7 @@ export async function GET() {
   if (isDenied(actor)) return actor;
   const orgId = await getOrgId();
   try {
-    return NextResponse.json({ updates: await checkOrgUpdates(orgId, getOrgAgentRoot(orgId)) });
+    return NextResponse.json({ updates: await checkUpdates(orgId) });
   } catch (error) {
     return failure(error);
   }
@@ -51,7 +59,7 @@ export async function POST(request: Request) {
       const error = result.status >= 400 ? (result.body as { error?: string })?.error ?? `Upload failed (${result.status})` : null;
       packs.push({ id: archive.id, ok: !error, ...(error ? { error } : {}) });
     }
-    return NextResponse.json({ sha, packs, updates: await checkOrgUpdates(orgId, orgRoot) });
+    return NextResponse.json({ sha, packs, updates: await checkUpdates(orgId) });
   } catch (error) {
     return failure(error);
   }

@@ -31,7 +31,6 @@ export {
 } from "./remote";
 export {
   applyOrgUpdates,
-  checkOrgUpdates,
   confirmContextRemoteHostKey,
   deleteContextRemote,
   getContextRemote,

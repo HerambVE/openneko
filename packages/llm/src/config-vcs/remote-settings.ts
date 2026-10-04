@@ -1,5 +1,3 @@
-import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { context_remote, db, eq } from "@neko/db";
 import { maybeDecryptSecret, maybeEncryptSecret } from "../secrets";
 import { recordAuditEvent } from "../workflows/audit-chain";
@@ -7,7 +5,6 @@ import { git } from "./git-shell";
 import { insertConfigChangeRow } from "./index";
 import {
   bringInRemoteSkills,
-  checkRemoteUpdates,
   CONTEXT_REMOTE_KINDS,
   ContextRemoteError,
   DEFAULT_CONTEXT_REMOTE_KINDS,
@@ -23,7 +20,6 @@ import {
   type ContextRemoteProvider,
   type PublishResult,
   type RemoteAccess,
-  type RemoteUpdates,
 } from "./remote";
 import { generateDeployKey, hostKeyFingerprints, scanHostKeys } from "./ssh";
 
@@ -53,7 +49,7 @@ export type ContextRemoteDraft = {
   newSshKey?: boolean;
 };
 
-type Row = typeof context_remote.$inferSelect;
+export type Row = typeof context_remote.$inferSelect;
 
 async function toSettings(row: Row): Promise<ContextRemoteSettings> {
   const transport = remoteTransport(new URL(row.url)) === "ssh" ? "ssh" : "https";
@@ -84,7 +80,7 @@ async function toSettings(row: Row): Promise<ContextRemoteSettings> {
   };
 }
 
-async function readRow(orgId: string): Promise<Row | null> {
+export async function readRow(orgId: string): Promise<Row | null> {
   const [row] = await db().select().from(context_remote).where(eq(context_remote.org_id, orgId)).limit(1);
   return row ?? null;
 }
@@ -226,22 +222,7 @@ export async function publishOrgContext(
   }
 }
 
-async function uploadedPackVersions(orgRoot: string): Promise<Map<string, Map<string, string>>> {
-  const packs = new Map<string, Map<string, string>>();
-  for (const id of await readdir(join(orgRoot, "packs")).catch(() => [] as string[])) {
-    const versions = new Map<string, string>();
-    for (const version of await readdir(join(orgRoot, "packs", id, "versions")).catch(() => [] as string[])) {
-      const upload = await readFile(join(orgRoot, "packs", id, "versions", version, "upload.json"), "utf8")
-        .then((text) => JSON.parse(text) as { contentHash?: string })
-        .catch(() => null);
-      if (upload?.contentHash) versions.set(version, upload.contentHash);
-    }
-    if (versions.size) packs.set(id, versions);
-  }
-  return packs;
-}
-
-function remoteAccess(row: Row): RemoteAccess {
+export function remoteAccess(row: Row): RemoteAccess {
   const url = parseRemoteUrl(row.url);
   const ssh = remoteTransport(url) === "ssh";
   if (ssh && !row.ssh_host_confirmed) throw new ContextRemoteError("Confirm the server's SSH host key first.");
@@ -253,19 +234,6 @@ function remoteAccess(row: Row): RemoteAccess {
       ? { ssh: { privateKey: maybeDecryptSecret(row.ssh_private_key), knownHosts: row.ssh_known_hosts ?? "" } }
       : {}),
   };
-}
-
-/** Skills and packs that changed in the remote repository. */
-export async function checkOrgUpdates(orgId: string, orgRoot: string): Promise<RemoteUpdates> {
-  const row = await readRow(orgId);
-  if (!row) throw new ContextRemoteError("Connect a remote repository first.");
-  return checkRemoteUpdates({
-    orgRoot,
-    access: remoteAccess(row),
-    branch: row.branch,
-    skillBases: row.skill_bases ?? {},
-    uploadedPacks: await uploadedPackVersions(orgRoot),
-  });
 }
 
 export type UpdateChoices = {

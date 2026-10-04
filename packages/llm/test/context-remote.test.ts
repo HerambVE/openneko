@@ -7,9 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { commitConfigChange } from "../src/config-vcs/index";
 import { cp } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { checkRemoteUpdates } from "../src/config-vcs/updates";
 import {
   bringInRemoteSkills,
-  checkRemoteUpdates,
   openPullRequest,
   parseRemoteUrl,
   publishContext,
