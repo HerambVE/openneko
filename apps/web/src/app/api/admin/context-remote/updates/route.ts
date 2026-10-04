@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { applyOrgUpdates, ContextRemoteError, getContextRemote, type RemoteUpdates, type UpdateChoices } from "@neko/llm/config-vcs";
+import { applyOrgUpdates, ContextRemoteError, diffOrgIncomingSkill, getContextRemote, type RemoteUpdates, type UpdateChoices } from "@neko/llm/config-vcs";
 import { getOrgAgentRoot } from "@neko/llm/work";
 import { isDenied, requireAdminActor } from "@/lib/admin-auth";
 import { getOrgId } from "@/lib/db";
@@ -22,12 +22,17 @@ function failure(error: unknown) {
   throw error;
 }
 
-/** List skills and packs that changed in the remote repository. */
-export async function GET() {
+/**
+ * List skills and packs that changed in the remote repository.
+ * With ?skill=…, the repository's version of that skill compared with OpenNeko's.
+ */
+export async function GET(request: Request) {
   const actor = await requireAdminActor();
   if (isDenied(actor)) return actor;
   const orgId = await getOrgId();
+  const skill = new URL(request.url).searchParams.get("skill");
   try {
+    if (skill) return NextResponse.json(await diffOrgIncomingSkill(orgId, getOrgAgentRoot(orgId), skill));
     return NextResponse.json({ updates: await checkUpdates(orgId) });
   } catch (error) {
     return failure(error);

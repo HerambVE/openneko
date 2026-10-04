@@ -148,17 +148,13 @@ describe("work run action timeline", () => {
     ]);
   });
 
-  it("keeps unstructured provider summaries available for inline display", async () => {
+  it("keeps unstructured provider summaries available for inline display", () => {
     expect(splitProgressSections("Checked the latest sales totals.")).toEqual([
       { heading: "Details", detail: "Checked the latest sales totals." },
     ]);
 
-    const source = await readFile(
-      fileURLToPath(new URL("../src/app/(work)/work/work-screen.tsx", import.meta.url)),
-      "utf8",
-    );
-    expect(source).toContain('sections[0]?.heading === "Details"');
-    expect(source).toContain("linkifyWorkspacePaths(inlineSummary)");
+    // Every note, with or without headings, now renders inline as one note
+    // (see work-reasoning.test.ts).
   });
 
   it("keeps plain completed answers as prose and adds vitals only as evidence", () => {

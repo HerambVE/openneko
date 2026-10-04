@@ -1302,3 +1302,24 @@ textarea.work-a2ui-input { resize: vertical; }
     gap: 2px;
   }
 }
+
+/* Times beside a question and an answer, and a running turn's elapsed time. */
+.work-bubble-time,
+.work-answer-time,
+.work-status-elapsed {
+  font-size: var(--type-caption);
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+}
+.work-bubble-time { margin-right: 4px; align-self: center; }
+.work-answer-evidence .work-answer-time {
+  display: inline;
+  margin-left: 6px;
+  font-family: inherit;
+  font-weight: 400;
+}
+.work-answer-evidence .work-answer-time::before { content: "· "; }
+.work-status-elapsed { margin-left: auto; }
+
+/* A finished run's working trail, folded above the answer. */
+.work-trail summary { font-weight: 600; }

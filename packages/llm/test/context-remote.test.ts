@@ -11,7 +11,10 @@ import { checkRemoteUpdates } from "../src/config-vcs/updates";
 import {
   bringInRemoteSkills,
   localOnlyPath,
+  incomingSkillDiff,
   openPullRequest,
+  previewPublish,
+  publishItemDiff,
   parseRemoteUrl,
   publishContext,
   skillTreesAt,
@@ -254,6 +257,26 @@ describe("publish and compare rules for skills", () => {
     expect(updates.inSync.shortfall).toEqual({ remote: expect.any(String), local: expect.any(String) });
   });
 
+  it("offers a repository change as an update after a sync, despite repository-only files", async () => {
+    await publishSkills();
+    await remoteCommit(async (clone) => {
+      await mkdir(join(clone, "skills/shortfall/runtimes/reckon"), { recursive: true });
+      await writeFile(join(clone, "skills/shortfall/runtimes/reckon/SKILL.md"), "# Reckon\n");
+    });
+    const first = await checkRemoteUpdates({ orgRoot, access: { url: remoteUrl }, branch: "main", skillBases: {}, uploadedPacks: new Map() });
+    expect(first.skills).toEqual([]);
+    const bases = first.inSync;
+
+    await remoteCommit((clone) => writeFile(join(clone, "skills/shortfall/SKILL.md"), "# Upstream edit\n"));
+    const second = await checkRemoteUpdates({ orgRoot, access: { url: remoteUrl }, branch: "main", skillBases: bases, uploadedPacks: new Map() });
+    expect(second.skills).toEqual([expect.objectContaining({ name: "shortfall", status: "update" })]);
+
+    await write("skills/shortfall/SKILL.md", "# Local edit\n");
+    await commitConfigChange({ workspaceRoot: orgRoot, paths: ["skills"], message: "Local" });
+    const third = await checkRemoteUpdates({ orgRoot, access: { url: remoteUrl }, branch: "main", skillBases: bases, uploadedPacks: new Map() });
+    expect(third.skills).toEqual([expect.objectContaining({ name: "shortfall", status: "both_changed" })]);
+  });
+
   it("keeps local-only files when bringing in the repository's skill", async () => {
     await publishSkills();
     await write("skills/shortfall/.protoexpress-agent-assets.json", "{}");
@@ -264,6 +287,65 @@ describe("publish and compare rules for skills", () => {
     await bringInRemoteSkills({ orgRoot, tip: updates.tip!, names: ["shortfall"], message: "Bring in" });
     expect(git(orgRoot, "show", "HEAD:skills/shortfall/SKILL.md")).toBe("# Upstream");
     expect(git(orgRoot, "show", "HEAD:skills/shortfall/.protoexpress-agent-assets.json")).toBe("{}");
+  });
+});
+
+describe("previewPublish", () => {
+  const preview = (excludeSkills: string[] = []) =>
+    previewPublish({ orgRoot, access: { url: remoteUrl }, branch: "main", kinds: ["skills", "workflows"], excludeSkills });
+
+  it("lists every item before the first publish, and nothing after it", async () => {
+    expect(await preview()).toEqual([
+      { kind: "skills", name: "shortfall", added: 1, changed: 0, removed: 0 },
+      { kind: "workflows", name: "daily", added: 1, changed: 0, removed: 0 },
+    ]);
+    await publish();
+    expect(await preview()).toEqual([]);
+  });
+
+  it("lists a changed skill with its file counts, and leaves out excluded skills and local-only files", async () => {
+    await publish();
+    await write("skills/shortfall/SKILL.md", "# Edited\n");
+    await write("skills/shortfall/references/notes.md", "notes\n");
+    await write("skills/shortfall/.marker.json", "{}");
+    await write("skills/xlsx/SKILL.md", "# Built-in\n");
+    await commitConfigChange({ workspaceRoot: orgRoot, paths: ["skills"], message: "Edit" });
+
+    expect(await preview(["xlsx"])).toEqual([{ kind: "skills", name: "shortfall", added: 1, changed: 1, removed: 0 }]);
+    expect(git(bare, "show", "main:skills/shortfall/SKILL.md")).toBe("# Shortfall");
+  });
+});
+
+describe("change diffs", () => {
+  it("shows the lines a publish would send for one skill, without local-only files", async () => {
+    await publish();
+    await write("skills/shortfall/SKILL.md", "# Shortfall v2\n");
+    await write("skills/shortfall/.marker.json", "{}");
+    await commitConfigChange({ workspaceRoot: orgRoot, paths: ["skills"], message: "Edit" });
+
+    const { diff, truncated } = await publishItemDiff({ orgRoot, access: { url: remoteUrl }, branch: "main", kinds: ["skills"], kind: "skills", name: "shortfall" });
+    expect(truncated).toBe(false);
+    expect(diff).toContain("-# Shortfall");
+    expect(diff).toContain("+# Shortfall v2");
+    expect(diff).not.toContain(".marker.json");
+    await expect(publishItemDiff({ orgRoot, access: { url: remoteUrl }, branch: "main", kinds: ["skills"], kind: "skills", name: "../x" }))
+      .rejects.toThrow("Unknown item.");
+  });
+
+  it("shows the repository's version of a skill against OpenNeko's", async () => {
+    await publish();
+    await write("skills/shortfall/.marker.json", "{}");
+    await commitConfigChange({ workspaceRoot: orgRoot, paths: ["skills"], message: "Marker" });
+    const clone = join(root, "clone-diff");
+    git(root, "clone", "-q", bare, clone);
+    await writeFile(join(clone, "skills/shortfall/SKILL.md"), "# From the repository\n");
+    git(clone, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qam", "Remote");
+    git(clone, "push", "-q", "origin", "main");
+    await checkRemoteUpdates({ orgRoot, access: { url: remoteUrl }, branch: "main", skillBases: {}, uploadedPacks: new Map() });
+
+    const { diff } = await incomingSkillDiff({ orgRoot, branch: "main", name: "shortfall" });
+    expect(diff).toContain("+# From the repository");
+    expect(diff).not.toContain(".marker.json");
   });
 });
 

@@ -245,6 +245,109 @@ export async function openPullRequest(opts: {
  * The new commit's parent is the remote branch tip, so a push is a normal
  * fast-forward and a pull request shows exactly what OpenNeko changed.
  */
+export type PublishPreviewItem = {
+  kind: ContextRemoteKind;
+  name: string;
+  added: number;
+  changed: number;
+  removed: number;
+};
+
+const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
+/**
+ * What a publish would send, grouped by item, without committing or pushing.
+ * It builds the same tree as publishContext and compares it with the remote branch.
+ */
+type PreviewOptions = {
+  orgRoot: string;
+  access: RemoteAccess;
+  branch: string;
+  kinds: readonly ContextRemoteKind[];
+  excludeSkills?: readonly string[];
+  skillBases?: Record<string, string | SkillBase>;
+};
+
+/** The remote branch's tree and the tree a publish would send. Caller holds the repo lock. */
+async function publishTrees(root: string, opts: PreviewOptions): Promise<{ baseTree: string; tree: string } | null> {
+  const head = (await git(root, ["rev-parse", "--verify", "--quiet", "HEAD"]).catch(() => ({ stdout: "" }))).stdout.trim();
+  if (!head) return null;
+  const base = await fetchRemote(root, opts.access, opts.branch);
+  const tree = await publishTree(root, head, base, opts.kinds, {
+    exclude: new Set(opts.excludeSkills ?? []),
+    bases: opts.skillBases ?? {},
+  });
+  const baseTree = base ? (await git(root, ["rev-parse", `${base}^{tree}`])).stdout.trim() : EMPTY_TREE;
+  return { baseTree, tree };
+}
+
+/** What a publish would send, grouped by item, without committing or pushing. */
+export async function previewPublish(opts: PreviewOptions): Promise<PublishPreviewItem[]> {
+  const root = resolve(opts.orgRoot);
+  return withRepoLock(root, async () => {
+    const trees = await publishTrees(root, opts);
+    if (!trees) return [];
+    const { stdout } = await git(root, ["diff-tree", "-r", "--name-status", "--no-renames", trees.baseTree, trees.tree]);
+    const items = new Map<string, PublishPreviewItem>();
+    for (const line of stdout.split("\n").filter(Boolean)) {
+      const [status, path] = line.split("\t");
+      const [kind, second] = (path ?? "").split("/");
+      if (!kind || !second || !opts.kinds.includes(kind as ContextRemoteKind)) continue;
+      const name = kind === "skills" ? second : second.replace(/\.md$/, "");
+      const key = `${kind}/${name}`;
+      const item = items.get(key) ?? { kind: kind as ContextRemoteKind, name, added: 0, changed: 0, removed: 0 };
+      if (status === "A") item.added += 1;
+      else if (status === "D") item.removed += 1;
+      else item.changed += 1;
+      items.set(key, item);
+    }
+    return [...items.values()].sort((a, b) => `${a.kind}/${a.name}`.localeCompare(`${b.kind}/${b.name}`));
+  });
+}
+
+export type ItemDiff = { diff: string; truncated: boolean };
+
+const DIFF_LIMIT = 200_000;
+
+function itemPaths(kind: ContextRemoteKind, name: string): string[] {
+  if (!name || name.includes("..") || name.includes("/")) throw new ContextRemoteError("Unknown item.");
+  return kind === "skills" ? [`skills/${name}`] : [`${kind}/${name}.md`, `${kind}/${name}`];
+}
+
+function capped(diff: string): ItemDiff {
+  return diff.length > DIFF_LIMIT ? { diff: diff.slice(0, DIFF_LIMIT), truncated: true } : { diff, truncated: false };
+}
+
+/** The unified diff a publish would send for one item. */
+export async function publishItemDiff(opts: PreviewOptions & { kind: ContextRemoteKind; name: string }): Promise<ItemDiff> {
+  const root = resolve(opts.orgRoot);
+  const paths = itemPaths(opts.kind, opts.name);
+  return withRepoLock(root, async () => {
+    const trees = await publishTrees(root, opts);
+    if (!trees) return { diff: "", truncated: false };
+    const { stdout } = await git(root, ["diff", "--no-color", "--no-renames", trees.baseTree, trees.tree, "--", ...paths]);
+    return capped(stdout);
+  });
+}
+
+/**
+ * The repository's version of a skill compared with OpenNeko's, from the
+ * remote tip fetched by the last update check. Local-only files are left out.
+ */
+export async function incomingSkillDiff(opts: { orgRoot: string; branch: string; name: string }): Promise<ItemDiff> {
+  const root = resolve(opts.orgRoot);
+  const [path] = itemPaths("skills", opts.name);
+  return withRepoLock(root, async () => {
+    const tip = (await git(root, ["rev-parse", "--verify", "--quiet", `refs/openneko/remote/${opts.branch}`]).catch(() => ({ stdout: "" }))).stdout.trim();
+    if (!tip) throw new ContextRemoteError("Check for updates first.");
+    const { stdout } = await git(root, [
+      "diff", "--no-color", "--no-renames", "HEAD", tip, "--", path!,
+      `:(exclude,glob)${path}/**/.*`, `:(exclude,glob)${path}/**/.*/**`,
+    ]);
+    return capped(stdout);
+  });
+}
+
 export async function publishContext(opts: {
   orgRoot: string;
   access: RemoteAccess;

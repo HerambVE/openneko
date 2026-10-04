@@ -7,6 +7,8 @@ import {
   ArrowUp,
   Check,
   Copy,
+  ChevronsDownUp,
+  ChevronsUpDown,
   History,
   Loader2,
   Paperclip,
@@ -127,6 +129,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, IconButton } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/field";
 import { Disclosure } from "@/components/ui/disclosure";
+import { LocalDateTime } from "@/components/ui/local-date-time";
 import { renderComponent, renderChildren } from "@/a2ui/renderer";
 import { applyMessage, getRootComponent, setDataModelValue } from "@/a2ui/surface";
 import { buildActionFollowUp, parseClarificationReply } from "@/a2ui/action";
@@ -389,6 +392,29 @@ export default function WorkScreen() {
   const [activeRunId, setActiveRunIdState] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const [reasoningExpanded, setReasoningExpanded] = useState(false);
+  useEffect(() => {
+    // Read after hydration so the server and first client render agree.
+    const id = window.setTimeout(() => {
+      try {
+        setReasoningExpanded(window.localStorage.getItem(REASONING_STORAGE_KEY) === "expanded");
+      } catch {
+        // Storage can be unavailable; reasoning then starts collapsed.
+      }
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, []);
+  const toggleReasoning = () => {
+    setReasoningExpanded((expanded) => {
+      try {
+        window.localStorage.setItem(REASONING_STORAGE_KEY, expanded ? "collapsed" : "expanded");
+      } catch {
+        // The choice still applies to this page.
+      }
+      return !expanded;
+    });
+  };
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const activeRunStreamRef = useRef<ActiveRunStream | null>(null);
@@ -468,8 +494,56 @@ export default function WorkScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gateChecked, gateError, routeThreadId]);
 
+  // Follow new output only while the reader is at the bottom of a running
+  // thread. Opening a thread, scrolling up, or clicking into the transcript
+  // (a tool call, reasoning or text) leaves the page where the reader put it.
+  const followRef = useRef(false);
+  const ignoreScrollUntilRef = useRef(0);
   useEffect(() => {
+    const nearBottom = () =>
+      window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 120;
+    const onScroll = () => {
+      if (Date.now() < ignoreScrollUntilRef.current) return;
+      followRef.current = nearBottom();
+    };
+    const stop = () => {
+      followRef.current = false;
+      ignoreScrollUntilRef.current = 0;
+    };
+    const onWheel = (event: WheelEvent) => {
+      if (event.deltaY < 0) stop();
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (transcriptRef.current?.contains(event.target as Node)) stop();
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("wheel", onWheel, { passive: true });
+    window.addEventListener("touchmove", stop, { passive: true });
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("touchmove", stop);
+      document.removeEventListener("pointerdown", onPointerDown, true);
+    };
+  }, []);
+
+  // A thread opens at the top, and is not followed until the reader sends.
+  useEffect(() => {
+    followRef.current = false;
+    window.scrollTo({ top: 0 });
+  }, [routeThreadId]);
+
+  // Sending shows the question and the running indicator, then follows.
+  useEffect(() => {
+    if (!sending) return;
+    followRef.current = true;
+    ignoreScrollUntilRef.current = Date.now() + 800;
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [sending]);
+
+  useEffect(() => {
+    if ((sending || activeRunId) && followRef.current) endRef.current?.scrollIntoView({ block: "end" });
   }, [bundle, sending, activeRunId]);
 
   // Register the handle the rail's "Ask next" chips call to drop a question
@@ -1201,6 +1275,17 @@ export default function WorkScreen() {
           <h1 title={threadTitle}>{threadTitle}</h1>
         </div>
         <div className="work-command-actions">
+          {bundle?.messages.length ? (
+            <Button
+              variant="secondary"
+              className="work-command-action"
+              onClick={toggleReasoning}
+              aria-pressed={reasoningExpanded}
+            >
+              {reasoningExpanded ? <ChevronsDownUp aria-hidden="true" strokeWidth={1.9} /> : <ChevronsUpDown aria-hidden="true" strokeWidth={1.9} />}
+              <span>{reasoningExpanded ? "Collapse reasoning" : "Expand reasoning"}</span>
+            </Button>
+          ) : null}
           <Button
             variant="secondary"
             className="work-command-action"
@@ -1229,7 +1314,7 @@ export default function WorkScreen() {
         onClose={() => setHistoryOpen(false)}
       />
 
-      <div className="work-transcript">
+      <div className="work-transcript" ref={transcriptRef}>
         {loadingThread ? (
           <div className="work-loading-state" role="status">
             <span />
@@ -1263,6 +1348,7 @@ export default function WorkScreen() {
                     events={events}
                     pending={isPending}
                     fallbackContent={message.content}
+                    reasoningExpanded={reasoningExpanded}
                   />
                 </div>
               );
@@ -1853,7 +1939,7 @@ function MessageBubble({
     );
   }
 
-  const showActions = onCopy || onRetry || onEdit;
+  const showActions = onCopy || onRetry || onEdit || message.createdAt;
   return (
     <div className="work-bubble-row is-user has-actions">
       <div className="work-bubble is-user">
@@ -1875,6 +1961,7 @@ function MessageBubble({
       </div>
       {showActions ? (
         <div className="work-bubble-actions">
+          {message.createdAt ? <LocalDateTime value={message.createdAt} className="work-bubble-time" /> : null}
           {onCopy ? (
             <IconButton
               label={copied ? "Copied" : "Copy"}
@@ -2653,17 +2740,28 @@ function FenceAwareBubble({
   );
 }
 
-function ProviderProgress({
+export function ProviderProgress({
   content,
   live,
+  collapsed = false,
 }: {
   content: string;
   live: boolean;
+  collapsed?: boolean;
 }) {
-  const sections = splitProgressSections(content);
-  const inlineSummary = sections.length === 1 && sections[0]?.heading === "Details"
-    ? sections[0].detail
-    : null;
+  if (collapsed) {
+    return (
+      <Disclosure title={<span className="font-normal text-text2">{progressPreview(content)}</span>} meta="Progress" className="work-progress-disclosure">
+        <div className="work-markdown px-3.5 pb-3">
+          <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
+            {linkifyWorkspacePaths(content)}
+          </ReactMarkdown>
+        </div>
+      </Disclosure>
+    );
+  }
+  // Every provider's reasoning renders as one note. Gemini thought summaries
+  // carry bold headings; they stay inside the note as markdown.
   return (
     <div
       className="work-progress-summary"
@@ -2672,31 +2770,11 @@ function ProviderProgress({
       <span className="work-progress-summary-mark" aria-hidden="true" />
       <div className="work-progress-summary-copy">
         <span className="work-progress-summary-label">Progress</span>
-        {inlineSummary ? (
-          <div className="work-markdown">
-            <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
-              {linkifyWorkspacePaths(inlineSummary)}
-            </ReactMarkdown>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            {sections.map((section, index) => (
-              <Disclosure
-                key={`${section.heading}-${index}`}
-                title={section.heading}
-                className="work-progress-disclosure"
-              >
-                {section.detail ? (
-                  <div className="work-markdown">
-                    <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
-                      {linkifyWorkspacePaths(section.detail)}
-                    </ReactMarkdown>
-                  </div>
-                ) : null}
-              </Disclosure>
-            ))}
-          </div>
-        )}
+        <div className="work-markdown">
+          <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
+            {linkifyWorkspacePaths(content)}
+          </ReactMarkdown>
+        </div>
       </div>
     </div>
   );
@@ -2779,18 +2857,76 @@ export function splitProgressSections(content: string): ProgressSection[] {
   return sections;
 }
 
+const TRAIL_KINDS = new Set<TimelineItem["kind"]>(["progress", "tools", "interim"]);
+const REASONING_STORAGE_KEY = "openneko.work.reasoning";
+
+/** The first line of a reasoning note, without markdown markers, for its collapsed row. */
+export function progressPreview(content: string): string {
+  const line = content
+    .split("\n")
+    .map((text) => text.replace(/^[#>\-\s]+/, "").replace(/[*_`]+/g, "").trim())
+    .find(Boolean) ?? "Progress";
+  return line.length > 140 ? `${line.slice(0, 139)}…` : line;
+}
+
+/** Elapsed time such as "45 s", "3 min 12 s" or "1 h 5 min". */
+export function formatElapsed(ms: number): string {
+  const seconds = Math.max(0, Math.round(ms / 1000));
+  if (seconds < 60) return `${seconds} s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return seconds % 60 ? `${minutes} min ${seconds % 60} s` : `${minutes} min`;
+  return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
+}
+
+function workDuration(run: RunRecord | null): string | null {
+  if (!run?.finishedAt) return null;
+  const ms = Date.parse(run.finishedAt) - Date.parse(run.createdAt);
+  return Number.isFinite(ms) && ms >= 0 ? formatElapsed(ms) : null;
+}
+
+/** Elapsed time since `since`, refreshed every second while `active`. */
+function useElapsed(since: string | undefined, active: boolean): string | null {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [active]);
+  if (!active || !since) return null;
+  const ms = now - Date.parse(since);
+  return Number.isFinite(ms) && ms >= 0 ? formatElapsed(ms) : null;
+}
+
+export function WorkTrail({ run, items, children }: { run: RunRecord | null; items: TimelineItem[]; children?: React.ReactNode }) {
+  const notes = items.filter((item) => item.kind === "progress" || item.kind === "interim").length;
+  const tools = items.reduce((count, item) => count + (item.kind === "tools" ? item.tools.length : 0), 0);
+  const duration = workDuration(run);
+  const meta = [
+    notes ? `${notes} ${notes === 1 ? "note" : "notes"}` : "",
+    tools ? `${tools} ${tools === 1 ? "tool call" : "tool calls"}` : "",
+  ].filter(Boolean).join(", ");
+  return (
+    <Disclosure title={duration ? `Worked for ${duration}` : "How OpenNeko worked"} meta={meta} className="work-trail">
+      <div className="flex flex-col gap-2.5 px-3 pb-3">{children}</div>
+    </Disclosure>
+  );
+}
+
 function RunTimeline({
   threadId,
   run,
   events,
   pending,
   fallbackContent,
+  reasoningExpanded,
 }: {
   threadId: string;
   run: RunRecord | null;
   events: WorkEvent[];
   pending: boolean;
   fallbackContent: string;
+  /** Show every reasoning note and tool call in full, in every run. */
+  reasoningExpanded: boolean;
 }) {
   const { insertComposerRef } = useWorkShell();
   const presentation = useMemo(
@@ -2835,79 +2971,100 @@ function RunTimeline({
     Boolean(persistedText) ||
     persistedVitals.length > 0;
 
+  const lastProgress = presentation.items.map((item) => item.kind).lastIndexOf("progress");
+  const elapsed = useElapsed(run?.createdAt, pending);
+  const renderItem = (item: TimelineItem, index: number) => {
+    if (item.kind === "text") {
+      const failure = presentWorkFailure(item.content);
+      if (failure.technical) {
+        return (
+          <WorkFailureNotice
+            key={`text-error-${index}`}
+            message={item.content}
+          />
+        );
+      }
+      return (
+        <FenceAwareBubble
+          key={`text-${index}`}
+          keyPrefix={`text-${index}`}
+          raw={item.content}
+        />
+      );
+    }
+    if (item.kind === "interim") {
+      return (
+        <FenceAwareBubble
+          key={`interim-${item.id}-${index}`}
+          keyPrefix={`interim-${item.id}-${index}`}
+          raw={item.content}
+        />
+      );
+    }
+    if (item.kind === "progress") {
+      return (
+        <ProviderProgress
+          key={`progress-${item.id}-${index}`}
+          content={item.content}
+          live={pending && index === lastProgress}
+          collapsed={!reasoningExpanded && index !== lastProgress}
+        />
+      );
+    }
+    if (item.kind === "tools") {
+      return (
+        <ToolGroup
+          key={`tools-${index}`}
+          tools={item.tools}
+          threadId={threadId}
+          runId={run?.id ?? ""}
+        />
+      );
+    }
+    if (item.kind === "surface") {
+      return <SurfaceBlock key={`surface-${index}`} messages={item.messages} />;
+    }
+    if (item.kind === "capability") {
+      return (
+        <CapabilityDeniedNotice
+          key={`capability-${item.denial.host}-${index}`}
+          denial={item.denial}
+          canAdminister={run?.actorRole === "admin"}
+          onRequest={(prompt) => insertComposerRef.current?.(prompt)}
+        />
+      );
+    }
+    if (item.kind === "needs_input") {
+      return (
+        <NeedsInputNotice
+          key={`needs-input-${index}`}
+          request={item.request}
+          onRespond={(text) => insertComposerRef.current?.(text)}
+        />
+      );
+    }
+    return <WorkFailureNotice key={`error-${index}`} message={item.message} />;
+  };
+  // A finished answer folds its working trail (reasoning, tool calls and
+  // interim notes) into one row, so the answer leads. Its last reasoning note
+  // stays open beside the answer.
+  const trail = presentation.items
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => TRAIL_KINDS.has(item.kind));
+  const foldTrail = !reasoningExpanded && !pending && trail.length > 0 && (hasText || hasSurface || Boolean(persistedText));
+
   return (
     <div className="work-timeline flex flex-col gap-2.5 mt-1">
-      {presentation.items.map((item, index) => {
-        if (item.kind === "text") {
-          const failure = presentWorkFailure(item.content);
-          if (failure.technical) {
-            return (
-              <WorkFailureNotice
-                key={`text-error-${index}`}
-                message={item.content}
-              />
-            );
-          }
-          return (
-            <FenceAwareBubble
-              key={`text-${index}`}
-              keyPrefix={`text-${index}`}
-              raw={item.content}
-            />
-          );
-        }
-        if (item.kind === "interim") {
-          return (
-            <FenceAwareBubble
-              key={`interim-${item.id}-${index}`}
-              keyPrefix={`interim-${item.id}-${index}`}
-              raw={item.content}
-            />
-          );
-        }
-        if (item.kind === "progress") {
-          return (
-            <ProviderProgress
-              key={`progress-${item.id}-${index}`}
-              content={item.content}
-              live={pending}
-            />
-          );
-        }
-        if (item.kind === "tools") {
-          return (
-            <ToolGroup
-              key={`tools-${index}`}
-              tools={item.tools}
-              threadId={threadId}
-              runId={run?.id ?? ""}
-            />
-          );
-        }
-        if (item.kind === "surface") {
-          return <SurfaceBlock key={`surface-${index}`} messages={item.messages} />;
-        }
-        if (item.kind === "capability") {
-          return (
-            <CapabilityDeniedNotice
-              key={`capability-${item.denial.host}-${index}`}
-              denial={item.denial}
-              canAdminister={run?.actorRole === "admin"}
-              onRequest={(prompt) => insertComposerRef.current?.(prompt)}
-            />
-          );
-        }
-        if (item.kind === "needs_input") {
-          return (
-            <NeedsInputNotice
-              key={`needs-input-${index}`}
-              request={item.request}
-              onRespond={(text) => insertComposerRef.current?.(text)}
-            />
-          );
-        }
-        return <WorkFailureNotice key={`error-${index}`} message={item.message} />;
-      })}
+      {foldTrail ? (
+        <WorkTrail run={run} items={trail.map(({ item }) => item)}>
+          {trail.filter(({ index }) => index !== lastProgress).map(({ item, index }) => renderItem(item, index))}
+        </WorkTrail>
+      ) : null}
+      {/* The last reasoning note stays open above the answer. */}
+      {foldTrail && lastProgress >= 0 ? renderItem(presentation.items[lastProgress]!, lastProgress) : null}
+      {presentation.items.map((item, index) =>
+        foldTrail && TRAIL_KINDS.has(item.kind) ? null : renderItem(item, index),
+      )}
 
       {fallbackIsTechnicalFailure ? (
         <WorkFailureNotice message={fallbackContent} />
@@ -2928,6 +3085,7 @@ function RunTimeline({
         <div className="work-status-row">
           <Loader2 className="work-status-spin" size={12} />
           <span>{presentation.lastStatus ?? "Running…"}</span>
+          {elapsed ? <span className="work-status-elapsed">{elapsed}</span> : null}
         </div>
       ) : null}
       {!pending && run?.error && !hasError ? (
@@ -3115,7 +3273,8 @@ function AnswerRunFooter({
     run.analysisMinutesSaved > 0
       ? formatSavedShort(run.analysisMinutesSaved)
       : null;
-  const hasEvidence = sources.length > 0 || artifacts.length > 0 || saved;
+  const answeredIn = workDuration(run);
+  const hasEvidence = sources.length > 0 || artifacts.length > 0 || saved || answeredIn;
   if (!hasEvidence && followups.length === 0) return null;
   return (
     <footer className="work-answer-footer">
@@ -3138,6 +3297,15 @@ function AnswerRunFooter({
               <strong>{artifact.label}</strong>
             </a>
           ))}
+          {answeredIn && run?.finishedAt ? (
+            <div>
+              <span>Answered in</span>
+              <strong>
+                {answeredIn}
+                <LocalDateTime value={run.finishedAt} className="work-answer-time" />
+              </strong>
+            </div>
+          ) : null}
           {saved ? (
             <div title={run?.analysisMinutesBasis ?? undefined}>
               <span>Analysis avoided</span>

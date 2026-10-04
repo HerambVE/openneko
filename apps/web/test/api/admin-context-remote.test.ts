@@ -60,12 +60,14 @@ const reachable = await dbReachable();
     expect((await callRoute(updates.GET)).status).toBe(403);
     expect((await callRoute(updates.POST, { method: "POST", body: { skills: [], packs: [] } })).status).toBe(403);
     expect((await callRoute(publish.POST, { method: "POST" })).status).toBe(403);
+    expect((await callRoute(publish.GET)).status).toBe(403);
   });
 
   it("reports a publish or update check without a remote", async () => {
     const publish = await import("@/app/api/admin/context-remote/publish/route");
     const updates = await import("@/app/api/admin/context-remote/updates/route");
     expect(await callRoute(updates.GET)).toMatchObject({ status: 400, body: { error: "Connect a remote repository first." } });
+    expect(await callRoute(publish.GET)).toMatchObject({ status: 400, body: { error: "Connect a remote repository first." } });
     expect(await callRoute(publish.POST, { method: "POST" })).toMatchObject({
       status: 400,
       body: { error: "Connect a remote repository first." },
