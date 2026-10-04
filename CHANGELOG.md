@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.15.1](https://github.com/open-neko/openneko/compare/v3.15.0...v3.15.1) (2026-10-04)
+
+
+### Bug Fixes
+
+* publish and compare only the org's own skill files ([4a6126a](https://github.com/open-neko/openneko/commit/4a6126a17ba162c948c96a7513f148e1d8a33cf2))
+* publish and compare only the org's own skill files ([7716c4c](https://github.com/open-neko/openneko/commit/7716c4c1b085bc091ce85e0fc9a6932c8c7478df))
+
 ## [3.15.0](https://github.com/open-neko/openneko/compare/v3.14.0...v3.15.0) (2026-10-04)
 
 
