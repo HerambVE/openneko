@@ -108,6 +108,8 @@ restorable.
 | Personal workflows | Your saved workflows are yours; the team's are the team's. Same name, no collisions. | #96 |
 | Personal memory layer | Correct or hide a team memory just for yourself without changing it for anyone else — and pull in team updates when you want them. | #96 |
 | Save, history, restore | Browse what changed and roll back to any earlier state of your assistant's configuration. | #96 |
+| Skill edits that stick | When the assistant changes a skill during a conversation, the change is saved as a new version when the turn ends. It applies to everyone if an admin asked, or only to you otherwise. | #413 |
+| Optional git repository | Connect the company's skills and workflows to GitHub, GitLab or any git host over HTTPS or SSH. Publish by push or pull request, and bring in skills and packs that changed there. See [CONTEXT_REPOSITORY.md](CONTEXT_REPOSITORY.md). | #413 |
 | Promote and adopt | When a personal workflow or memory proves valuable, an admin can promote it to the whole team with full lineage of where it came from. | #96 |
 | Document library | Files you attach in a conversation are added to your personal library automatically — a librarian distills them into concepts the assistant can search and cite, each traced back to the original document. | #220 |
 | Share and approve knowledge | A distilled concept stays private to you until you share it; an admin approves it into the team library, stamping who vouched for it and when. | #220 |
