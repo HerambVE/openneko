@@ -414,6 +414,14 @@ async function runOnce(args: RunOnceArgs): Promise<RunOnceOutcome> {
     mcpBridgeEnv,
   } = args;
 
+  // The latest usage Hermes reported for this turn. A turn that ends early
+  // still reports it, so the model calls it already paid for reach the ledger.
+  let turnUsage: AgentTokenUsage | undefined;
+  let turnUsageFinal = false;
+  let turnUsageReported = false;
+  let turnIdentity: AgentModelIdentity | undefined;
+  let drainEvents = async (): Promise<void> => {};
+
   let cwd: string;
   let cleanupScratch: (() => Promise<void>) | undefined;
   if (workspace) {
@@ -610,6 +618,7 @@ async function runOnce(args: RunOnceArgs): Promise<RunOnceOutcome> {
     });
     const sessionId = fresh.sessionId;
     const observedIdentity = parseHermesSessionIdentity(fresh);
+    turnIdentity = observedIdentity;
 
     let accumulatedText = "";
     let emittedOutsideLen = 0;
@@ -632,6 +641,7 @@ async function runOnce(args: RunOnceArgs): Promise<RunOnceOutcome> {
         }
       });
     };
+    drainEvents = () => eventQueue;
     const flushProviderSummary = (): void => {
       const content = pendingProviderSummary.trim();
       pendingProviderSummary = "";
@@ -713,9 +723,10 @@ async function runOnce(args: RunOnceArgs): Promise<RunOnceOutcome> {
             unsafeToolActivityObserved = true;
           }
           flushProviderSummary();
-          if (!onEvent) return;
           const meta = (update.fieldMeta ?? update._meta) as { openneko?: { usage?: unknown } } | undefined;
           const usageSnapshot = normalizeHermesUsage(meta?.openneko?.usage);
+          if (usageSnapshot && !turnUsageFinal) turnUsage = usageSnapshot;
+          if (!onEvent) return;
           const mcpToolName = canonicalAcpMcpToolName(update.title);
           // The brokered neko_ui server is the sole surface emitter. Suppress
           // a successful render's tool pill, but preserve the exact rejected
@@ -824,6 +835,10 @@ async function runOnce(args: RunOnceArgs): Promise<RunOnceOutcome> {
       promptStopReason = promptResponse.stopReason;
       const promptMeta = promptResponse.fieldMeta ?? promptResponse._meta;
       promptUsage = normalizeHermesUsage(promptResponse.usage, promptMeta?.openneko?.usage);
+      if (promptUsage) {
+        turnUsage = promptUsage;
+        turnUsageFinal = true;
+      }
       flushProviderSummary();
     } catch (e) {
       if (e instanceof AcpProtocolError) {
@@ -866,6 +881,7 @@ async function runOnce(args: RunOnceArgs): Promise<RunOnceOutcome> {
               ...(observedIdentity ? { observed: observedIdentity } : {}),
             }
           : undefined;
+      turnUsageReported = true;
       emitQueued({
         type: "usage",
         source: "outer",
@@ -945,6 +961,28 @@ async function runOnce(args: RunOnceArgs): Promise<RunOnceOutcome> {
     }
     throw e;
   } finally {
+    if (onEvent && turnUsage && !turnUsageReported) {
+      await drainEvents().catch(() => {});
+      try {
+        await onEvent({
+          type: "usage",
+          source: "outer",
+          ...(turnIdentity ?? {}),
+          usage: turnUsageFinal
+            ? turnUsage
+            : {
+                ...turnUsage,
+                coverage: "partial",
+                missingReasons: [
+                  ...(turnUsage.missingReasons ?? []),
+                  "The turn ended early; usage covers the model calls made before its last tool call.",
+                ],
+              },
+        });
+      } catch (error) {
+        console.warn(`[hermes] could not report usage for an early-ended turn: ${error instanceof Error ? error.message : error}`);
+      }
+    }
     client?.dispose();
     if (child.exitCode == null && !signal?.aborted) {
       killProcessGroup(child, "SIGTERM");

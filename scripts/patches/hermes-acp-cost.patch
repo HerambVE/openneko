@@ -102,7 +102,7 @@
                      # Do this for every platform with a session_id so non-CLI
 --- a/agent/usage_pricing.py
 +++ b/agent/usage_pricing.py
-@@ -1035,6 +1035,42 @@ for _alias, _canonical in {
+@@ -1035,6 +1035,56 @@ for _alias, _canonical in {
      ]
  del _alias, _canonical
  
@@ -132,6 +132,20 @@
 +    )
 +    for model in ("gemini-3.7-flash", "gemini-3.8-flash")
 +}
++_DATED_OFFICIAL_DOCS_PRICING[("anthropic", "claude-sonnet-5-5")] = (
++    (
++        datetime(1970, 1, 1, tzinfo=timezone.utc),
++        PricingEntry(
++            input_cost_per_million=Decimal("2.00"),
++            output_cost_per_million=Decimal("10.00"),
++            cache_read_cost_per_million=Decimal("0.20"),
++            cache_write_cost_per_million=Decimal("2.50"),
++            source="official_docs_snapshot",
++            source_url="https://platform.claude.com/docs/en/models/sonnet-5-5/overview",
++            pricing_version="anthropic-pricing-2026-10-04",
++        ),
++    ),
++)
 +
 +
 +def _dated_official_docs_pricing(key: tuple[str, str]) -> Optional[PricingEntry]:
@@ -145,7 +159,7 @@
  
  def _to_decimal(value: Any) -> Optional[Decimal]:
      if value is None:
-@@ -1185,6 +1221,9 @@ def _normalize_anthropic_model_name(model: str) -> str:
+@@ -1185,6 +1235,9 @@ def _normalize_anthropic_model_name(model: str) -> str:
  
  def _lookup_official_docs_pricing(route: BillingRoute) -> Optional[PricingEntry]:
      model = route.model.lower()

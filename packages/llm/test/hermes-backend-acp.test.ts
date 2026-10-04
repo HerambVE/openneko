@@ -1149,5 +1149,29 @@ it("delivers the compacted summary to ACP and retains usage before tool-boundary
   expect(receivedPrompt).toContain("Unrelated turn 11");
   expect(receivedPrompt).not.toContain("Earlier decision was compacted.");
   expect(events.find(event => event.type === "tool_start")).toMatchObject({ usageSnapshot: { inputTokens: 120, outputTokens: 30, totalTokens: 150 } });
-  expect(events.filter(event => event.type === "usage")).toHaveLength(0);
+  expect(events.filter(event => event.type === "usage")).toEqual([
+    expect.objectContaining({ source: "outer", usage: expect.objectContaining({ inputTokens: 120, outputTokens: 30, coverage: "partial" }) }),
+  ]);
+});
+
+it("reports the last usage snapshot when a turn times out", async () => {
+  const events: AgentEvent[] = [];
+  controller.setScript({ staysOpen: true, responders: {
+    "session/new": () => ({ sessionId: "s-timeout" }),
+    "session/prompt": (_params, ctx) => {
+      ctx.emitNotification({ jsonrpc: "2.0", method: "session/update", params: { sessionId: "s-timeout", update: {
+        sessionUpdate: "tool_call", toolCallId: "t", title: "terminal", kind: "execute",
+        _meta: { openneko: { usage: { input_tokens: 900, output_tokens: 40, cost_usd: 0.42, cost_status: "estimated" } } },
+      } } });
+      return NO_RESPONSE;
+    },
+  } });
+  const result = await new HermesBackend().run({ prompt: "p", workspace: FAKE_WORKSPACE, timeoutMs: 200, onEvent: (event) => { events.push(event); } });
+  expect(result.status).toBe("failed");
+  expect(events.filter(event => event.type === "usage")).toEqual([
+    expect.objectContaining({
+      source: "outer",
+      usage: expect.objectContaining({ inputTokens: 900, estimatedCostUsd: 0.42, coverage: "partial" }),
+    }),
+  ]);
 });

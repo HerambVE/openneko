@@ -295,6 +295,8 @@ async function runChatTurnTraced(
     : await startupPhase("knowledge.read_pack", () => readKnowledgePack(knowledgePackPaths(workspace.knowledgeRoot)));
 
   let assistantText = "";
+  let turnUsageReported = false;
+  let lastUsageSnapshot: Extract<AgentEvent, { type: "tool_start" }>["usageSnapshot"];
   const surfaceMessages: Extract<AgentEvent, { type: "surface" }>["messages"] = [];
   let firstOutputLogged = false;
   let needsInputEvent: Extract<
@@ -329,6 +331,8 @@ async function runChatTurnTraced(
       assistantText += event.content;
     }
     if (event.type === "surface") surfaceMessages.push(...event.messages);
+    if (event.type === "usage" && event.source === "outer") turnUsageReported = true;
+    if (event.type === "tool_start" && event.usageSnapshot) lastUsageSnapshot = event.usageSnapshot;
     if (event.type === "needs_input" && !needsInputEvent) {
       needsInputEvent = event;
     }
@@ -571,6 +575,21 @@ async function runChatTurnTraced(
       emit: wrappedEmit,
       signal,
     });
+    if (!turnUsageReported && lastUsageSnapshot) {
+      // A sandbox stopped on cancel never reports its turn usage.
+      await wrappedEmit({
+        type: "usage",
+        source: "outer",
+        usage: {
+          ...lastUsageSnapshot,
+          coverage: "partial",
+          missingReasons: [
+            ...(lastUsageSnapshot.missingReasons ?? []),
+            "The turn ended early; usage covers the model calls made before its last tool call.",
+          ],
+        },
+      });
+    }
     const spendStop = spendCapFromSignal(signal);
     const result = spendStop
       ? { ...coreResult, status: "failed" as const, error: spendStop.message }

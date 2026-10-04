@@ -2,7 +2,15 @@ import { pool } from "@neko/db";
 import { recordAuditEvent } from "../workflows/audit-chain";
 import { spendBreakdownMicros, spendWindows } from "./admission";
 import { listOpenSpendAlerts, type SpendAlert } from "./alerts";
-import { loadSpendLimits, microsToUsd, spendCeilingsMicros, usdToMicros } from "./limits";
+import {
+  loadSpendLimits,
+  METRIC_REFRESH_VALUES,
+  metricRefreshFromColumn,
+  microsToUsd,
+  spendCeilingsMicros,
+  usdToMicros,
+  type MetricRefresh,
+} from "./limits";
 
 export type SpendLimitsUsd = {
   runCapUsd: number;
@@ -33,6 +41,7 @@ export type WorkflowSpendRow = {
 
 export type SpendSettings = {
   limits: SpendLimitsUsd;
+  metricRefresh: MetricRefresh;
   ceilings: Omit<SpendLimitsUsd, "warnPercent">;
   org: { hour: SpendWindowUsage; day: SpendWindowUsage };
   workflows: WorkflowSpendRow[];
@@ -51,10 +60,14 @@ export async function getSpendSettings(orgId: string, now = new Date()): Promise
   const limits = await loadSpendLimits(db, orgId);
   const ceilings = spendCeilingsMicros();
   const windows = spendWindows(now);
-  const [hour, day, alerts] = await Promise.all([
+  const [hour, day, alerts, refresh] = await Promise.all([
     spendBreakdownMicros(db, { orgId, since: windows.hourStart }),
     spendBreakdownMicros(db, { orgId, since: windows.dayStart }),
     listOpenSpendAlerts(orgId),
+    db.query<{ metric_refresh: string | null }>(
+      "select metric_refresh from spend_limit where org_id = $1 and workflow_id is null",
+      [orgId],
+    ),
   ]);
   const { rows } = await db.query<{
     id: string;
@@ -83,6 +96,7 @@ export async function getSpendSettings(orgId: string, now = new Date()): Promise
       workflowDailyUsd: microsToUsd(limits.workflowDailyMicros),
       warnPercent: limits.warnPercent,
     },
+    metricRefresh: metricRefreshFromColumn(refresh.rows[0]?.metric_refresh),
     ceilings: {
       runCapUsd: microsToUsd(ceilings.runCapMicros),
       orgHourlyUsd: microsToUsd(ceilings.orgHourlyMicros),
@@ -132,7 +146,7 @@ function amount(value: unknown, label: string, ceilingMicros: number): number {
 export async function saveSpendLimits(
   orgId: string,
   actorUserId: string | null,
-  draft: Partial<SpendLimitsUsd>,
+  draft: Partial<SpendLimitsUsd> & { metricRefresh?: MetricRefresh },
 ): Promise<SpendSettings> {
   const ceilings = spendCeilingsMicros();
   const next = {
@@ -155,14 +169,21 @@ export async function saveSpendLimits(
   if (next.runCap > next.orgHourly || next.runCap > next.workflowHourly) {
     throw new SpendSettingsError("Per-run cap cannot exceed an hourly budget, or no run could start.");
   }
+  if (draft.metricRefresh !== undefined && !METRIC_REFRESH_VALUES.includes(draft.metricRefresh)) {
+    throw new SpendSettingsError("Metric refresh must be card, daily, weekly or off.");
+  }
   const previous = await getSpendSettings(orgId);
+  const metricRefresh = draft.metricRefresh ?? previous.metricRefresh;
   const { rowCount } = await pool().query(
     `update spend_limit
         set run_cap_micros = $2, org_hourly_micros = $3, org_daily_micros = $4,
             workflow_hourly_micros = $5, workflow_daily_micros = $6, warn_percent = $7,
-            updated_by_user_id = $8, updated_at = now()
+            metric_refresh = $9, updated_by_user_id = $8, updated_at = now()
       where org_id = $1 and workflow_id is null`,
-    [orgId, next.runCap, next.orgHourly, next.orgDaily, next.workflowHourly, next.workflowDaily, warn, actorUserId],
+    [
+      orgId, next.runCap, next.orgHourly, next.orgDaily, next.workflowHourly, next.workflowDaily, warn, actorUserId,
+      metricRefresh === "card" ? null : metricRefresh,
+    ],
   );
   if (!rowCount) throw new SpendSettingsError("This organization has no spend limits to update.");
   const saved = await getSpendSettings(orgId);
@@ -171,7 +192,11 @@ export async function saveSpendLimits(
     entityKind: "spend_limit",
     entityId: orgId,
     event: "spend:limit_changed",
-    payload: { actorUserId, previous: previous.limits, next: saved.limits },
+    payload: {
+      actorUserId,
+      previous: { ...previous.limits, metricRefresh: previous.metricRefresh },
+      next: { ...saved.limits, metricRefresh: saved.metricRefresh },
+    },
   });
   return saved;
 }

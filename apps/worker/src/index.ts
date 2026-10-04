@@ -80,8 +80,10 @@ import {
   getOrgId,
   isNull,
   metric,
+  pool,
   processing_job,
 } from "@neko/db";
+import { loadMetricRefreshSettings } from "@neko/llm/spend";
 import {
   agentTurnTimeoutMs,
   cancelAllAgents,
@@ -411,11 +413,13 @@ async function runMetricRefreshSweep() {
     })
     .from(metric)
     .where(eq(metric.active, true));
+  const orgRefresh = await loadMetricRefreshSettings(pool());
   const now = new Date();
   const due = cards.filter((card) => metricRefreshIsDue({
     cadence: card.cadence,
     lastRefreshStatus: card.last_refresh_status,
     updatedAt: card.updated_at,
+    orgRefresh: orgRefresh.get(card.org_id),
     now,
   }));
   if (due.length === 0) {

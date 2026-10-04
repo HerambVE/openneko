@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import type { SpendLimitsUsd, SpendSettings, SpendWindowUsage, WorkflowSpendRow } from "@neko/llm/spend";
+import type { MetricRefresh, SpendLimitsUsd, SpendSettings, SpendWindowUsage, WorkflowSpendRow } from "@neko/llm/spend";
 import { AdminError } from "@/components/admin/AdminError";
 import { adminApi } from "@/components/admin/admin-api";
 import AppHeader from "@/components/AppHeader";
@@ -11,7 +11,7 @@ import PageHeading from "@/components/PageHeading";
 import SectionNav from "@/components/SectionNav";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Button } from "@/components/ui/button";
-import { Field, Input } from "@/components/ui/field";
+import { Field, Input, NativeSelect } from "@/components/ui/field";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const usd = (value: number) =>
@@ -29,9 +29,17 @@ const LIMIT_FIELDS: Array<{ key: DollarKey; label: string; hint: string }> = [
   { key: "workflowDailyUsd", label: "Workflow daily budget", hint: "Default for each workflow, per UTC day." },
 ];
 
+const METRIC_REFRESH_OPTIONS: Array<{ value: MetricRefresh; label: string }> = [
+  { value: "card", label: "On each card's schedule" },
+  { value: "daily", label: "At most once a day" },
+  { value: "weekly", label: "At most once a week" },
+  { value: "off", label: "Off" },
+];
+
 export default function SpendForm({ initial }: { initial: SpendSettings }) {
   const [settings, setSettings] = useState(initial);
   const [draft, setDraft] = useState<Record<keyof SpendLimitsUsd, string>>(() => toDraft(initial.limits));
+  const [metricRefresh, setMetricRefresh] = useState<MetricRefresh>(initial.metricRefresh);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,12 +47,16 @@ export default function SpendForm({ initial }: { initial: SpendSettings }) {
     event.preventDefault();
     setSaving(true);
     setError(null);
-    const body = Object.fromEntries(Object.entries(draft).map(([key, value]) => [key, Number(value)]));
+    const body = {
+      ...Object.fromEntries(Object.entries(draft).map(([key, value]) => [key, Number(value)])),
+      metricRefresh,
+    };
     const result = await adminApi<SpendSettings>("/api/admin/spend", "PUT", body);
     setSaving(false);
     if (!result.ok) return setError(result.error);
     setSettings(result.body);
     setDraft(toDraft(result.body.limits));
+    setMetricRefresh(result.body.metricRefresh);
     toast.success("Spending limits saved.");
   }
 
@@ -112,6 +124,21 @@ export default function SpendForm({ initial }: { initial: SpendSettings }) {
                 value={draft.warnPercent}
                 onChange={(e) => setDraft((d) => ({ ...d, warnPercent: e.target.value }))}
               />
+            </Field>
+            <Field
+              label="Metric refresh"
+              htmlFor="spend-metricRefresh"
+              hint="How often briefing metrics refresh on schedule. Each refresh is a model run. A person can still refresh a card by hand."
+            >
+              <NativeSelect
+                id="spend-metricRefresh"
+                value={metricRefresh}
+                onChange={(e) => setMetricRefresh(e.target.value as MetricRefresh)}
+              >
+                {METRIC_REFRESH_OPTIONS.map(({ value, label }) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </NativeSelect>
             </Field>
           </div>
           <div className="flex justify-end">
