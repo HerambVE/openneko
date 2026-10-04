@@ -3052,6 +3052,7 @@ export const spend_limit = pgTable(
     workflow_hourly_micros: bigint("workflow_hourly_micros", { mode: "number" }),
     workflow_daily_micros: bigint("workflow_daily_micros", { mode: "number" }),
     warn_percent: integer("warn_percent"),
+    metric_refresh: text("metric_refresh"),
     updated_by_user_id: text("updated_by_user_id").references(() => app_user.id, {
       onDelete: "set null",
     }),

@@ -5,6 +5,7 @@ import {
   admitRunSpend,
   createRunSpendGuard,
   listOpenSpendAlerts,
+  loadMetricRefreshSettings,
   SpendCapExceeded,
   spendCapFromSignal,
   committedSpendMicros,
@@ -314,6 +315,19 @@ describeIfDb("spend settings", () => {
       const r = await run(orgId);
       const reservation = await pool().query("select reserved_micros from spend_reservation where work_run_id = $1", [r.id]);
       expect(reservation.rows[0].reserved_micros).toBe("4000000");
+    });
+  });
+
+  it("saves the metric refresh setting and keeps it when a save omits it", async () => {
+    await withOrg(async (orgId) => {
+      expect((await getSpendSettings(orgId)).metricRefresh).toBe("card");
+      expect((await saveSpendLimits(orgId, null, { ...valid, metricRefresh: "weekly" })).metricRefresh).toBe("weekly");
+      expect((await saveSpendLimits(orgId, null, valid)).metricRefresh).toBe("weekly");
+      expect((await loadMetricRefreshSettings(pool())).get(orgId)).toBe("weekly");
+      expect((await saveSpendLimits(orgId, null, { ...valid, metricRefresh: "card" })).metricRefresh).toBe("card");
+      await expect(
+        saveSpendLimits(orgId, null, { ...valid, metricRefresh: "hourly" as never }),
+      ).rejects.toThrow("Metric refresh must be card, daily, weekly or off.");
     });
   });
 
