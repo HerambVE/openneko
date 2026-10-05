@@ -11,6 +11,7 @@ import { Disclosure } from "@/components/ui/disclosure";
 import { Field, Input, NativeSelect } from "@/components/ui/field";
 import { LocalDateTime } from "@/components/ui/local-date-time";
 import { Badge } from "@/components/ui/badge";
+import { newRequestId } from "@/lib/request-id";
 
 type Value = string | number | boolean;
 type Operation = "install" | "configure" | "upgrade";
@@ -210,7 +211,7 @@ export default function CustomPacksAdmin({ initialPack = "", connected = "" }: {
     if (!review) return;
     setBusy(operation); setError("");
     try {
-      const result = await api<Status>(`/api/admin/packs/${selected}/${operation}`, { ...review.request, reviewHash: review.result.reviewHash, idempotencyKey: crypto.randomUUID() });
+      const result = await api<Status>(`/api/admin/packs/${selected}/${operation}`, { ...review.request, reviewHash: review.result.reviewHash, idempotencyKey: newRequestId() });
       setStatus(result); setReview(null); setSecrets({}); setDirty(false);
       toast.success("Pack changes applied."); await refresh();
       setOperation("configure");
@@ -228,7 +229,7 @@ export default function CustomPacksAdmin({ initialPack = "", connected = "" }: {
     if (!await confirmDialog({ title: "Remove this pack?", description: "Its automations and connector access will stop. History and business data are retained.", confirmLabel: "Remove pack", destructive: true })) { removeButton.current?.focus(); return; }
     setBusy("uninstall"); setError("");
     try {
-      setStatus(await api<Status>(`/api/admin/packs/${selected}/uninstall`, { idempotencyKey: crypto.randomUUID() }));
+      setStatus(await api<Status>(`/api/admin/packs/${selected}/uninstall`, { idempotencyKey: newRequestId() }));
       setReview(null); setSecrets({}); setDirty(false); setOperation("install");
       toast.success("Pack removed. History and data retained."); await refresh();
     } catch (error) { fail(error, "The pack could not be removed. Check its status and try again."); }
@@ -238,7 +239,7 @@ export default function CustomPacksAdmin({ initialPack = "", connected = "" }: {
   async function installBuiltin(pack: CatalogPack) {
     setBusy(`install-${pack.id}`); setError("");
     try {
-      await api<Status>(`/api/admin/packs/${encodeURIComponent(pack.id)}/install`, { version: pack.version, deferConfiguration: true, idempotencyKey: crypto.randomUUID() });
+      await api<Status>(`/api/admin/packs/${encodeURIComponent(pack.id)}/install`, { version: pack.version, deferConfiguration: true, idempotencyKey: newRequestId() });
       toast.success(`${pack.name} installed. Configure its connections when ready.`);
       await refresh();
       await loadPack(pack.id);
