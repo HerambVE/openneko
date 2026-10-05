@@ -148,6 +148,18 @@ async function assertGraphjinSupervisor(configFile: string): Promise<void> {
  * what seals plaintext connection credentials into GraphJin's keystore; the
  * durable YAML receives only gjsecret:// references.
  */
+/**
+ * GraphJin before 3.18.35 has no config preview: it rejects the fields that
+ * OpenNeko asks for. Returns a message an administrator can act on, or null.
+ */
+export function unsupportedGraphjinConfigApi(messages: ReadonlyArray<string | null | undefined>): string | null {
+  const rejected = messages.find((message) =>
+    message && /'(valid|preview_id|errors_json|catalog_revision|applied)' is not a column or a function|Cannot query field "(valid|preview_id|errors_json|catalog_revision|applied)"/i.test(message));
+  return rejected
+    ? `GraphJin on this OpenNeko install is too old to apply pack configuration. Pack configuration needs GraphJin 3.18.35 or later. Upgrade GraphJin, then install the pack again. (GraphJin said: ${rejected})`
+    : null;
+}
+
 export async function applyPackGraphjinConfig(input: {
   endpoint: string;
   orgId: string;
@@ -214,6 +226,8 @@ export async function applyPackGraphjinConfig(input: {
         query: `query ${revisionOperation} { gj_config(id: "current") { catalog_revision sources tables relationships } }`,
       });
       const reportedRevision = current.data?.gj_config?.catalog_revision;
+      const revisionUnsupported = unsupportedGraphjinConfigApi(current.errors?.map((error) => error.message) ?? []);
+      if (revisionUnsupported) throw new Error(revisionUnsupported);
       if (!reportedRevision || current.errors?.length) {
         throw new Error(
           `pack GraphJin config revision unavailable: ${current.errors?.map((error) => error.message).join("; ") ?? "no revision"}`,
@@ -304,6 +318,8 @@ export async function applyPackGraphjinConfig(input: {
         ...(preview.errors?.map((error) => error.message) ?? []),
         previewResult?.errors_json,
       ];
+      const previewUnsupported = unsupportedGraphjinConfigApi(previewMessages);
+      if (previewUnsupported) throw new Error(previewUnsupported);
       if (preview.errors?.length || !previewResult?.valid || !previewResult.preview_id) {
         if (attempt < maxRevisionAttempts && isCatalogRevisionConflict(previewMessages)) {
           conflictRevision = currentRevisionFromConflict(previewMessages);

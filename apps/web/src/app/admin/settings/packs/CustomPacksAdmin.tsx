@@ -274,7 +274,7 @@ export default function CustomPacksAdmin({ initialPack = "", connected = "" }: {
           {status?.status === "installed" && status.installedAt ? <p className="text-ui-caption text-text2">Installed <LocalDateTime value={status.installedAt} /></p> : null}</div>
         <Badge variant={status?.status === "installed" ? "success" : status?.status === "failed" ? "danger" : "muted"}>{status?.status === "installed" ? "Installed" : status?.status === "failed" ? "Install failed" : "Not installed"}</Badge>
       </div>
-      {status?.lastError ? <div className="grid gap-2"><p role="alert" className="text-ui-body-sm text-danger">The last installation attempt failed. Use the error details to correct the pack or its configuration, then review it again.</p><Disclosure title="Pack author error details"><p className="break-words text-ui-body-sm">{status.lastError}</p></Disclosure></div> : null}
+      {status?.lastError ? <div className="grid gap-2"><p role="alert" className="text-ui-body-sm text-danger">The last installation attempt failed. The error details say whether to change the pack, its settings or this OpenNeko install. Then review it again.</p><Disclosure title="Error details"><p className="break-words text-ui-body-sm">{status.lastError}</p></Disclosure></div> : null}
       {status?.status === "installed" ? <ActionGroup align="start">
         {!status.configuration?.required && detail.manifest.management && <ButtonLink href={detail.manifest.management.path}>{detail.manifest.management.label}</ButtonLink>}
         <ButtonLink href={`/admin/access?type=pack&id=${encodeURIComponent(selected)}`}>Access</ButtonLink>
