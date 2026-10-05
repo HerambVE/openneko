@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.16.2](https://github.com/open-neko/openneko/compare/v3.16.1...v3.16.2) (2026-10-05)
+
+
+### Bug Fixes
+
+* **web:** make pack request ids on plain HTTP installs ([275c91e](https://github.com/open-neko/openneko/commit/275c91e048299684828a6d74a5e59c685b4e562e))
+* **web:** make pack request ids on plain HTTP installs ([e3ba2b0](https://github.com/open-neko/openneko/commit/e3ba2b007bef0774e199465ffc87d870de7c1310))
+
 ## [3.16.1](https://github.com/open-neko/openneko/compare/v3.16.0...v3.16.1) (2026-10-05)
 
 
