@@ -7,6 +7,7 @@ import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { createHash } from "node:crypto";
 import pg from "pg";
 import { buildPoolConfig } from "./connection";
+import { guardPoolErrors } from "./pool-errors";
 import * as schema from "./schema";
 
 export { schema };
@@ -21,6 +22,7 @@ export {
   type RecordsMigrationResult,
 } from "./records-migrate";
 export { createNotifyClient, type NotifyClient } from "./notify";
+export { guardPoolErrors } from "./pool-errors";
 export { getOrCreateSoloAdmin, isUnclaimedSoloEmail, soloAdminNeedsEmail } from "./solo-admin";
 export { getOrgId, _resetOrgIdCacheForTesting } from "./org";
 export {
@@ -170,14 +172,7 @@ export function pool(): pg.Pool {
     });
   }
 
-  _pool = new pg.Pool(config);
-  // An idle connection that the server or the network drops emits on the
-  // pool. With no listener node treats it as unhandled and kills the
-  // process, which took the whole worker down. The next query opens a
-  // fresh connection, so logging is the right answer.
-  _pool.on("error", (error) => {
-    console.error("[db] idle connection error:", error instanceof Error ? error.message : error);
-  });
+  _pool = guardPoolErrors(new pg.Pool(config), "db");
   _poolConfigSignature = signature;
   _db = null;
   return _pool;

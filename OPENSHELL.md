@@ -83,6 +83,7 @@ Set these on the **worker** (channel runs) and/or the **web** process
 | `OPENNEKO_AGENT_MODEL_HOST` | Comma-separated egress hosts (e.g. `generativelanguage.googleapis.com,models.dev`) |
 | `OPENNEKO_AGENT_MODEL_KEY_ENV` | The env var the backend reads (e.g. `GEMINI_API_KEY`) |
 | `OPENSHELL_GATEWAY` / `OPENSHELL_GATEWAY_ENDPOINT` | Gateway selection (mTLS name, or endpoint) |
+| `OPENNEKO_METRIC_REFRESH_CONCURRENCY` | Metric refreshes that run at once, each in its own sandbox (worker only; default 2, never above the agent concurrency cap) |
 
 **Provider auto-sync.** On startup the worker turns your configured model key
 (`/settings`) into a gateway-side OpenShell provider automatically — you do not

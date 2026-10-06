@@ -78,6 +78,7 @@ import {
   eq,
   activeAdministratorIds,
   getOrgId,
+  guardPoolErrors,
   isNull,
   metric,
   pool,
@@ -87,6 +88,7 @@ import { loadMetricRefreshSettings } from "@neko/llm/spend";
 import {
   agentTurnTimeoutMs,
   cancelAllAgents,
+  metricRefreshConcurrency,
   prefetchKnowledgeForOrg,
   provisionHostConfig,
   resolveAgentConcurrency,
@@ -223,10 +225,10 @@ if (initializeWorkerTelemetry()) {
 
 const ADMIN_ORG_ID = await getOrgId();
 const packService = new PackService(ADMIN_ORG_ID);
-const recordsPool = new pg.Pool({
+const recordsPool = guardPoolErrors(new pg.Pool({
   ...buildRecordsPoolConfig(),
   application_name: "openneko-worker-records",
-});
+}), "records-db");
 const recordsRegistry = new RecordRegistry(recordsPool);
 const recordsOpsWatchDependencies = createRecordsOpsWatchDependencies(recordsPool);
 const recordsGraphjin = new RecordsGraphjinClient({
@@ -1129,7 +1131,12 @@ const metricRefreshHandler = makeHandler<ProcessingJobPayload>(
     await runMetricRefresh(jobId, orgId);
   },
 );
-for (let i = 0; i < concurrency.globalCap; i++) {
+const metricRefreshCap = metricRefreshConcurrency(
+  concurrency.globalCap,
+  process.env.OPENNEKO_METRIC_REFRESH_CONCURRENCY,
+);
+console.log(`[worker] concurrency: metric refresh=${metricRefreshCap}`);
+for (let i = 0; i < metricRefreshCap; i++) {
   await b.work(
     QUEUE.METRIC_REFRESH,
     { batchSize: 1, pollingIntervalSeconds: 0.5 },
