@@ -91,7 +91,7 @@ async function validateWithTestGraphjin(configDirectory: string): Promise<void> 
       graphjinImage,
       "version",
     ]);
-    expect(version.stdout).toContain("GraphJin 3.20.78");
+    expect(version.stdout).toContain("GraphJin 3.21.0");
     await runTestCommand("docker", [
       "run",
       "--rm",

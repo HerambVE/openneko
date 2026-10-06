@@ -36,6 +36,11 @@ describe("GraphJin without config preview", () => {
     expect(message).toContain("field 'valid' is not a column or a function");
   });
 
+  it("explains a GraphJin that cannot take pack files through its API", () => {
+    const message = unsupportedGraphjinConfigApi(["column: 'gj_config.update_saved_queries' not found; available columns include: id"]);
+    expect(message).toContain("cannot take pack saved queries and OpenAPI documents through its API");
+  });
+
   it("leaves other GraphJin errors alone", () => {
     expect(unsupportedGraphjinConfigApi(["stale catalog revision", null, undefined])).toBeNull();
     expect(unsupportedGraphjinConfigApi(["field 'customer_name' is not a column or a function"])).toBeNull();

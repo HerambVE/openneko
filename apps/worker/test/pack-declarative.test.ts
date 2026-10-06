@@ -38,6 +38,18 @@ describe("declarative pack configuration", () => {
     expect(gmail.specs.gmail.operations.getMessage).toEqual({ expose_top_level: true });
   });
 
+  it("sends spec documents and saved queries inline for a GraphJin that keeps its own config", () => {
+    const pack = bundle();
+    const update = declarativeGraphjinUpdate(pack, inputs, secrets, [], {}, {
+      specDocuments: new Map([["graphjin/specs/service-health.yaml", "openapi: 3.0.3\npaths: {}\n"]]),
+      savedQueries: [{ name: "fixture_health", query: "query Health { health { healthy } }" }],
+    }) as { update_sources: Array<Record<string, unknown>>; update_saved_queries: unknown };
+    const source = update.update_sources[0]!;
+    expect(source).not.toHaveProperty("specs_dir");
+    expect(source.specs).toMatchObject({ "service-health": { document: "openapi: 3.0.3\npaths: {}\n", base_url: inputs["service.base_url"] } });
+    expect(update.update_saved_queries).toEqual([{ name: "fixture_health", query: "query Health { health { healthy } }" }]);
+  });
+
   it("rejects GraphJin readiness checks for a pack without GraphJin", () => {
     const pack = bundle();
     pack.manifest.artifacts = { skills: [] };
