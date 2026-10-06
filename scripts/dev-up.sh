@@ -31,6 +31,26 @@ if ! "$OPENNEKO_DEV_STATE/bin/graphjin" version 2>/dev/null | grep -q "GraphJin 
   rm -rf "$download"
 fi
 
+# Host processes start agent sandboxes with the pinned OpenShell CLI.
+openshell_version="$(sed -n 's/^ARG OPENSHELL_VERSION=\(.*\)$/\1/p' Dockerfile)"
+if ! "$OPENNEKO_DEV_STATE/bin/openshell" --version 2>/dev/null | grep -qx "openshell $openshell_version"; then
+  case "$(uname -s)-$(uname -m)" in
+    Darwin-arm64) target=aarch64-apple-darwin ;;
+    Linux-x86_64) target=x86_64-unknown-linux-musl ;;
+    Linux-aarch64 | Linux-arm64) target=aarch64-unknown-linux-musl ;;
+    *) echo "OpenShell $openshell_version has no CLI build for $(uname -s) $(uname -m)" >&2; exit 1 ;;
+  esac
+  asset="openshell-$target.tar.gz"
+  download="$(mktemp -d)"
+  base="https://github.com/NVIDIA/OpenShell/releases/download/v$openshell_version"
+  curl -fsSL -o "$download/$asset" "$base/$asset"
+  curl -fsSL -o "$download/checksums.txt" "$base/openshell-checksums-sha256.txt"
+  (cd "$download" && grep " $asset\$" checksums.txt | shasum -a 256 -c -)
+  mkdir -p "$OPENNEKO_DEV_STATE/bin"
+  tar -xzf "$download/$asset" -C "$OPENNEKO_DEV_STATE/bin" openshell
+  rm -rf "$download"
+fi
+
 compose up -d --wait neko-db records-db
 (cd apps/openneko && go run ./cmd/openneko migrate)
 
@@ -46,6 +66,16 @@ compose exec -T neko-db psql -U neko -d neko -v ON_ERROR_STOP=1 \
 compose run --rm --no-deps graphjin-config-init
 GRAPHJIN_SOURCES_CONFIG="$OPENNEKO_GRAPHJIN_CONFIG" \
   pnpm --filter @neko/worker exec tsx ../../packages/llm/src/graphjin/init-secret.mjs
+
+# Compose reuses a built image after the GraphJin pin moves. Rebuild each
+# GraphJin image that reports another version, or the worker stops at start.
+for service in neko-graphjin graphjin records-graphjin; do
+  if ! compose run --rm --no-deps -T --entrypoint graphjin "$service" version 2>/dev/null \
+    | grep -q "GraphJin $graphjin_version"; then
+    echo "Rebuilding $service for GraphJin $graphjin_version"
+    compose build "$service"
+  fi
+done
 
 compose up -d \
   neko-graphjin graphjin records-graphjin records-watch-graphjin \

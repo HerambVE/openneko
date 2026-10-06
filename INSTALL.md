@@ -372,7 +372,7 @@ pnpm dev
 
 Web and worker run on the host with hot reload. Everything else runs in Docker.
 
-- `pnpm dev:up` starts the backing services with `compose.dev.yml`: `neko-db`, `records-db`, both GraphJin data planes, `neko-graphjin`, `embedding`, `librarian`, the OpenShell gateway with the agent image, and AdventureWorks with its simulator. It runs migrations from source, writes the GraphJin JWT secret, and registers the OpenShell gateway for host processes.
+- `pnpm dev:up` starts the backing services with `compose.dev.yml`: `neko-db`, `records-db`, both GraphJin data planes, `neko-graphjin`, `embedding`, `librarian`, the OpenShell gateway with the agent image, and AdventureWorks with its simulator. It installs the pinned GraphJin and OpenShell CLIs into `.openneko/dev/bin`, rebuilds a GraphJin image that reports another version than the pin, runs migrations from source, writes the GraphJin JWT secret, and registers the OpenShell gateway for host processes.
 - `pnpm dev:seed` seeds demo workflows. `pnpm dev:setup` runs both steps.
 - `pnpm dev` runs `next dev` on port 3000 and `tsx watch` for the worker. Edits to `apps/web`, `apps/worker`, and workspace packages reload without an image build.
 - `scripts/dev-env.sh` holds the host settings. Each service a host process calls has a loopback port; `pnpm dev:web` and `pnpm dev:worker` source the file.
