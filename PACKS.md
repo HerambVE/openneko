@@ -195,7 +195,7 @@ GraphJin needs:
   OpenNeko.
 - `secrets.keystore.key` set, for a pack that brings a credential. GraphJin seals
   the credential with it.
-- A GraphJin release that accepts inline OpenAPI documents and
+- GraphJin 3.21.0 or later, which accepts inline OpenAPI documents and
   `update_saved_queries`.
 
 When that GraphJin has no auth, every caller is anonymous. OpenNeko then makes

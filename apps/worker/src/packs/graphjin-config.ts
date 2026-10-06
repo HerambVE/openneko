@@ -157,7 +157,7 @@ async function assertGraphjinSupervisor(configFile: string): Promise<void> {
 export function unsupportedGraphjinConfigApi(messages: ReadonlyArray<string | null | undefined>): string | null {
   const noRemoteFiles = messages.find((message) => message && /gj_config\.(update_saved_queries|remove_saved_queries)' not found/i.test(message));
   if (noRemoteFiles) {
-    return `This GraphJin cannot take pack saved queries and OpenAPI documents through its API. Upgrade GraphJin to a release with inline OpenAPI documents, then install the pack again. (GraphJin said: ${noRemoteFiles})`;
+    return `This GraphJin cannot take pack saved queries and OpenAPI documents through its API. Upgrade GraphJin to 3.21.0 or later, then install the pack again. (GraphJin said: ${noRemoteFiles})`;
   }
   const rejected = messages.find((message) =>
     message && /'(valid|preview_id|errors_json|catalog_revision|applied)' is not a column or a function|Cannot query field "(valid|preview_id|errors_json|catalog_revision|applied)"/i.test(message));
