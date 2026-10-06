@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.17.0](https://github.com/open-neko/openneko/compare/v3.16.2...v3.17.0) (2026-10-06)
+
+
+### Features
+
+* **packs:** install packs into any GraphJin through its API ([e95f04f](https://github.com/open-neko/openneko/commit/e95f04ffd31260d348457ba8e502408b28a81637))
+* **packs:** install packs into any GraphJin through its API ([487d200](https://github.com/open-neko/openneko/commit/487d20077c4cc3eebaf0a3a1ad3ff4ca70dc869a))
+
 ## [3.16.2](https://github.com/open-neko/openneko/compare/v3.16.1...v3.16.2) (2026-10-05)
 
 
