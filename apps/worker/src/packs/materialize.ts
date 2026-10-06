@@ -126,3 +126,38 @@ export async function installSkills(input: {
     throw error;
   }
 }
+
+/**
+ * A pack's GraphJin files, delivered through gj_config instead of a shared
+ * folder. Specs travel as inline OpenAPI documents and saved queries as
+ * update_saved_queries, so any GraphJin that keeps its own config can take
+ * them. Targets are graphjin:<kind>:<name> references, not paths.
+ */
+export async function graphjinApiArtifacts(input: {
+  bundle: SolutionPackBundle;
+  values: Record<string, unknown>;
+}): Promise<{
+  specDocuments: Map<string, string>;
+  savedQueries: Array<{ name: string; query: string }>;
+  targets: Map<string, string>;
+}> {
+  const specDocuments = new Map<string, string>();
+  const savedQueries: Array<{ name: string; query: string }> = [];
+  const targets = new Map<string, string>();
+  for (const artifact of input.bundle.artifacts) {
+    if (artifact.kind === "spec") {
+      specDocuments.set(artifact.path, renderTemplate(await readFile(join(input.bundle.root, artifact.path), "utf8"), input.values));
+      targets.set(`${artifact.kind}:${artifact.key}`, `graphjin:spec:${artifact.path}`);
+    } else if (artifact.kind === "saved_query") {
+      const name = packSavedQueryName(input.bundle.manifest.metadata.id, artifact.path);
+      savedQueries.push({ name, query: String(artifact.content) });
+      targets.set(`${artifact.kind}:${artifact.key}`, `graphjin:saved_query:${name}`);
+    }
+  }
+  return { specDocuments, savedQueries, targets };
+}
+
+/** The saved query name GraphJin serves for a pack query file. */
+export function packSavedQueryName(packId: string, path: string): string {
+  return `${packId.replaceAll("-", "_")}_${basename(path).replace(/\.(gql|graphql)$/i, "")}`;
+}

@@ -44,6 +44,8 @@ export function declarativeGraphjinUpdate(
   secrets: Record<string, string>,
   retiredSources: string[] = [],
   bindings: Record<string, string> = {},
+  api?: { specDocuments: Map<string, string>; savedQueries: Array<{ name: string; query: string }> },
+  callerAccess: "authenticated" | "public" = "authenticated",
 ): Record<string, unknown> {
   const knownChecks = new Set(["db-connect", "db-read-only", "graphjin-reload", "analytics-smoke", "queries"]);
   for (const check of [...bundle.manifest.health.requiredPreflight, ...bundle.manifest.health.postInstall, ...bundle.manifest.health.postWriteCanary, ...Object.values(bundle.manifest.health.readiness).flat()]) {
@@ -220,29 +222,36 @@ export function declarativeGraphjinUpdate(
     if (source.read_only === false && !write && !remove) {
       throw new Error("custom API sources may set read_only to false only when requesting write or delete capability");
     }
+    // A GraphJin without auth sees every caller as anonymous. GraphJin grants
+    // no capability and no public write to an anonymous caller, so the source
+    // is read-only there and its write operations stay unexposed.
+    const anonymous = callerAccess === "public";
+    const writeOn = write && !anonymous;
+    const removeOn = remove && !anonymous;
+    const exposures = [...(operationExposures.get(String(source.name)) ?? new Map<string, Record<string, unknown>>())]
+      .filter(([, exposure]) => !anonymous || exposure.expose_mutation !== true);
     return {
       name: source.name,
       kind: source.kind,
       default: false,
-      read_only: !(write || remove),
+      read_only: !(writeOn || removeOn),
       access: {
-        read: requested?.["api.read"] === false ? "blocked" : "authenticated",
-        write: write ? "authenticated" : "blocked",
-        delete: remove ? "authenticated" : "blocked",
+        read: requested?.["api.read"] === false ? "blocked" : callerAccess,
+        write: writeOn ? callerAccess : "blocked",
+        delete: removeOn ? callerAccess : "blocked",
       },
-      specs_dir: "/config/specs",
+      ...(api ? {} : { specs_dir: "/config/specs" }),
       specs: { [basename(spec.path, extname(spec.path))]: {
+        ...(api ? { document: api.specDocuments.get(spec.path) } : {}),
         base_url: url.toString().replace(/\/$/, ""),
         ...(specAuth ? { auth: specAuth } : {}),
-        ...(operationExposures.get(String(source.name))?.size
-          ? { operations: Object.fromEntries(operationExposures.get(String(source.name))!) }
-          : {}),
+        ...(exposures.length ? { operations: Object.fromEntries(exposures) } : {}),
       } },
-      capabilities: {
+      capabilities: Object.fromEntries(Object.entries({
         "api.read": requested?.["api.read"] !== false,
-        "api.write": write,
-        "api.delete": remove,
-      },
+        "api.write": writeOn,
+        "api.delete": removeOn,
+      }).filter(([, allowed]) => !anonymous || !allowed)),
     };
   });
   const names = Object.fromEntries(bundle.artifacts.filter(artifact => artifact.kind === "source" && bindings[artifact.key]).map(artifact => [String((artifact.content as Record<string, unknown>).name), bindings[artifact.key]]));
@@ -255,6 +264,7 @@ export function declarativeGraphjinUpdate(
       ? { roles: [{ name: "pack_api_executor", comment: "Short-lived executor for approved pack API actions" }] }
       : {}),
     update_sources: sources, relationships,
+    ...(api?.savedQueries.length ? { update_saved_queries: api.savedQueries } : {}),
     ...(retiredSources.length ? { source_patches: retiredSources.map(name => ({ name, read_only: true, access: { read: "blocked", write: "blocked", delete: "blocked" } })) } : {}),
   };
 }

@@ -12,6 +12,7 @@ import {
 } from "@neko/db";
 import { canonicalHash, sha256, type PackArtifact } from "@neko/packs";
 import { parse as parseYaml } from "yaml";
+import { readLiveGraphjinConfig, readLiveSavedQuery, type GraphjinTarget, type LiveGraphjinConfig } from "./graphjin-target.js";
 
 type ArtifactMetadata = Record<string, unknown>;
 
@@ -129,27 +130,69 @@ function safeMaterializedTarget(configFile: string, metadata: ArtifactMetadata):
   return absolute;
 }
 
-async function graphjinConfigState(
-  configFile: string,
-  kind: "source" | "relationships",
-  targetRef: string,
-  locator: PackArtifactLocator,
-): Promise<string | null> {
+type GraphjinConfigView = {
+  sources?: Array<Record<string, unknown>>;
+  tables?: Array<Record<string, unknown>>;
+  relationships?: Array<Record<string, unknown>>;
+};
+
+const liveConfigs = new WeakMap<object, Promise<LiveGraphjinConfig>>();
+
+/** One live read per target object, shared by every artifact it inspects. */
+function liveConfig(target: Extract<GraphjinTarget, { mode: "api" }>): Promise<LiveGraphjinConfig> {
+  let pending = liveConfigs.get(target);
+  if (!pending) {
+    pending = readLiveGraphjinConfig(target);
+    liveConfigs.set(target, pending);
+  }
+  return pending;
+}
+
+async function graphjinConfigView(graphjin: GraphjinTarget): Promise<GraphjinConfigView | null> {
+  if (graphjin.mode === "api") return liveConfig(graphjin);
   let raw: string;
   try {
-    raw = await readFile(configFile, "utf8");
+    raw = await readFile(graphjin.configFile, "utf8");
   } catch (error) {
     if (isMissing(error)) return null;
     throw error;
   }
-  const config = parseYaml(raw) as {
-    sources?: Array<Record<string, unknown>>;
-    tables?: Array<Record<string, unknown>>;
-    relationships?: Array<Record<string, unknown>>;
+  return parseYaml(raw) as GraphjinConfigView;
+}
+
+/**
+ * The pack-controlled part of a source as GraphJin reports it. GraphJin
+ * redacts sealed credentials and fills defaults differently after a reload,
+ * so a hash of the whole source would report drift that nobody made. The
+ * spec document has its own artifact.
+ */
+function stableLiveSource(source: Record<string, unknown>): Record<string, unknown> {
+  const specs = source.specs && typeof source.specs === "object" ? source.specs as Record<string, Record<string, unknown>> : {};
+  return {
+    name: source.name ?? null,
+    kind: source.kind ?? null,
+    read_only: source.read_only ?? null,
+    access: source.access ?? null,
+    capabilities: source.capabilities ?? null,
+    specs: Object.fromEntries(Object.entries(specs).map(([key, spec]) => [key, {
+      base_url: spec.base_url ?? null,
+      operations: spec.operations ?? null,
+    }])),
   };
+}
+
+async function graphjinConfigState(
+  graphjin: GraphjinTarget,
+  kind: "source" | "relationships",
+  targetRef: string,
+  locator: PackArtifactLocator,
+): Promise<string | null> {
+  const config = await graphjinConfigView(graphjin);
+  if (!config) return null;
   if (kind === "source") {
     const source = config.sources?.find((value) => value.name === (locator.name ?? targetRef));
-    return source ? canonicalHash(source) : null;
+    if (!source) return null;
+    return canonicalHash(graphjin.mode === "api" ? stableLiveSource(source) : source);
   }
   const source = locator.source ?? targetRef;
   const tables = (config.tables ?? []).filter(
@@ -163,6 +206,27 @@ async function graphjinConfigState(
   return tables.length || relationships.length || config.sources?.some(value => value.name === source)
     ? canonicalHash({ tables, relationships })
     : null;
+}
+
+/** The hash of a spec or saved query that an api-mode install sent to GraphJin. */
+async function liveGraphjinArtifactState(
+  graphjin: Extract<GraphjinTarget, { mode: "api" }>,
+  kind: "spec" | "saved_query",
+  target: string,
+): Promise<string | null> {
+  if (kind === "saved_query") {
+    const name = target.slice("graphjin:saved_query:".length);
+    const query = await readLiveSavedQuery(graphjin, name);
+    return query === null ? null : sha256(query.replace(/\r\n/g, "\n").trim());
+  }
+  const path = target.slice("graphjin:spec:".length);
+  const key = path.split("/").pop()!.replace(/\.(ya?ml|json)$/i, "");
+  for (const source of (await liveConfig(graphjin)).sources) {
+    const specs = source.specs && typeof source.specs === "object" ? source.specs as Record<string, Record<string, unknown>> : {};
+    const document = specs[key]?.document;
+    if (typeof document === "string" && document.trim()) return canonicalHash(parseYaml(document));
+  }
+  return null;
 }
 
 async function inspectNative(
@@ -253,7 +317,7 @@ export async function inspectInstalledPackArtifactCurrent(input: {
   kind: PackArtifact["kind"];
   targetRef: string;
   metadata: ArtifactMetadata;
-  graphjinConfigFile: string;
+  graphjin: GraphjinTarget | null;
   fallbackArtifact?: PackArtifact;
   lastAppliedHash?: string;
 }): Promise<string | null> {
@@ -261,10 +325,16 @@ export async function inspectInstalledPackArtifactCurrent(input: {
   switch (input.kind) {
     case "source":
     case "relationships":
-      return graphjinConfigState(input.graphjinConfigFile, input.kind, input.targetRef, locator);
+      return input.graphjin ? graphjinConfigState(input.graphjin, input.kind, input.targetRef, locator) : null;
     case "spec":
     case "saved_query": {
-      const target = safeMaterializedTarget(input.graphjinConfigFile, input.metadata);
+      if (!input.graphjin) return null;
+      const materialized = typeof input.metadata.materializedTarget === "string" ? input.metadata.materializedTarget : null;
+      if (materialized?.startsWith("graphjin:")) {
+        return input.graphjin.mode === "api" ? liveGraphjinArtifactState(input.graphjin, input.kind, materialized) : null;
+      }
+      if (input.graphjin.mode !== "files") return null;
+      const target = safeMaterializedTarget(input.graphjin.configFile, input.metadata);
       return target ? hashMaterializedFile(target) : null;
     }
     case "skill": {
@@ -286,14 +356,14 @@ export async function inspectPackArtifactCurrent(input: {
   orgId: string;
   artifact: PackArtifact;
   metadata: ArtifactMetadata;
-  graphjinConfigFile: string;
+  graphjin: GraphjinTarget | null;
 }): Promise<string | null> {
   return inspectInstalledPackArtifactCurrent({
     orgId: input.orgId,
     kind: input.artifact.kind,
     targetRef: input.artifact.targetRef,
     metadata: input.metadata,
-    graphjinConfigFile: input.graphjinConfigFile,
+    graphjin: input.graphjin,
     fallbackArtifact: input.artifact,
   });
 }

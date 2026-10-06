@@ -180,6 +180,28 @@ and applying that configuration activates the pack through the shared lifecycle.
 In particular, an administrator cannot configure a personal OAuth client for an
 uninstalled pack. Custom packs retain the upload, review, and install flow.
 
+### Install into any GraphJin
+
+OpenNeko installs a pack into the GraphJin of the selected data connection,
+including a GraphJin that the customer runs outside OpenNeko. It sends the pack's
+sources, OpenAPI documents, saved queries, and credentials through that GraphJin's
+`gj_config` API, and GraphJin writes them to its own config folder. That
+GraphJin needs:
+
+- `production: false`, so it keeps changes made through its API. A production
+  GraphJin keeps them only when OpenNeko manages its config folder, as with the
+  GraphJin that ships with OpenNeko.
+- `config.read` and `config.write` capabilities, with `gj_config` open to
+  OpenNeko.
+- `secrets.keystore.key` set, for a pack that brings a credential. GraphJin seals
+  the credential with it.
+- A GraphJin release that accepts inline OpenAPI documents and
+  `update_saved_queries`.
+
+When that GraphJin has no auth, every caller is anonymous. OpenNeko then makes
+pack API sources readable by anyone who can reach GraphJin, and keeps them
+read-only: GraphJin does not grant writes to an anonymous caller.
+
 For an optional operations link, declare, for example:
 
 ```yaml
