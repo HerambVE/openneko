@@ -306,6 +306,7 @@ export async function applyPackGraphjinConfig(input: {
         preview = await graphjinQuery({
           baseUrl: input.endpoint,
         configurationOnly: true,
+          longRunning: true,
           headers,
           query: `mutation${previewInput.variableDefinitions} { gj_config(id: "current", update: ${previewInput.literal}) { valid preview_id errors_json } }`,
           variables: previewInput.variables,
@@ -350,6 +351,7 @@ export async function applyPackGraphjinConfig(input: {
         applied = await graphjinQuery({
           baseUrl: input.endpoint,
         configurationOnly: true,
+          longRunning: true,
           headers,
           query: `mutation${applyInput.variableDefinitions} { gj_config(id: "current", update: ${applyInput.literal}) { applied catalog_revision errors_json } }`,
           variables: applyInput.variables,
@@ -467,6 +469,7 @@ async function previewThenApplyLive(input: {
       const result = await graphjinQuery<{ gj_config?: { valid?: boolean; applied?: boolean; preview_id?: string; catalog_revision?: string; errors_json?: string } }>({
         baseUrl: input.target.endpoint,
         configurationOnly: true,
+        longRunning: true,
         headers,
         query: `mutation${request.variableDefinitions} { gj_config(id: "current", update: ${request.literal}) { valid applied preview_id catalog_revision errors_json } }`,
         variables: request.variables,

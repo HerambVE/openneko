@@ -1,5 +1,6 @@
 import { packUserConnectionHeaders, type ConnectionBinding } from "./pack-user-connections";
 import { randomUUID } from "node:crypto";
+import { Agent } from "undici";
 
 export type GraphjinQueryOptions = {
   connectionBindings?: ConnectionBinding[];
@@ -14,12 +15,26 @@ export type GraphjinQueryOptions = {
   role?: string;
   headers?: Record<string, string>;
   signal?: AbortSignal;
+  /**
+   * A gj_config preview or apply can rebuild GraphJin's runtime, which
+   * rediscovers every source. On a large schema that outlasts fetch's
+   * 5-minute wait for response headers.
+   */
+  longRunning?: boolean;
 };
 
 export type GraphjinQueryResult<T = unknown> = {
   data: T | null;
   errors?: Array<{ message: string; path?: (string | number)[] }>;
 };
+
+const longRunningTimeoutMs = 45 * 60_000;
+let longRunningAgent: Agent | undefined;
+
+function longRunningDispatcher(): Agent {
+  longRunningAgent ??= new Agent({ headersTimeout: longRunningTimeoutMs, bodyTimeout: longRunningTimeoutMs });
+  return longRunningAgent;
+}
 
 export async function graphjinQuery<T = unknown>(
   opts: GraphjinQueryOptions,
@@ -40,7 +55,8 @@ export async function graphjinQuery<T = unknown>(
       operationName: opts.operationName,
     }),
     signal: opts.signal,
-  });
+    ...(opts.longRunning ? { dispatcher: longRunningDispatcher() } : {}),
+  } as RequestInit);
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`graphjin query failed: ${res.status} ${text.slice(0, 500)}`);
