@@ -41,6 +41,14 @@ describe("GraphJin without config preview", () => {
     expect(message).toContain("cannot take pack saved queries and OpenAPI documents through its API");
   });
 
+  it("tells the operator to set a keystore key when GraphJin has none", () => {
+    const message = unsupportedGraphjinConfigApi([
+      "secrets.keystore.key must be set before setting secret config values or reading encrypted secret refs (sources.sierra_discourse); set secrets.keystore.key, for example with GJ_SECRETS_KEYSTORE_KEY, and retry",
+    ]);
+    expect(message).toContain("has no secrets keystore key");
+    expect(message).toContain("GJ_SECRETS_KEYSTORE_KEY");
+  });
+
   it("leaves other GraphJin errors alone", () => {
     expect(unsupportedGraphjinConfigApi(["stale catalog revision", null, undefined])).toBeNull();
     expect(unsupportedGraphjinConfigApi(["field 'customer_name' is not a column or a function"])).toBeNull();
