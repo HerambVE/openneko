@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { durablePackTables, unsupportedGraphjinConfigApi } from "../src/packs/graphjin-config";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { applyPackGraphjinConfigLive, durablePackTables, unsupportedGraphjinConfigApi } from "../src/packs/graphjin-config";
 
 describe("pack GraphJin config persistence", () => {
   it("keeps the live source-resolution hint out of durable YAML", () => {
@@ -55,3 +55,28 @@ describe("GraphJin without config preview", () => {
   });
 });
 
+
+describe("live pack GraphJin apply", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("leaves existing relationships alone when the pack declares none", async () => {
+    const mutations: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init: { body: string }) => {
+      const body = JSON.parse(init.body) as { query: string; variables?: unknown };
+      const respond = (data: unknown) => new Response(JSON.stringify({ data }), { headers: { "content-type": "application/json" } });
+      if (!body.query.startsWith("mutation")) {
+        return respond({ gj_config: { catalog_revision: "r1", sources: [], tables: [], relationships: [{ from: "a:s.t.c", to: "b:s.u.c" }], saved_queries: [] } });
+      }
+      mutations.push(JSON.stringify(body));
+      return respond({ gj_config: { valid: true, applied: true, preview_id: "p1", catalog_revision: "r2", errors_json: "[]" } });
+    }));
+
+    await applyPackGraphjinConfigLive({
+      target: { endpoint: "http://graphjin.test/api/v1/graphql", orgId: "org-1" },
+      update: { update_sources: [{ name: "forum", kind: "api" }], relationships: [] },
+    });
+
+    expect(mutations).toHaveLength(2);
+    for (const mutation of mutations) expect(mutation).not.toContain("relationships");
+  });
+});

@@ -61,13 +61,14 @@ describe("declarative pack configuration", () => {
   it("maps a bundled connector to the existing read-only GraphJin contract without mutating the pack", () => {
     const pack = bundle();
     const original = JSON.stringify(pack);
-    expect(declarativeGraphjinUpdate(pack, inputs, secrets, ["old_health"])).toMatchObject({
+    const update = declarativeGraphjinUpdate(pack, inputs, secrets, ["old_health"]);
+    expect(update).toMatchObject({
       update_sources: [{ name: "service_health", kind: "api", read_only: true, specs_dir: "/config/specs",
         access: { read: "authenticated", write: "blocked", delete: "blocked" },
         specs: { "service-health": { base_url: inputs["service.base_url"], auth: { scheme: "bearer", token: secrets["service.api_token"] } } } }],
       source_patches: [{ name: "old_health", access: { read: "blocked" } }],
-      relationships: [],
     });
+    expect(update).not.toHaveProperty("relationships");
     expect(JSON.stringify(pack)).toBe(original);
   });
 
