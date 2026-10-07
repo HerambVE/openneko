@@ -479,7 +479,10 @@ export function createRecordsGraphjinConfigValidator(options: {
   return async ({ configDirectory }) => {
     const version = await runGraphjin(binary, ["version"], { timeoutMs });
     if (!version.stdout.includes(`GraphJin ${expectedVersion}`)) {
-      throw new Error(`records GraphJin validator must be version ${expectedVersion}`);
+      const found = /GraphJin \S+/.exec(version.stdout)?.[0] ?? "no version";
+      throw new Error(
+        `records GraphJin validator must be version ${expectedVersion}; ${binary} reports ${found}`,
+      );
     }
     await runGraphjin(
       binary,

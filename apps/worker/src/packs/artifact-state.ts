@@ -166,7 +166,15 @@ async function graphjinConfigView(graphjin: GraphjinTarget): Promise<GraphjinCon
  * so a hash of the whole source would report drift that nobody made. The
  * spec document has its own artifact.
  */
-function stableLiveSource(source: Record<string, unknown>): Record<string, unknown> {
+export function liveSourceStateHash(source: Record<string, unknown>, lastAppliedHash?: string): string {
+  const current = canonicalHash(stableLiveSource(source));
+  if (!lastAppliedHash || current === lastAppliedHash) return current;
+  const legacy = canonicalHash(legacyStableLiveSource(source));
+  return legacy === lastAppliedHash ? legacy : current;
+}
+
+/** Receipts written before empty values were dropped hashed this shape. */
+function legacyStableLiveSource(source: Record<string, unknown>): Record<string, unknown> {
   const specs = source.specs && typeof source.specs === "object" ? source.specs as Record<string, Record<string, unknown>> : {};
   return {
     name: source.name ?? null,
@@ -181,18 +189,53 @@ function stableLiveSource(source: Record<string, unknown>): Record<string, unkno
   };
 }
 
+/**
+ * GraphJin reports an unset list as null after an apply and as [] after a
+ * restart reads its YAML. Drop empty values so both views hash the same.
+ * False and 0 stay: a capability set to false differs from a missing one.
+ */
+function withoutEmpty(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutEmpty);
+  if (!value || typeof value !== "object" || value instanceof Date) return value;
+  const out: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    const compact = withoutEmpty(entry);
+    if (compact === null || compact === undefined || compact === "") continue;
+    if (Array.isArray(compact) && compact.length === 0) continue;
+    if (typeof compact === "object" && !Array.isArray(compact) && Object.keys(compact).length === 0) continue;
+    out[key] = compact;
+  }
+  return out;
+}
+
+function stableLiveSource(source: Record<string, unknown>): Record<string, unknown> {
+  const specs = source.specs && typeof source.specs === "object" ? source.specs as Record<string, Record<string, unknown>> : {};
+  return {
+    name: source.name ?? null,
+    kind: source.kind ?? null,
+    read_only: source.read_only ?? null,
+    access: withoutEmpty(source.access ?? {}),
+    capabilities: source.capabilities ?? null,
+    specs: Object.fromEntries(Object.entries(specs).map(([key, spec]) => [key, {
+      base_url: spec.base_url ?? null,
+      operations: withoutEmpty(spec.operations ?? {}),
+    }])),
+  };
+}
+
 async function graphjinConfigState(
   graphjin: GraphjinTarget,
   kind: "source" | "relationships",
   targetRef: string,
   locator: PackArtifactLocator,
+  lastAppliedHash?: string,
 ): Promise<string | null> {
   const config = await graphjinConfigView(graphjin);
   if (!config) return null;
   if (kind === "source") {
     const source = config.sources?.find((value) => value.name === (locator.name ?? targetRef));
     if (!source) return null;
-    return canonicalHash(graphjin.mode === "api" ? stableLiveSource(source) : source);
+    return graphjin.mode === "api" ? liveSourceStateHash(source, lastAppliedHash) : canonicalHash(source);
   }
   const source = locator.source ?? targetRef;
   const tables = (config.tables ?? []).filter(
@@ -325,7 +368,9 @@ export async function inspectInstalledPackArtifactCurrent(input: {
   switch (input.kind) {
     case "source":
     case "relationships":
-      return input.graphjin ? graphjinConfigState(input.graphjin, input.kind, input.targetRef, locator) : null;
+      return input.graphjin
+        ? graphjinConfigState(input.graphjin, input.kind, input.targetRef, locator, input.lastAppliedHash)
+        : null;
     case "spec":
     case "saved_query": {
       if (!input.graphjin) return null;

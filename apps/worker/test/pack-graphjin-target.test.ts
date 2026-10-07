@@ -26,6 +26,14 @@ describe("pack GraphJin target", () => {
       .resolves.toMatchObject({ mode: "api", anonymous: true });
   });
 
+  it("reports whether the GraphJin has a secrets keystore key", async () => {
+    for (const [reported, expected] of [[true, true], [false, false], [undefined, undefined]] as const) {
+      graphjinQuery.mockResolvedValue({ data: { gj_config: { serv: { production: false, secrets_keystore_configured: reported } } } });
+      const target = await resolveGraphjinTarget({ endpoint: "http://gj:8080", orgId: "org" });
+      expect(target.mode === "api" && target.keystoreConfigured).toBe(expected ?? undefined);
+    }
+  });
+
   it("writes the shared config folder for a production GraphJin that OpenNeko manages", async () => {
     const configFile = join(await mkdtemp(join(tmpdir(), "gj-")), "agentic.yml");
     await writeFile(configFile, "sources: []\n");

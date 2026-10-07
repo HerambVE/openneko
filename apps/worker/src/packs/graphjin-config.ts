@@ -13,7 +13,7 @@ import {
   type GraphjinQueryResult,
 } from "@neko/llm/graphjin";
 
-import { graphjinAdminHeaders, readLiveGraphjinConfig, type LiveGraphjinConfig } from "./graphjin-target.js";
+import { GRAPHJIN_NO_KEYSTORE_MESSAGE, graphjinAdminHeaders, readLiveGraphjinConfig, type LiveGraphjinConfig } from "./graphjin-target.js";
 
 export type AppliedGraphjinConfig = {
   catalogRevision: string | null;
@@ -155,6 +155,10 @@ async function assertGraphjinSupervisor(configFile: string): Promise<void> {
  * OpenNeko asks for. Returns a message an administrator can act on, or null.
  */
 export function unsupportedGraphjinConfigApi(messages: ReadonlyArray<string | null | undefined>): string | null {
+  const noKeystore = messages.find((message) => message && /secrets\.keystore\.key must be set/i.test(message));
+  if (noKeystore) {
+    return GRAPHJIN_NO_KEYSTORE_MESSAGE;
+  }
   const noRemoteFiles = messages.find((message) => message && /gj_config\.(update_saved_queries|remove_saved_queries)' not found/i.test(message));
   if (noRemoteFiles) {
     return `This GraphJin cannot take pack saved queries and OpenAPI documents through its API. Upgrade GraphJin to 3.21.0 or later, then install the pack again. (GraphJin said: ${noRemoteFiles})`;

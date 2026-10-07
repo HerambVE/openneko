@@ -8,6 +8,17 @@ export type AgentBackendId = (typeof AGENT_BACKEND_IDS)[number];
 // gateway and model-provider quota.
 export const AGENT_DEFAULT_GLOBAL_CAP = 3;
 
+// Metric refreshes run in the background, each in its own sandbox. Two at a
+// time leaves sandbox room for chat on a small host.
+export const METRIC_REFRESH_DEFAULT_CAP = 2;
+
+/** Concurrent metric refreshes: OPENNEKO_METRIC_REFRESH_CONCURRENCY, else the default, never above globalCap. */
+export function metricRefreshConcurrency(globalCap: number, configured?: string): number {
+  const value = Number(configured);
+  const cap = configured?.trim() && Number.isInteger(value) && value >= 1 ? value : METRIC_REFRESH_DEFAULT_CAP;
+  return Math.max(1, Math.min(cap, globalCap));
+}
+
 export const AGENT_BACKEND_OPTIONS = [
   {
     value: "hermes",
