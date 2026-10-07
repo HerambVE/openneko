@@ -259,11 +259,15 @@ export function declarativeGraphjinUpdate(
     const value = artifact.content as { source: string; relationships: Array<{ left: string; right: string }> };
     return value.relationships.map(edge => ({ from: `${names[value.source] ?? value.source}:${edge.left}`, to: `${names[value.source] ?? value.source}:${edge.right}` }));
   });
+  const exposesSourceMutations = sources.some(source =>
+    Object.values((source.specs ?? {}) as Record<string, { operations?: Record<string, { expose_mutation?: boolean }> }>)
+      .some(spec => Object.values(spec.operations ?? {}).some(operation => operation.expose_mutation === true)));
   return {
-    ...(exposesMutations
+    ...(exposesMutations && exposesSourceMutations
       ? { roles: [{ name: "pack_api_executor", comment: "Short-lived executor for approved pack API actions" }] }
       : {}),
-    update_sources: sources, relationships,
+    update_sources: sources,
+    ...(relationships.length ? { relationships } : {}),
     ...(api?.savedQueries.length ? { update_saved_queries: api.savedQueries } : {}),
     ...(retiredSources.length ? { source_patches: retiredSources.map(name => ({ name, read_only: true, access: { read: "blocked", write: "blocked", delete: "blocked" } })) } : {}),
   };

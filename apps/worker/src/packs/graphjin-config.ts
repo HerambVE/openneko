@@ -264,8 +264,9 @@ export async function applyPackGraphjinConfig(input: {
           if (existingNames.has(String(table.name)) && !input.ownedTableNames.has(String(table.name))) throw new Error(`GraphJin table ${table.name} already exists and is not owned by this pack`);
         }
       }
+      const { relationships: _relationships, ...requestedUpdate } = input.update;
       const update = {
-        ...input.update,
+        ...requestedUpdate,
         ...(requestedRoles.length > 0
           ? {
               roles: mergeByKey(
@@ -540,8 +541,9 @@ export async function applyPackGraphjinConfigLive(input: {
           }
         }
       }
+      const { relationships: _relationships, ...update } = input.update;
       return {
-        ...input.update,
+        ...update,
         ...(requestedTables.length > 0 ? { tables: durablePackTables(requestedTables) } : {}),
         ...(input.sectionMode === "replace" && Object.hasOwn(input.update, "relationships")
           ? { relationships: requestedRelationships }
