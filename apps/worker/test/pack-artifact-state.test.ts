@@ -42,7 +42,7 @@ describe("pack materialized state", () => {
 
   it("hashes a live GraphJin source the same after a restart fills empty lists", () => {
     const applied = {
-      name: "sierra_discourse",
+      name: "forum_api",
       kind: "api",
       read_only: true,
       password: "[REDACTED]",
