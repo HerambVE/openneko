@@ -43,7 +43,7 @@ describe("GraphJin without config preview", () => {
 
   it("tells the operator to set a keystore key when GraphJin has none", () => {
     const message = unsupportedGraphjinConfigApi([
-      "secrets.keystore.key must be set before setting secret config values or reading encrypted secret refs (sources.sierra_discourse); set secrets.keystore.key, for example with GJ_SECRETS_KEYSTORE_KEY, and retry",
+      "secrets.keystore.key must be set before setting secret config values or reading encrypted secret refs (sources.forum_api); set secrets.keystore.key, for example with GJ_SECRETS_KEYSTORE_KEY, and retry",
     ]);
     expect(message).toContain("has no secrets keystore key");
     expect(message).toContain("GJ_SECRETS_KEYSTORE_KEY");
