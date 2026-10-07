@@ -13,7 +13,7 @@ import {
   type GraphjinQueryResult,
 } from "@neko/llm/graphjin";
 
-import { graphjinAdminHeaders, readLiveGraphjinConfig, type LiveGraphjinConfig } from "./graphjin-target.js";
+import { GRAPHJIN_NO_KEYSTORE_MESSAGE, graphjinAdminHeaders, readLiveGraphjinConfig, type LiveGraphjinConfig } from "./graphjin-target.js";
 
 export type AppliedGraphjinConfig = {
   catalogRevision: string | null;
@@ -157,7 +157,7 @@ async function assertGraphjinSupervisor(configFile: string): Promise<void> {
 export function unsupportedGraphjinConfigApi(messages: ReadonlyArray<string | null | undefined>): string | null {
   const noKeystore = messages.find((message) => message && /secrets\.keystore\.key must be set/i.test(message));
   if (noKeystore) {
-    return "The connected GraphJin has no secrets keystore key, so it cannot store this pack's credentials. Set secrets.keystore.key in that GraphJin's config, for example with GJ_SECRETS_KEYSTORE_KEY, restart GraphJin, then install the pack again.";
+    return GRAPHJIN_NO_KEYSTORE_MESSAGE;
   }
   const noRemoteFiles = messages.find((message) => message && /gj_config\.(update_saved_queries|remove_saved_queries)' not found/i.test(message));
   if (noRemoteFiles) {

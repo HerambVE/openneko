@@ -66,7 +66,7 @@ import {
 import { assertNativeTargetsAvailable } from "./native-targets.js";
 import { enqueuePackMetricRefreshes, runMagentoAnalyticsSmoke, runPackReadPreflight } from "./preflight.js";
 import { applyPackGraphjinConfig, applyPackGraphjinConfigLive } from "./graphjin-config.js";
-import { readLiveGraphjinConfig, resolveGraphjinTarget, type GraphjinTarget } from "./graphjin-target.js";
+import { GRAPHJIN_NO_KEYSTORE_MESSAGE, readLiveGraphjinConfig, resolveGraphjinTarget, type GraphjinTarget } from "./graphjin-target.js";
 import {
   runMagentoPreflight,
   type MagentoPreflightResult,
@@ -321,6 +321,14 @@ export class PackService {
     });
   }
 
+  /** Fails review when the GraphJin says it cannot store the pack's secrets. */
+  private async assertGraphjinKeystore(selection: NonNullable<PackRuntime["source"]>): Promise<void> {
+    const target = await resolvePackSource(this.orgId, selection)
+      .then((source) => this.graphjinTarget(source.graphqlUrl))
+      .catch(() => null);
+    if (target?.mode === "api" && target.keystoreConfigured === false) throw new Error(GRAPHJIN_NO_KEYSTORE_MESSAGE);
+  }
+
   private async installedGraphjinTarget(config: Record<string, unknown>): Promise<GraphjinTarget | null> {
     const selection = storedRuntime(config)?.source;
     if (!selection) return null;
@@ -345,6 +353,9 @@ export class PackService {
       const bound = bindPackQueries(bundle, runtime.bindings);
       runtime.tables = [...new Map([...(storedRuntime(existing?.config ?? {})?.tables ?? []), ...bound.tables].map(table => [table.name, table])).values()];
       declarativeGraphjinUpdate(bound.bundle, inputs, secrets.values, [], runtime.bindings);
+      if (bundle.manifest.artifacts.graphjin && Object.keys(secrets.values).length && runtime.source) {
+        await this.assertGraphjinKeystore(runtime.source);
+      }
     }
     const plan = await this.planBundle(bundle);
     await assertNativeTargetsAvailable({ orgId: this.orgId, bundle, plan });

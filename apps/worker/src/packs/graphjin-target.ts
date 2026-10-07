@@ -13,8 +13,12 @@ import { graphjinQuery, mintGraphjinToken } from "@neko/llm/graphjin";
  *   shares with its own GraphJin.
  */
 export type GraphjinTarget =
-  | { mode: "api"; endpoint: string; orgId: string; anonymous: boolean }
+  // keystoreConfigured is undefined when the GraphJin does not report it.
+  | { mode: "api"; endpoint: string; orgId: string; anonymous: boolean; keystoreConfigured?: boolean }
   | { mode: "files"; endpoint: string; orgId: string; configFile: string };
+
+export const GRAPHJIN_NO_KEYSTORE_MESSAGE =
+  "The connected GraphJin has no secrets keystore key, so it cannot store this pack's credentials. Set secrets.keystore.key in that GraphJin's config, for example with GJ_SECRETS_KEYSTORE_KEY, restart GraphJin, then install the pack again.";
 
 export function graphjinAdminHeaders(orgId: string, userId = "pack-installer"): Record<string, string> {
   return {
@@ -27,7 +31,7 @@ export async function resolveGraphjinTarget(input: {
   orgId: string;
   configFile?: string;
 }): Promise<GraphjinTarget> {
-  type Serv = { production?: boolean; auth?: { type?: string } };
+  type Serv = { production?: boolean; auth?: { type?: string }; secrets_keystore_configured?: boolean };
   const result = await graphjinQuery<{ gj_config?: { serv?: Serv | string } | Array<{ serv?: Serv | string }> }>({
     baseUrl: input.endpoint,
     configurationOnly: true,
@@ -45,7 +49,8 @@ export async function resolveGraphjinTarget(input: {
   if (serv.production !== true) {
     // A GraphJin without auth sees OpenNeko as anonymous whatever token it sends.
     const authType = String(serv.auth?.type ?? "").trim().toLowerCase();
-    return { mode: "api", endpoint: input.endpoint, orgId: input.orgId, anonymous: authType === "" || authType === "none" };
+    const keystoreConfigured = typeof serv.secrets_keystore_configured === "boolean" ? serv.secrets_keystore_configured : undefined;
+    return { mode: "api", endpoint: input.endpoint, orgId: input.orgId, anonymous: authType === "" || authType === "none", keystoreConfigured };
   }
   const configFile = input.configFile?.trim();
   if (configFile && (await access(configFile).then(() => true, () => false))) {
