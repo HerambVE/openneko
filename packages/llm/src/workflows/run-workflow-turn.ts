@@ -347,7 +347,6 @@ async function runWorkflowTurnTraced(
     persistedText = valueFence.text;
     const analysisMinutes = clampAnalysisMinutes(valueFence.payload?.minutes_saved);
 
-    await finishWorkRun(workRunId, result.status, result.error ?? null);
     if (valueFence.payload) {
       try {
         await setWorkRunValue(workRunId, {
@@ -381,6 +380,8 @@ async function runWorkflowTurnTraced(
       });
     }
 
+    await finishWorkRun(workRunId, result.status, result.error ?? null);
+
     await wrappedEmit({
       type: "done",
       result: { status: result.status, minutesSaved: analysisMinutes ?? 0 },
@@ -401,13 +402,13 @@ async function runWorkflowTurnTraced(
         outcome: "needs_input",
         usageMissingReason: "workflow paused for operator input",
       });
-      await finishWorkRun(workRunId, "failed", null);
       await startupPhase("workflow.persist_result", async () => finishWorkflowRun({
         workflowRunId: workflowRun.id,
         status: "needs_input",
         summary: assistantText.slice(0, 4000) || null,
         error: null,
       }));
+      await finishWorkRun(workRunId, "failed", null);
       await wrappedEmit({ type: "done", result: { status: "needs_input" } });
       return {
         status: "needs_input",
@@ -441,13 +442,13 @@ async function runWorkflowTurnTraced(
     });
 
     await wrappedEmit({ type: "error", message: errMsg });
-    await finishWorkRun(workRunId, status, aborted ? null : errMsg);
     await startupPhase("workflow.persist_result", async () => finishWorkflowRun({
       workflowRunId: workflowRun.id,
       status,
       summary: assistantText.slice(0, 4000) || null,
       error: aborted ? null : errMsg,
     }));
+    await finishWorkRun(workRunId, status, aborted ? null : errMsg);
     await wrappedEmit({ type: "done", result: { status } });
     if (!aborted && !spendStop) throw error;
     return {

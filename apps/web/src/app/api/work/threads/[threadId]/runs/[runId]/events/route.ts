@@ -71,6 +71,8 @@ async function getEvents(request: NextRequest, context: RouteContext) {
       let firstOutput = true;
       let closed = false;
       let lastSentId = afterId;
+      let hasSentDone = false;
+      let terminalDetectedAt = 0;
       const sentIds = new Set<number>();
 
       const safeEnqueue = (chunk: Uint8Array): void => {
@@ -91,6 +93,7 @@ async function getEvents(request: NextRequest, context: RouteContext) {
         if (firstEvent) { firstEvent = false; startupEvent("sse.first_event", { durationMs: performance.now() - started, afterId }); }
         if (firstOutput && ((event.type === "message" && event.role === "assistant" && event.content) || event.type === "surface")) { firstOutput = false; startupEvent("sse.first_output", { durationMs: performance.now() - started, afterId }); }
         if (id > lastSentId) lastSentId = id;
+        if (event.type === "done") hasSentDone = true;
       };
 
       request.signal.addEventListener(
@@ -149,6 +152,10 @@ async function getEvents(request: NextRequest, context: RouteContext) {
             sendIfNew(event, id);
           }
 
+          if (hasSentDone) {
+            break;
+          }
+
           const current = await getWorkRun(orgId, runId);
           if (
             current &&
@@ -157,10 +164,10 @@ async function getEvents(request: NextRequest, context: RouteContext) {
               current.status === "cancelled" ||
               current.status === "needs_input")
           ) {
-            const tail = await getWorkRunEventsAfter(orgId, runId, lastSentId);
-            for (const { id, event } of tail) {
-              sendIfNew(event, id);
-            }
+            if (terminalDetectedAt === 0) terminalDetectedAt = Date.now();
+          }
+
+          if (terminalDetectedAt > 0 && Date.now() - terminalDetectedAt > 5_000) {
             break;
           }
 
