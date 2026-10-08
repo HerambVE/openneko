@@ -7,6 +7,7 @@ import {
   buildRecordImportPlan,
   getRecordImportRun,
   normalizeRecordImportSourcePath,
+  recordImportActionPayload,
   type RecordImportPlan,
   type RecordImportStatus,
 } from "@neko/records";
@@ -246,22 +247,6 @@ export async function previewRecordImport(input: {
   });
 }
 
-function importPayload(plan: RecordImportPlan): Record<string, unknown> {
-  return {
-    app: plan.appId,
-    object: plan.objectApiName,
-    source_path: plan.source.path,
-    source_name: plan.source.name,
-    duplicate_key: plan.duplicateKey,
-    batch_size: plan.batchSize,
-    owner_user_id: plan.ownerUserId,
-    mapping: Object.fromEntries(
-      plan.columns.map((column) => [column.sourceColumn, column.targetField]),
-    ),
-    import_plan: plan,
-  };
-}
-
 async function executeApprovedImportControl(input: {
   orgId: string;
   kind: "records_import_start" | "records_import_cancel";
@@ -351,7 +336,7 @@ export async function startRecordImportFromWeb(input: {
     orgId: input.orgId,
     kind: "records_import_start",
     target: `record-import:${input.plan.appId}/${input.plan.objectApiName}`,
-    payload: importPayload(input.plan),
+    payload: recordImportActionPayload(input.plan),
     summary: `Import ${input.plan.rowCount.toLocaleString("en")} rows from ${input.plan.source.name} into ${input.plan.objectApiName}`,
   });
   return {

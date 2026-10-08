@@ -210,6 +210,29 @@ export function verifyRecordImportPlanHash(plan: RecordImportPlan): void {
   }
 }
 
+/**
+ * The records_import_start action payload for an approved plan. The worker
+ * rebuilds the plan from the staged file, so the payload carries only inputs.
+ */
+export function recordImportActionPayload(plan: RecordImportPlan): Record<string, unknown> {
+  const emptyTextColumns = plan.columns
+    .filter((column) => column.emptyText)
+    .map((column) => column.sourceColumn);
+  return {
+    app: plan.appId,
+    object: plan.objectApiName,
+    source_path: plan.source.path,
+    source_name: plan.source.name,
+    duplicate_key: plan.duplicateKey,
+    batch_size: plan.batchSize,
+    owner_user_id: plan.ownerUserId,
+    mapping: Object.fromEntries(
+      plan.columns.map((column) => [column.sourceColumn, column.targetField]),
+    ),
+    ...(emptyTextColumns.length > 0 ? { empty_text_columns: emptyTextColumns } : {}),
+  };
+}
+
 /** Build the human-reviewable mapping bound to the eventual import action. */
 export function buildRecordImportPlan(input: {
   snapshot: AppRegistrySnapshot;
