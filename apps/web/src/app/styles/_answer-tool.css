@@ -57,7 +57,6 @@
   min-height: 120px;
   border: 0;
   background: var(--card);
-  transition: height 160ms ease;
 }
 
 .work-tool-loading {
@@ -78,7 +77,7 @@
 .work-tool[data-state="ready"] .work-tool-frame,
 .work-tool[data-state="silent"] .work-tool-frame {
   opacity: 1;
-  transition: opacity 160ms ease, height 160ms ease;
+  transition: opacity 160ms ease;
 }
 
 .work-tool-message {
