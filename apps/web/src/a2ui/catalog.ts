@@ -42,6 +42,11 @@ export const ComponentTypes = {
   Conditional: "Conditional",
   OpenApiSpecInput: "OpenApiSpecInput",
   ManagedFileSourceInput: "ManagedFileSourceInput",
+  Compare: "Compare",
+  WhatIf: "WhatIf",
+  AnswerMap: "AnswerMap",
+  Diagram: "Diagram",
+  AnswerTool: "AnswerTool",
   // Dashboard / back-compat aliases (same renderers):
   Briefing: "Briefing",
   BriefingCard: "BriefingCard",
@@ -70,6 +75,7 @@ export interface ChartProps {
   baselineLabel?: string;
   source?: string;
   asOf?: string;
+  drill?: string;
 }
 
 // --- Component Property Schemas ---
@@ -90,6 +96,8 @@ export interface AnswerProps {
   title: string;
   subtitle?: string;
   eyebrow?: string;
+  /** "draft" while the agent is still checking the figures. */
+  stage?: "draft" | "final";
   children: string[]; // ids of body components, in display order
 }
 
@@ -123,6 +131,86 @@ export interface TableProps {
   columns: TableColumn[];
   rows: Record<string, string | number>[];
   caption?: string;
+  drill?: string;
+}
+
+/**
+ * A follow-up question for one row, point, place, or step. `{label}` is
+ * replaced with the item's name before the question is sent.
+ */
+export type DrillTemplate = string;
+
+/** Table rows as side-by-side panels, one panel per row. */
+export interface CompareProps {
+  component: "Compare";
+  columns: TableColumn[];
+  rows: Record<string, string | number>[];
+  drill?: DrillTemplate;
+}
+
+export interface WhatIfControl {
+  name: string;
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  unit?: string;
+}
+
+export interface WhatIfOutput {
+  label: string;
+  unit?: string;
+  expression: string;
+}
+
+/** Controls the reader moves; outputs recompute in the browser. */
+export interface WhatIfProps {
+  component: "WhatIf";
+  controls: WhatIfControl[];
+  values: Record<string, number>;
+  outputs: WhatIfOutput[];
+}
+
+export interface MapPoint {
+  label: string;
+  lat: number;
+  lon: number;
+  v: number;
+}
+
+export interface AnswerMapProps {
+  component: "AnswerMap";
+  title: string;
+  valueLabel: string;
+  points: MapPoint[];
+  drill?: DrillTemplate;
+}
+
+export interface DiagramNode {
+  id: string;
+  label: string;
+}
+
+export interface DiagramEdge {
+  from: string;
+  to: string;
+  label?: string;
+}
+
+export interface DiagramProps {
+  component: "Diagram";
+  title: string;
+  nodes: DiagramNode[];
+  edges: DiagramEdge[];
+  drill?: DrillTemplate;
+}
+
+/** A self-contained HTML tool shown in an isolated frame. */
+export interface AnswerToolProps {
+  component: "AnswerTool";
+  title: string;
+  html: string;
 }
 
 export interface SectionProps {
@@ -289,4 +377,9 @@ export type ComponentProps =
   | ChoicePickerProps
   | ConditionalProps
   | OpenApiSpecInputProps
-  | ManagedFileSourceInputProps;
+  | ManagedFileSourceInputProps
+  | CompareProps
+  | WhatIfProps
+  | AnswerMapProps
+  | DiagramProps
+  | AnswerToolProps;

@@ -4,7 +4,9 @@ import { acknowledgeWorkStartup, markWorkStartup } from "@/lib/work-startup-timi
 
 import "@/a2ui/components";
 import {
+  AlignLeft,
   ArrowUp,
+  ChartNoAxesColumn,
   Check,
   Copy,
   ChevronsDownUp,
@@ -394,17 +396,32 @@ export default function WorkScreen() {
   const endRef = useRef<HTMLDivElement | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const [reasoningExpanded, setReasoningExpanded] = useState(false);
+  const [visualsOff, setVisualsOff] = useState(false);
+  const visualsOffRef = useRef(false);
   useEffect(() => {
     // Read after hydration so the server and first client render agree.
     const id = window.setTimeout(() => {
       try {
         setReasoningExpanded(window.localStorage.getItem(REASONING_STORAGE_KEY) === "expanded");
+        const off = window.localStorage.getItem(VISUALS_STORAGE_KEY) === "text";
+        visualsOffRef.current = off;
+        setVisualsOff(off);
       } catch {
         // Storage can be unavailable; reasoning then starts collapsed.
       }
     }, 0);
     return () => window.clearTimeout(id);
   }, []);
+  const toggleVisuals = () => {
+    const off = !visualsOffRef.current;
+    visualsOffRef.current = off;
+    setVisualsOff(off);
+    try {
+      window.localStorage.setItem(VISUALS_STORAGE_KEY, off ? "text" : "rich");
+    } catch {
+      // The choice still applies to this page.
+    }
+  };
   const toggleReasoning = () => {
     setReasoningExpanded((expanded) => {
       try {
@@ -970,7 +987,7 @@ export default function WorkScreen() {
     // the truncated thread first, and that reload clears `sending` when no
     // earlier run remains in flight.
     setSending(true);
-    const body = JSON.stringify({ message });
+    const body = JSON.stringify({ message, ...(visualsOffRef.current ? { visuals: "text" } : {}) });
     const res = await fetch(`/api/work/threads/${threadId}/runs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1349,6 +1366,7 @@ export default function WorkScreen() {
                     pending={isPending}
                     fallbackContent={message.content}
                     reasoningExpanded={reasoningExpanded}
+                    textOnly={visualsOff}
                   />
                 </div>
               );
@@ -1675,6 +1693,17 @@ export default function WorkScreen() {
                 disabled={sending || files.length >= MAX_ATTACHMENTS}
               >
                 <Paperclip size={15} strokeWidth={2} />
+              </IconButton>
+              <IconButton
+                label={visualsOff ? "Visual answers are off" : "Visual answers are on"}
+                size="icon-sm"
+                variant="ghost"
+                className="work-icon-btn"
+                onClick={toggleVisuals}
+                aria-pressed={!visualsOff}
+                title={visualsOff ? "Answers come as text. Select to turn on charts, maps, and tools." : "Answers can include charts, maps, and tools. Select to answer in text."}
+              >
+                {visualsOff ? <AlignLeft size={15} strokeWidth={2} /> : <ChartNoAxesColumn size={15} strokeWidth={2} />}
               </IconButton>
               <span className="work-composer-hint" aria-live="polite">
                 {sending ? (
@@ -2754,7 +2783,7 @@ export function ProviderProgress({
       <Disclosure title={<span className="font-normal text-text2">{progressPreview(content)}</span>} meta="Progress" className="work-progress-disclosure">
         <div className="work-markdown px-3.5 pb-3">
           <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
-            {linkifyWorkspacePaths(content)}
+            {linkifyWorkspacePaths(readableTrace(content))}
           </ReactMarkdown>
         </div>
       </Disclosure>
@@ -2772,7 +2801,7 @@ export function ProviderProgress({
         <span className="work-progress-summary-label">Progress</span>
         <div className="work-markdown">
           <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
-            {linkifyWorkspacePaths(content)}
+            {linkifyWorkspacePaths(readableTrace(content))}
           </ReactMarkdown>
         </div>
       </div>
@@ -2859,10 +2888,21 @@ export function splitProgressSections(content: string): ProgressSection[] {
 
 const TRAIL_KINDS = new Set<TimelineItem["kind"]>(["progress", "tools", "interim"]);
 const REASONING_STORAGE_KEY = "openneko.work.reasoning";
+const VISUALS_STORAGE_KEY = "openneko.work.visuals";
+
+const INTERNAL_TOOL = /`?\b(?:mcp_{1,2})?neko_{1,2}([a-z]+)_([a-z_]+)\b`?/g;
+
+/** Reasoning notes name tools by their internal ids; show readers plain names. */
+export function readableTrace(content: string): string {
+  return content
+    .replace(/`?\b(?:mcp_{1,2}neko_{1,2}ui_)?render_cards\b`?/g, "the answer card")
+    .replace(INTERNAL_TOOL, (_match, _server: string, tool: string) => `the ${tool.replaceAll("_", " ")} tool`)
+    .replace(/`?"?\bminutes_saved\b"?`?/g, "the time-saved estimate");
+}
 
 /** The first line of a reasoning note, without markdown markers, for its collapsed row. */
 export function progressPreview(content: string): string {
-  const line = content
+  const line = readableTrace(content)
     .split("\n")
     .map((text) => text.replace(/^[#>\-\s]+/, "").replace(/[*_`]+/g, "").trim())
     .find(Boolean) ?? "Progress";
@@ -2919,6 +2959,7 @@ function RunTimeline({
   pending,
   fallbackContent,
   reasoningExpanded,
+  textOnly = false,
 }: {
   threadId: string;
   run: RunRecord | null;
@@ -2927,13 +2968,23 @@ function RunTimeline({
   fallbackContent: string;
   /** Show every reasoning note and tool call in full, in every run. */
   reasoningExpanded: boolean;
+  /** The reader turned visual answers off: leave out the key figures built from the run summary. */
+  textOnly?: boolean;
 }) {
   const { insertComposerRef } = useWorkShell();
-  const presentation = useMemo(
-    () => buildRunTimeline(events, run?.id ?? "pending"),
-    [events, run?.id],
-  );
+  const presentation = useMemo(() => {
+    const built = buildRunTimeline(events, run?.id ?? "pending");
+    if (!textOnly) return built;
+    const summarySurface = `answer-${run?.id ?? "pending"}`;
+    return {
+      ...built,
+      items: built.items.filter((item) => item.kind !== "surface" || surfaceIdOf(item.messages) !== summarySurface),
+    };
+  }, [events, run?.id, textOnly]);
   const hasSurface = presentation.items.some((item) => item.kind === "surface");
+  const hasChoice = presentation.items.some((item) =>
+    item.kind === "surface" && [...surfaceComponents(item.messages).values()].some((component) => component.component === "Choice"),
+  );
   const hasText = presentation.items.some((item) => item.kind === "text");
   const hasError = presentation.items.some((item) => item.kind === "error");
   const fallbackFailure = presentWorkFailure(fallbackContent);
@@ -2948,7 +2999,7 @@ function RunTimeline({
       : "";
   const persistedVitals = useMemo(
     () =>
-      !pending && !hasSurface
+      !pending && !hasSurface && !textOnly
         ? fallbackAnswerSurface(
             run?.id ?? "persisted",
             "",
@@ -2960,6 +3011,7 @@ function RunTimeline({
     [
       hasSurface,
       pending,
+      textOnly,
       presentation.items,
       presentation.sources,
       presentation.vitals,
@@ -3045,9 +3097,8 @@ function RunTimeline({
     }
     return <WorkFailureNotice key={`error-${index}`} message={item.message} />;
   };
-  // A finished answer folds its working trail (reasoning, tool calls and
-  // interim notes) into one row, so the answer leads. Its last reasoning note
-  // stays open beside the answer.
+  // A finished answer folds its whole working trail (reasoning, tool calls
+  // and interim notes) into one row, so the answer leads.
   const trail = presentation.items
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => TRAIL_KINDS.has(item.kind));
@@ -3057,11 +3108,9 @@ function RunTimeline({
     <div className="work-timeline flex flex-col gap-2.5 mt-1">
       {foldTrail ? (
         <WorkTrail run={run} items={trail.map(({ item }) => item)}>
-          {trail.filter(({ index }) => index !== lastProgress).map(({ item, index }) => renderItem(item, index))}
+          {trail.map(({ item, index }) => renderItem(item, index))}
         </WorkTrail>
       ) : null}
-      {/* The last reasoning note stays open above the answer. */}
-      {foldTrail && lastProgress >= 0 ? renderItem(presentation.items[lastProgress]!, lastProgress) : null}
       {presentation.items.map((item, index) =>
         foldTrail && TRAIL_KINDS.has(item.kind) ? null : renderItem(item, index),
       )}
@@ -3096,7 +3145,7 @@ function RunTimeline({
           run={run}
           sources={presentation.sources}
           artifacts={presentation.artifacts}
-          followups={presentation.followups}
+          followups={hasChoice ? [] : presentation.followups}
           onFollowup={(prompt) => insertComposerRef.current?.(prompt)}
         />
       ) : null}

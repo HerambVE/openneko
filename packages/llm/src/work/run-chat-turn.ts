@@ -93,6 +93,8 @@ export type RunChatTurnOptions = {
   message: string;
   /** Delivery channel; defaults to "web". Gates output rendering. */
   channel?: RunChannel;
+  /** "text" answers in prose only, for readers who switch answer visuals off. */
+  visuals?: "rich" | "text";
   /** Efficacy evals disable the work UX metadata blocks. Defaults to true. */
   includeUxMetadata?: boolean;
   emit: (event: AgentEvent) => Promise<void>;
@@ -396,7 +398,9 @@ async function runChatTurnTraced(
     const RENDERING_CHANNELS = new Set(["web", "telegram"]);
     const customerSurface = dataSurface === "customer";
     const channelWantsCards = RENDERING_CHANNELS.has(opts.channel ?? "web");
-    const wantsCards = customerSurface && channelWantsCards;
+    const visualsOff = opts.visuals === "text";
+    const wantsCards = customerSurface && channelWantsCards && !visualsOff;
+    const richCards = wantsCards && (opts.channel ?? "web") === "web";
     const supportsCardTool = customerSurface && backend.capabilities.mcpTools;
     const supportsClarificationTool = backend.capabilities.mcpTools;
     const supportsSkillTool = customerSurface && backend.capabilities.mcpTools;
@@ -514,6 +518,7 @@ async function runChatTurnTraced(
       wantsCards,
       includeUxMetadata: opts.includeUxMetadata,
       supportsCardTool,
+      richCards,
       supportsSkillTool,
       supportsMemoryTool,
       supportsWorkflowTool,
@@ -572,6 +577,7 @@ async function runChatTurnTraced(
       // Work chat, including records-scoped app chat. Generated answer-card
       // vocabulary remains gated separately in the prompt above.
       wantsCards: channelWantsCards,
+      cardSchema: visualsOff ? "none" : richCards ? "rich" : "core",
       emit: wrappedEmit,
       signal,
     });

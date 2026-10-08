@@ -18,6 +18,7 @@ import {
   db,
   eq,
   metric,
+  inArray,
   pool,
   processing_job,
   sql,
@@ -449,6 +450,23 @@ describeIfDb("reconcileStaleRuns", () => {
       .from(workflow_run)
       .where(eq(workflow_run.id, wfRun!.id));
     expect(wfr[0]?.status).toBe("cancelled");
+  });
+
+  it("at boot cancels the worker's own running runs and leaves web chat runs to the web", async () => {
+    const workerRun = await insertRunningRun(new Date());
+    const chatRun = await insertRunningRun(new Date());
+    await pool().query(
+      `insert into spend_reservation (org_id, work_run_id, source, reserved_micros, created_at) values ($1, $2, 'chat', 0, now())`,
+      [orgId, chatRun.workRunId],
+    );
+    await reconcileStaleRuns({ workerOwnedOnly: true });
+    const statuses = await db()
+      .select({ id: work_run.id, status: work_run.status })
+      .from(work_run)
+      .where(inArray(work_run.id, [workerRun.workRunId, chatRun.workRunId]));
+    const byId = Object.fromEntries(statuses.map((row) => [row.id, row.status]));
+    expect(byId[workerRun.workRunId]).toBe("cancelled");
+    expect(byId[chatRun.workRunId]).toBe("running");
   });
 
   it("leaves a recently-updated running run alone (respects minAgeMs)", async () => {

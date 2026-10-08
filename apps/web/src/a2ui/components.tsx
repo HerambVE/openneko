@@ -60,6 +60,12 @@ import type {
 } from "./catalog";
 import BriefingCard from "@/components/BriefingCard";
 import Chart from "@/components/Chart";
+import { displayFigure } from "./answer-format";
+import { drillInto, drillPrompt } from "./drill";
+import "./answer-blocks";
+import "./answer-diagram";
+import "./answer-map";
+import "./answer-tool";
 
 // ─── Answer / Briefing root ───
 // The card frame for a conversational answer (Answer) and the dashboard's daily
@@ -73,12 +79,19 @@ function surfaceFrame(
     eyebrow?: string;
     title?: string;
     subtitle?: string;
+    draft?: boolean;
     childIds: string[];
   },
   ctx: RenderContext,
 ) {
   return (
-    <div key={opts.id} className="work-surface">
+    <div key={opts.id} className="work-surface" data-stage={opts.draft ? "draft" : undefined}>
+      {opts.draft ? (
+        <div className="answer-draft-note" role="status">
+          <span className="answer-draft-pulse" aria-hidden="true" />
+          Early figures · OpenNeko is still checking
+        </div>
+      ) : null}
       {opts.eyebrow ? (
         <div
           className="work-surface-eyebrow"
@@ -117,6 +130,7 @@ registerComponent("Answer", (comp: A2UIComponent, ctx: RenderContext) => {
       eyebrow: props.eyebrow,
       title: props.title,
       subtitle: props.subtitle,
+      draft: props.stage === "draft",
       childIds: bodyChildIds(ctx.surface, comp),
     },
     ctx,
@@ -211,7 +225,7 @@ registerComponent("KeyFigures", (comp: A2UIComponent) => {
           return (
             <div className="work-key-figure" key={`${item.label}-${index}`}>
               <dt>{item.label}</dt>
-              <dd>{item.value}</dd>
+              <KeyFigureValue value={item.value} />
               {item.sub ? (
                 <div className="work-key-figure-sub">{item.sub}</div>
               ) : null}
@@ -227,6 +241,17 @@ registerComponent("KeyFigures", (comp: A2UIComponent) => {
     </section>
   );
 });
+
+function KeyFigureValue({ value }: { value: string }) {
+  const { display, exact } = displayFigure(value);
+  if (!exact) return <dd>{value}</dd>;
+  return (
+    <dd title={exact}>
+      <span aria-hidden="true">{display}</span>
+      <span className="sr-only">{exact}</span>
+    </dd>
+  );
+}
 
 // ─── MetricCard / BriefingCard ───
 // One KPI card, two names: MetricCard in a work/Ask Answer, BriefingCard on the
@@ -271,8 +296,9 @@ registerComponent("BriefingCard", renderMetricCard);
 
 // An answer chart uses the Briefing visualization without the saved-metric
 // lifecycle, mood, or card actions. Exact values remain available to readers.
-registerComponent("Chart", (comp: A2UIComponent) => {
+registerComponent("Chart", (comp: A2UIComponent, ctx: RenderContext) => {
   const props = comp as unknown as ChartProps & { id: string };
+  const drill = typeof props.drill === "string" && props.drill.includes("{label}") ? props.drill : undefined;
   const data = Array.isArray(props.data) ? props.data : [];
   const validPoints = data.every((point) =>
     point && typeof point.d === "string" && point.d.trim() &&
@@ -298,6 +324,8 @@ registerComponent("Chart", (comp: A2UIComponent) => {
         h={220}
         valueLabel={props.valueLabel}
         baselineLabel={props.baselineLabel}
+        maxBarSize={44}
+        onSelect={drill ? (label) => drillInto(ctx, props.id, drill, label) : undefined}
       />
       <table className="sr-only">
         <caption>{props.title} values</caption>
@@ -334,12 +362,13 @@ registerComponent("Chart", (comp: A2UIComponent) => {
 // Structured tabular data. Tables used to only exist as Markdown GFM, which
 // can't carry alignment or survive a non-web channel; this is a first-class
 // component the agent addresses by columns + rows.
-registerComponent("Table", (comp: A2UIComponent) => {
+registerComponent("Table", (comp: A2UIComponent, ctx: RenderContext) => {
   const props = comp as unknown as TableProps & { id: string };
   const columns = Array.isArray(props.columns) ? props.columns : [];
   const rows = Array.isArray(props.rows) ? props.rows : [];
+  const firstKey = columns[0]?.key;
   return (
-    <div key={props.id} className="work-table-wrap">
+    <div key={props.id} className="work-table-wrap" data-columns={columns.length}>
       {props.caption ? (
         <div className="work-table-caption">{props.caption}</div>
       ) : null}
@@ -357,18 +386,33 @@ registerComponent("Table", (comp: A2UIComponent) => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((row, r) => (
-            <TableRow key={r}>
-              {columns.map((col) => (
-                <TableCell
-                  key={col.key}
-                  style={col.align ? { textAlign: col.align } : undefined}
-                >
-                  {String(row[col.key] ?? "")}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
+          {rows.map((row, r) => {
+            const name = firstKey ? String(row[firstKey] ?? "") : "";
+            const drill = name ? drillPrompt(props.drill, name) : null;
+            return (
+              <TableRow key={r} data-drill={drill ? "" : undefined}>
+                {columns.map((col, c) => (
+                  <TableCell
+                    key={col.key}
+                    style={col.align ? { textAlign: col.align } : undefined}
+                  >
+                    {c === 0 && drill ? (
+                      <Button
+                        variant="ghost"
+                        className="work-table-drill"
+                        title={drill}
+                        onClick={() => drillInto(ctx, props.id, props.drill, name)}
+                      >
+                        {name}
+                      </Button>
+                    ) : (
+                      String(row[col.key] ?? "")
+                    )}
+                  </TableCell>
+                ))}
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>

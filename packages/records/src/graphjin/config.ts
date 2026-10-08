@@ -9,6 +9,7 @@ import {
   stat,
   unlink,
 } from "node:fs/promises";
+import { hostname } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { stringify } from "yaml";
 import {
@@ -25,6 +26,9 @@ const CONFIG_MODE = 0o600;
 const LOCK_MODE = 0o600;
 const DIRECTORY_MODE = 0o700;
 const VALIDATION_TIMEOUT_MS = 30_000;
+const RECORDS_CONFIG_LOCK_STALE_MS = 10 * 60_000;
+const RECORDS_CONFIG_LOCK_WAIT_MS = 60_000;
+const RECORDS_CONFIG_LOCK_POLL_MS = 250;
 
 export type RecordsGraphjinDatabaseConfig = {
   connectionString: string;
@@ -496,19 +500,31 @@ export function createRecordsGraphjinConfigValidator(options: {
  * Cross-process lock dedicated to the complete records config writer. This is
  * deliberately separate from customer-source GraphJin config persistence.
  */
-export async function acquireRecordsGraphjinConfigLock(configFile: string): Promise<() => Promise<void>> {
+export async function acquireRecordsGraphjinConfigLock(
+  configFile: string,
+  opts: { waitMs?: number } = {},
+): Promise<() => Promise<void>> {
   const directory = dirname(configFile);
   await mkdir(directory, { recursive: true, mode: DIRECTORY_MODE });
   const lockFile = join(directory, `.${basename(configFile)}.records.lock`);
-  const token = randomUUID();
+  const token = `${process.pid}@${hostname()}:${randomUUID()}`;
+  const deadline = Date.now() + (opts.waitMs ?? RECORDS_CONFIG_LOCK_WAIT_MS);
   let handle;
-  try {
-    handle = await open(lockFile, "wx", LOCK_MODE);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+  for (;;) {
+    try {
+      handle = await open(lockFile, "wx", LOCK_MODE);
+      break;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    }
+    if (await lockOwnerGone(lockFile)) {
+      await unlink(lockFile).catch(() => undefined);
+      continue;
+    }
+    if (Date.now() >= deadline) {
       throw new Error("records GraphJin config has another projection in progress");
     }
-    throw error;
+    await new Promise((resolve) => setTimeout(resolve, RECORDS_CONFIG_LOCK_POLL_MS));
   }
   try {
     await handle.writeFile(token, "utf8");
@@ -521,6 +537,21 @@ export async function acquireRecordsGraphjinConfigLock(configFile: string): Prom
     const current = await readFile(lockFile, "utf8").catch(() => "");
     if (current === token) await unlink(lockFile).catch(() => undefined);
   };
+}
+
+/** A lock whose writer stopped mid-projection: its process is gone, or it is older than any projection. */
+async function lockOwnerGone(lockFile: string): Promise<boolean> {
+  const held = await stat(lockFile).catch(() => null);
+  if (!held) return false;
+  if (Date.now() - held.mtimeMs >= RECORDS_CONFIG_LOCK_STALE_MS) return true;
+  const owner = /^(\d+)@([^:]+):/.exec(await readFile(lockFile, "utf8").catch(() => ""));
+  if (!owner || owner[2] !== hostname()) return false;
+  try {
+    process.kill(Number(owner[1]), 0);
+    return false;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "ESRCH";
+  }
 }
 
 async function fsyncDirectory(directory: string): Promise<void> {

@@ -1,6 +1,6 @@
 import { prepareSandboxCapacity, closeSandboxPools } from "@neko/llm/work/sandbox-launcher";
 import { withStartupTrace, startupPhase, startupEvent } from "@neko/telemetry/startup";
-import { soloAdminNeedsEmail } from "@neko/db";
+import { keepProcessThroughDatabaseRestarts, soloAdminNeedsEmail } from "@neko/db";
 import { dispatchEmbeddingJobs, runEmbeddingIndexJob, type EmbeddingIndexPayload } from "@neko/llm";
 import "dotenv/config";
 
@@ -114,7 +114,7 @@ import {
   type PluginActionSeed,
 } from "@neko/llm/workflows";
 import { resolveDeclarativePackActionAdapter, registerPackConnectionPreflight } from "./packs/declarative-action-runtime.js";
-import { ensureOrgWorkspace, getOrgAgentRoot, reportDeploymentProfile } from "@neko/llm/work";
+import { ensureOrgWorkspace, getOrgAgentRoot, reportDeploymentProfile, setAgentSlotLimit } from "@neko/llm/work";
 import { checkOrgUpdates } from "@neko/llm/config-vcs/updates";
 import { ensureQueueExists } from "./pg-boss-helpers.js";
 import { PluginRegistry } from "./plugins/plugin-registry.js";
@@ -205,6 +205,7 @@ import { registerPackActionPreflight } from "./packs/action-preflight.js";
 import { registerMagentoV2Runtime } from "./packs/magento-v2-runtime.js";
 
 process.env.OPENNEKO_SANDBOX_OWNER ||= "worker";
+keepProcessThroughDatabaseRestarts("worker");
 
 const PORT: number = 4100;
 const MAX_JOB_RETRIES: number = 2;
@@ -1027,6 +1028,8 @@ const knowledgeRefreshTimer = setInterval(() => { void refreshKnowledgeCaches();
 knowledgeRefreshTimer.unref();
 
 const concurrency = await resolveAgentConcurrency(ADMIN_ORG_ID);
+// Every agent job on this host, from any queue, shares one cap.
+setAgentSlotLimit(concurrency.globalCap);
 console.log(
   `[worker] concurrency: globalCap=${concurrency.globalCap} (configure in /admin/settings/agent; restart required)`,
 );
@@ -1071,9 +1074,10 @@ const b = await boss();
       `[worker] reconciled processing_job rows on boot: succeeded=${summary.succeeded} failed=${summary.failed} requeued=${summary.requeued} lost=${summary.lost}`,
     );
   }
-  // At boot nothing this worker tracks is running yet, so any "running" run is
-  // a zombie left by a hard restart — cancel it instead of stranding it.
-  const runs = await reconcileStaleRuns();
+  // At boot nothing this worker tracks is running yet, so any "running" run
+  // it owns is a zombie left by a hard restart. Web chat runs belong to the
+  // web process; the periodic sweep covers them if that process dies.
+  const runs = await reconcileStaleRuns({ workerOwnedOnly: true });
   if (runs.cancelled > 0) {
     console.log(
       `[worker] cancelled ${runs.cancelled} stale running run(s) on boot`,

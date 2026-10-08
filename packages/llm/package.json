@@ -14,6 +14,8 @@
     "./library/formats": "./src/library/formats.ts",
     "./secrets": "./src/secrets.ts",
     "./work": "./src/work/index.ts",
+    "./work/answer-expression": "./src/work/answer-expression.ts",
+    "./work/answer-tool-check": "./src/work/answer-tool-check.ts",
     "./config-vcs": "./src/config-vcs/public.ts",
     "./config-vcs/updates": "./src/config-vcs/updates.ts",
     "./interaction": "./src/interaction/index.ts",

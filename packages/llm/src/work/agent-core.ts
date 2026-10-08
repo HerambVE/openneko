@@ -72,6 +72,8 @@ export interface RunAgentBackendInput {
   /** Whether this channel renders a2ui cards (web). Default true. Gates the
    * brokered neko_ui render server. */
   wantsCards?: boolean;
+  /** The answer card tool: "rich" (web), "core" (other channels), or "none" when the reader turned visuals off. */
+  cardSchema?: "rich" | "core" | "none";
   emit: (event: AgentEvent) => Promise<void>;
   signal?: AbortSignal;
 }
@@ -105,6 +107,7 @@ export async function runAgentBackend(
     nativeDelegation,
     controlPlane,
     wantsCards = true,
+    cardSchema = "core",
     emit,
     signal,
   } = input;
@@ -178,7 +181,9 @@ export async function runAgentBackend(
           ...(graphjinToolPolicy ? { toolPolicy: graphjinToolPolicy } : {}),
         }),
         // Rendering is per-channel: the card server only ships to web turns.
-        ...(wantsCards ? { neko_ui: buildRenderCardsServer(emit) } : {}),
+        ...(wantsCards && cardSchema !== "none"
+          ? { neko_ui: buildRenderCardsServer(emit, { rich: cardSchema === "rich" }) }
+          : {}),
         neko_skills: buildSkillBuilderServer(workspace.skillsRoot),
         neko_memory: buildWorkMemoryServer({ orgId, threadId, runId }, { controlPlane }),
         neko_library: buildLibraryServer({ orgId, threadId, runId }, { controlPlane }),
@@ -256,6 +261,7 @@ export async function runAgentBackend(
           OPENNEKO_MCP_RUN_ID: runId,
           OPENNEKO_MCP_SKILLS_ROOT: workspace.skillsRoot,
           OPENNEKO_MCP_WANTS_CARDS: wantsCards ? "1" : "0",
+          OPENNEKO_MCP_CARD_SCHEMA: cardSchema,
           ...(graphjinToolPolicy
             ? {
                 [GRAPHJIN_TOOL_POLICY_ENV]:

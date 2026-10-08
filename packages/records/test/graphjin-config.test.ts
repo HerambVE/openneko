@@ -1,5 +1,5 @@
-import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdtemp, readFile, stat, utimes, writeFile } from "node:fs/promises";
+import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse } from "yaml";
 import { describe, expect, it } from "vitest";
@@ -193,11 +193,34 @@ describe("records GraphJin config", () => {
     const directory = await mkdtemp(join(tmpdir(), "records-config-lock-"));
     const configFile = join(directory, "dev.yml");
     const release = await acquireRecordsGraphjinConfigLock(configFile);
-    await expect(acquireRecordsGraphjinConfigLock(configFile)).rejects.toThrow(
+    await expect(acquireRecordsGraphjinConfigLock(configFile, { waitMs: 0 })).rejects.toThrow(
+      /another projection in progress/,
+    );
+    const waiting = acquireRecordsGraphjinConfigLock(configFile, { waitMs: 5_000 });
+    await release();
+    const releaseAgain = await waiting;
+    await releaseAgain();
+  });
+
+  it("takes over a lock whose process on this host has stopped", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "records-config-dead-"));
+    const configFile = join(directory, "dev.yml");
+    await writeFile(join(directory, ".dev.yml.records.lock"), `2147483646@${hostname()}:token`);
+    const release = await acquireRecordsGraphjinConfigLock(configFile, { waitMs: 0 });
+    await release();
+  });
+
+  it("takes over a lock left by a process that stopped mid-projection", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "records-config-stale-"));
+    const configFile = join(directory, "dev.yml");
+    const lockFile = join(directory, ".dev.yml.records.lock");
+    await writeFile(lockFile, "token-of-a-stopped-worker");
+    const old = new Date(Date.now() - 11 * 60_000);
+    await utimes(lockFile, old, old);
+    const release = await acquireRecordsGraphjinConfigLock(configFile, { waitMs: 0 });
+    await expect(acquireRecordsGraphjinConfigLock(configFile, { waitMs: 0 })).rejects.toThrow(
       /another projection in progress/,
     );
     await release();
-    const releaseAgain = await acquireRecordsGraphjinConfigLock(configFile);
-    await releaseAgain();
   });
 });

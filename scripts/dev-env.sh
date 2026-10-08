@@ -16,7 +16,9 @@ export OPENNEKO_DEV_STATE="${OPENNEKO_DEV_STATE:-$PWD/.openneko/dev}"
 if [ -z "${COMPOSE_PROJECT_NAME:-}" ] && [ -s "$OPENNEKO_DEV_STATE/compose-project" ]; then
   COMPOSE_PROJECT_NAME="$(cat "$OPENNEKO_DEV_STATE/compose-project")"
 fi
-export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-$(basename "$PWD")}"
+# Compose accepts only lowercase letters, digits, "-" and "_".
+COMPOSE_PROJECT_NAME="$(printf '%s' "${COMPOSE_PROJECT_NAME:-$(basename "$PWD")}" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9_-' '-')"
+export COMPOSE_PROJECT_NAME
 export OPENNEKO_CONFIG_VOLUME="${OPENNEKO_CONFIG_VOLUME:-${XDG_CONFIG_HOME:-$HOME/.config}/openneko}"
 export OPENSHELL_STATE_DIR="${OPENSHELL_STATE_DIR:-$PWD/.openneko/openshell}"
 # `pnpm dev:up` installs the pinned GraphJin CLI here.

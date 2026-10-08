@@ -197,6 +197,7 @@ async function postRun(request: NextRequest, context: RouteContext) {
       runId: run.id,
       message,
       channel: "web",
+      ...(body.visuals === "text" ? { visuals: "text" as const } : {}),
       emit: spendGuard.emit,
       signal: spendGuard.signal,
       pluginActions,

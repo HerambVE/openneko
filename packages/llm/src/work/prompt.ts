@@ -90,7 +90,7 @@ heuristic as urgency, priority, or overdue status.
 
 // Web-only (callers gate this behind wantsCards). The neko_ui render_cards tool
 // declares the block fields; this section says which block fits which data.
-export function buildCardsSection(supportsCardTool: boolean): string {
+export function buildCardsSection(supportsCardTool: boolean, rich = false): string {
   const tool = supportsCardTool
     ? A2UI_RENDER_MCP_TOOL_NAME
     : A2UI_RENDER_TOOL_NAME;
@@ -108,7 +108,7 @@ Choose fields by the shape of the data:
 - One or two headline numbers: keyFigures.
 - A status, risk, or recommended action: callout with its mood.
 - Natural next questions: followUps.
-Write the charted column as plain numbers and put the unit in its header.
+${rich ? RICH_CARD_CHOICES : ""}Write the charted column as plain numbers and put the unit in its header.
 
 Each example below is one complete set of tool arguments.
 
@@ -120,7 +120,7 @@ A breakdown:
 
 A status:
 {"title": "Overdue invoices", "table": "Customer | Invoices overdue | Amount (USD)\\nHarbor Foods | 3 | 12400\\nLumen Labs | 1 | 2150", "callout": "Harbor Foods has three invoices more than 30 days overdue.", "mood": "act"}
-
+${rich ? RICH_CARD_EXAMPLES : ""}
 Every claim and figure in the cards comes from a successful tool result in this
 turn or from the operator. Copy each value exactly as that source gives it.
 Report a failed tool call as an error. When one period differs from its
@@ -128,8 +128,46 @@ neighbours by more than three times, add a watch callout that names the likely
 cause, such as incomplete data or a one-off event. A single fact needs only a
 sentence. When the tool reports a problem, fix the named fields and call it
 again. Refer to the cards in your answer only after the tool confirms them.
-</cards>`;
+${rich ? RICH_CARD_STAGES : ""}</cards>`;
 }
+
+const RICH_CARD_CHOICES = `- Two to six items compared on the same measures for one period: the table
+  with layout "compare", so each item reads as its own panel. A change over
+  time keeps the line chart.
+- A question about changing a number, such as a price rise or a longer lead
+  time: controls for each number the operator may move, values for the fixed
+  figures, and computed for the results. Query the base figures once; the
+  results recompute as the operator moves the controls. Show the results
+  only in computed, and keep keyFigures for the fixed starting figures.
+- Figures by place: map, one line per place with its latitude and longitude,
+  and mapValue for the measure.
+- A process, a flow, or how parts connect: diagram, one arrow per link.
+- A calculator, planner, or small tool the operator asks for: tool, an HTML
+  fragment with inline script and every figure it needs written into it.
+- Rows, points, places, or steps the operator may open next: drillDown, a
+  question with {label} where the item's name goes.
+`;
+
+const RICH_CARD_EXAMPLES = `
+A comparison:
+{"title": "Warehouses, last 30 days", "layout": "compare", "table": "Warehouse | Orders shipped | On-time (%) | Cost per order (USD)\\nReno | 8120 | 97.4 | 6.80\\nDallas | 6455 | 92.1 | 7.35\\nNewark | 7302 | 95.0 | 8.10", "drillDown": "Show late shipments from {label} by carrier"}
+
+A what-if:
+{"title": "Freight surcharge on subscriptions", "controls": ["surcharge: Surcharge per box (USD) = 2 (0 to 6, step 0.5)", "churn_rise: Extra churn per USD (%) = 0.4 (0 to 2, step 0.1)"], "values": ["boxes = 41200", "subscribers = 18300"], "computed": ["Extra revenue (USD): boxes * surcharge", "Subscribers lost: round(subscribers * surcharge * churn_rise / 100)"]}
+
+Places:
+{"title": "Café sales by city", "map": ["Lisbon @ 38.72, -9.14: 184000", "Porto @ 41.15, -8.61: 96500"], "mapValue": "Sales (EUR)", "drillDown": "Show the best-selling drinks in {label}"}
+
+A flow:
+{"title": "Support ticket lifecycle", "diagram": ["Customer -> Ticket: opens", "Ticket -> Triage: routes", "Triage -> Engineer: assigns", "Engineer -> Ticket: resolves"], "drillDown": "Show open tickets in the {label} step"}
+`;
+
+const RICH_CARD_STAGES = `When an answer needs several queries, show the operator a first card as soon
+as the first figures arrive: call the tool with stage "draft" and the figures
+you hold, keep working, then call it with stage "final" when every figure is
+checked. The final card replaces the draft. When you already hold every figure,
+send one final card.
+`;
 
 const CONVERSATION_SECTION = `<conversation>
 Treat this as an ongoing working conversation, not a report generator. Respond
@@ -784,6 +822,7 @@ export function buildWorkPrompt(args: {
   /** Include work UX metadata; efficacy evals disable it. Defaults to true. */
   includeUxMetadata?: boolean;
   supportsCardTool: boolean;
+  richCards?: boolean;
   supportsSkillTool: boolean;
   supportsMemoryTool: boolean;
   supportsWorkflowTool: boolean;
@@ -817,6 +856,7 @@ export function buildWorkPrompt(args: {
     wantsCards = true,
     includeUxMetadata = true,
     supportsCardTool,
+    richCards = false,
     supportsSkillTool,
     supportsMemoryTool,
     supportsWorkflowTool,
@@ -852,7 +892,7 @@ that flags churn risk every Monday."
     buildClarificationSection(supportsClarificationTool),
     dataSurface === "customer" ? buildSelectedMentionsSection(workspace) : "",
     dataSurface === "customer" && wantsCards
-      ? buildCardsSection(supportsCardTool)
+      ? buildCardsSection(supportsCardTool, richCards)
       : "",
     buildSkillsSection(
       dataSurface === "customer" && supportsSkillTool,

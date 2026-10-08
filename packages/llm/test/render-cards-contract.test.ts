@@ -77,8 +77,8 @@ describe("render_cards contract", () => {
         { key: "c2", label: "Orders", align: "right" },
       ],
       rows: [
-        { c0: "2025 Q4", c1: "12,699,845.92", c2: "5,571" },
-        { c0: "2026 Q1", c1: "11,565,433.28", c2: "6,161" },
+        { c0: "2025 Q4", c1: "12,699,846", c2: "5,571" },
+        { c0: "2026 Q1", c1: "11,565,433", c2: "6,161" },
       ],
     });
     expect(callout).toEqual({ id: "callout", component: "Callout", mood: "watch", text: "Q1 revenue fell while orders rose." });
@@ -137,7 +137,7 @@ describe("render_cards contract", () => {
   });
 
   it("requires at least one section", () => {
-    expect(issues({ title: "Orders" })).toEqual(["Fill at least one of table, keyFigures, callout, followUps."]);
+    expect(issues({ title: "Orders" })).toEqual(["Fill at least one of table, keyFigures, callout, followUps, computed, map, diagram, tool."]);
   });
 
   it("recovers answers from the call shapes a tool bridge produces", () => {

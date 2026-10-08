@@ -35,6 +35,11 @@ const nextConfig: NextConfig = {
   // (@neko/db, @neko/llm) get included.
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname, "../.."),
+  // Answer tools run model-written HTML in a sandboxed frame. A frame may only
+  // load from this origin, so a tool cannot navigate itself to another site.
+  async headers() {
+    return [{ source: "/:path*", headers: [{ key: "Content-Security-Policy", value: "frame-src 'self'" }] }];
+  },
   experimental: {
     // Turbopack's FS cache (default-on since Next 16.1) was serving stale
     // globals.css after edits in dev. Disabling for dev only.

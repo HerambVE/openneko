@@ -35,6 +35,8 @@ const STALE_QUEUED_MIN_AGE_MS = 120_000;
  */
 export async function reconcileStaleRuns(opts?: {
   minAgeMs?: number;
+  /** Leave web chat runs alone; the web process owns and finishes them. */
+  workerOwnedOnly?: boolean;
 }): Promise<{ cancelled: number }> {
   const cutoff = new Date(Date.now() - (opts?.minAgeMs ?? 0));
   const now = new Date();
@@ -47,7 +49,13 @@ export async function reconcileStaleRuns(opts?: {
       finished_at: now,
       updated_at: now,
     })
-    .where(and(eq(work_run.status, "running"), lte(work_run.updated_at, cutoff)))
+    .where(and(
+      eq(work_run.status, "running"),
+      lte(work_run.updated_at, cutoff),
+      opts?.workerOwnedOnly
+        ? sql`not exists (select 1 from spend_reservation sr where sr.work_run_id = ${work_run.id} and sr.source = 'chat')`
+        : undefined,
+    ))
     .returning({ id: work_run.id });
 
   // Queued chat runs have no durable queue behind them — the web process

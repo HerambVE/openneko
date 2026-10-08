@@ -22,7 +22,12 @@ export {
   type RecordsMigrationResult,
 } from "./records-migrate";
 export { createNotifyClient, type NotifyClient } from "./notify";
-export { guardPoolErrors } from "./pool-errors";
+export {
+  guardPoolErrors,
+  isDatabaseUnavailable,
+  keepProcessThroughDatabaseRestarts,
+  retryWhileDatabaseUnavailable,
+} from "./pool-errors";
 export { getOrCreateSoloAdmin, isUnclaimedSoloEmail, soloAdminNeedsEmail } from "./solo-admin";
 export { getOrgId, _resetOrgIdCacheForTesting } from "./org";
 export {
