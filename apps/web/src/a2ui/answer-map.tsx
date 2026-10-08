@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { PRINT_PREPARE_EVENT, type PrintPrepareDetail } from "@/lib/print-thread";
 import { registerComponent } from "./renderer";
 import type { RenderContext } from "./renderer";
 import type { A2UIComponent } from "./types";
@@ -89,7 +90,38 @@ function TileMap({ props, ctx, points, active, setActive, onFail }: Shared & { o
   const [pins, setPins] = useState<Pin[]>([]);
   const [tip, setTip] = useState<Pin | null>(null);
   const indexOf = useRef(new Map<string, number>());
+  const snapshot = useRef<HTMLImageElement | null>(null);
   const pointsKey = JSON.stringify(points);
+
+  useEffect(() => {
+    // WebGL does not print reliably, so a print shows an image of the map as drawn.
+    const capture = () => {
+      const map = mapRef.current;
+      if (!map || !snapshot.current) return;
+      try {
+        snapshot.current.src = map.getCanvas().toDataURL("image/png");
+      } catch {
+        snapshot.current.removeAttribute("src");
+      }
+    };
+    const prepare = (event: Event) => {
+      const map = mapRef.current;
+      if (!map) return;
+      (event as CustomEvent<PrintPrepareDetail>).detail?.wait(new Promise<void>((resolve) => {
+        const done = () => { capture(); resolve(); };
+        const fallback = window.setTimeout(done, 3_000);
+        map.once("idle", () => { window.clearTimeout(fallback); done(); });
+        map.resize();
+        map.triggerRepaint();
+      }));
+    };
+    window.addEventListener(PRINT_PREPARE_EVENT, prepare);
+    window.addEventListener("beforeprint", capture);
+    return () => {
+      window.removeEventListener(PRINT_PREPARE_EVENT, prepare);
+      window.removeEventListener("beforeprint", capture);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -122,6 +154,7 @@ function TileMap({ props, ctx, points, active, setActive, onFail }: Shared & { o
           touchPitch: false,
           maxPitch: 0,
           renderWorldCopies: false,
+          canvasContextAttributes: { preserveDrawingBuffer: true },
           fadeDuration: reducedMotion() ? 0 : 150,
         });
       } catch {
@@ -270,6 +303,8 @@ function TileMap({ props, ctx, points, active, setActive, onFail }: Shared & { o
   return (
     <div className="answer-map-canvas is-tiles" data-ready={ready ? "" : undefined}>
       <div ref={container} className="answer-map-gl" role="img" aria-label={`${props.title}, ${points.length} places on a map`} />
+      {/* eslint-disable-next-line @next/next/no-img-element -- holds a data URL captured at print time */}
+      <img ref={snapshot} className="answer-map-print" alt="" aria-hidden="true" />
       {ready ? (
         <div className="answer-map-pins" aria-hidden="true">
           {pins.filter((pin) => pin.label !== tip?.label).map((pin) => (

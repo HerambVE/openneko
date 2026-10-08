@@ -23,6 +23,7 @@
 @import "./styles/_records.css";
 @import "./styles/_responsive.css";
 @import "./styles/_dock.css";
+@import "./styles/_print.css";
 @import "tw-animate-css";
 
 @custom-variant data-open {

@@ -14,6 +14,7 @@ import {
   Paperclip,
   Pencil,
   Plus,
+  Printer,
   RefreshCw,
   ShieldCheck,
   Square,
@@ -127,6 +128,7 @@ import {
 } from "@/lib/workflow-mention";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { printThread } from "@/lib/print-thread";
 import { Button, IconButton } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/field";
 import { Disclosure } from "@/components/ui/disclosure";
@@ -1287,6 +1289,17 @@ export default function WorkScreen() {
               <span>{reasoningExpanded ? "Collapse reasoning" : "Expand reasoning"}</span>
             </Button>
           ) : null}
+          {bundle?.messages.length ? (
+            <Button
+              variant="secondary"
+              className="work-command-action"
+              onClick={() => void printThread()}
+              title="Save this thread as a PDF"
+            >
+              <Printer aria-hidden="true" strokeWidth={1.9} />
+              <span>Save as PDF</span>
+            </Button>
+          ) : null}
           <Button
             variant="secondary"
             className="work-command-action"
@@ -1316,6 +1329,15 @@ export default function WorkScreen() {
       />
 
       <div className="work-transcript" ref={transcriptRef}>
+        {bundle?.messages.length ? (
+          <header className="work-print-head" aria-hidden="true">
+            <span>OpenNeko · Ask</span>
+            <h1>{threadTitle}</h1>
+            {bundle.thread?.lastMessageAt ?? bundle.thread?.updatedAt ? (
+              <LocalDateTime value={(bundle.thread.lastMessageAt ?? bundle.thread.updatedAt)!} />
+            ) : null}
+          </header>
+        ) : null}
         {loadingThread ? (
           <div className="work-loading-state" role="status">
             <span />

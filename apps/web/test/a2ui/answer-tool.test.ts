@@ -5,7 +5,9 @@ import {
   AnswerToolFrame,
   TOOL_CSP,
   TOOL_HEIGHT_MESSAGE,
-  TOOL_MAX_HEIGHT,
+  TOOL_PRINT_BUDGET,
+  TOOL_PRINT_MAX_HEIGHT,
+  toolPrintScale,
   TOOL_MAX_HTML,
   TOOL_MIN_HEIGHT,
   buildToolDocument,
@@ -77,13 +79,20 @@ describe("toolHtmlProblem", () => {
   });
 });
 
+describe("toolPrintScale", () => {
+  it("prints a short tool at full size and shrinks a tall one to fit one page", () => {
+    expect(toolPrintScale(400)).toBe(1);
+    expect(toolPrintScale(TOOL_PRINT_BUDGET * 2)).toBe(0.5);
+  });
+});
+
 describe("readToolHeight", () => {
   const frame = {} as Window;
 
   it("accepts only this frame's height report and clamps it", () => {
     expect(readToolHeight({ source: frame, data: { type: TOOL_HEIGHT_MESSAGE, height: 412.4 } }, frame)).toBe(412);
     expect(readToolHeight({ source: frame, data: { type: TOOL_HEIGHT_MESSAGE, height: 4 } }, frame)).toBe(TOOL_MIN_HEIGHT);
-    expect(readToolHeight({ source: frame, data: { type: TOOL_HEIGHT_MESSAGE, height: 99_999 } }, frame)).toBe(TOOL_MAX_HEIGHT);
+    expect(readToolHeight({ source: frame, data: { type: TOOL_HEIGHT_MESSAGE, height: 99_999 } }, frame)).toBe(TOOL_PRINT_MAX_HEIGHT);
   });
 
   it("ignores other sources, other messages and bad values", () => {

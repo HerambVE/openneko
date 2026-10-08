@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { RotateCcw } from "lucide-react";
 import { ANSWER_TOOL_MAX_HTML, answerToolReachesOut } from "@neko/llm/work/answer-tool-check";
 import { IconButton } from "@/components/ui/button";
@@ -23,6 +23,15 @@ export const TOOL_CSP = [
 export const TOOL_HEIGHT_MESSAGE = "openneko-tool-height";
 export const TOOL_MIN_HEIGHT = 120;
 export const TOOL_MAX_HEIGHT = 900;
+/** The tallest content height the frame records. */
+export const TOOL_PRINT_MAX_HEIGHT = 4000;
+/** The height a tool may take on a printed A4 page, under its card header. */
+export const TOOL_PRINT_BUDGET = 860;
+
+/** How much a tool shrinks so it prints whole on one page. */
+export function toolPrintScale(contentHeight: number): number {
+  return Math.min(1, TOOL_PRINT_BUDGET / Math.max(1, contentHeight));
+}
 export const TOOL_MAX_HTML = ANSWER_TOOL_MAX_HTML;
 const TOOL_DEFAULT_HEIGHT = 320;
 const TOOL_REPORT_TIMEOUT_MS = 4_000;
@@ -129,7 +138,7 @@ export function readToolHeight(event: Pick<MessageEvent, "source" | "data">, fra
   const data = event.data as { type?: unknown; height?: unknown } | null;
   if (!data || typeof data !== "object" || data.type !== TOOL_HEIGHT_MESSAGE) return null;
   if (typeof data.height !== "number" || !Number.isFinite(data.height)) return null;
-  return Math.min(TOOL_MAX_HEIGHT, Math.max(TOOL_MIN_HEIGHT, Math.round(data.height)));
+  return Math.min(TOOL_PRINT_MAX_HEIGHT, Math.max(TOOL_MIN_HEIGHT, Math.round(data.height)));
 }
 
 type FrameState = "loading" | "ready" | "silent" | "navigated";
@@ -200,7 +209,13 @@ export function AnswerToolFrame({ title, html, tokens: initialTokens = null }: {
           {problem ?? "The tool tried to leave the answer, so OpenNeko stopped it. Reload it to start again."}
         </p>
       ) : (
-        <div className="work-tool-body">
+        <div
+          className="work-tool-body"
+          style={{
+            "--tool-content-height": `${height}px`,
+            "--tool-print-scale": toolPrintScale(height),
+          } as CSSProperties}
+        >
           {state === "loading" ? <div className="work-tool-loading" aria-hidden="true" /> : null}
           {tokens ? <iframe
             key={generation}
@@ -210,10 +225,9 @@ export function AnswerToolFrame({ title, html, tokens: initialTokens = null }: {
             sandbox={TOOL_SANDBOX}
             referrerPolicy="no-referrer"
             allow=""
-            loading="lazy"
             srcDoc={srcDoc}
             onLoad={onLoad}
-            style={{ height }}
+            style={{ height: Math.min(height, TOOL_MAX_HEIGHT) }}
           /> : null}
           {state === "silent" ? (
             <p className="work-tool-message" role="status">
