@@ -58,7 +58,7 @@ interface SandboxJob {
   graphjinToolPolicy?: RunAgentBackendInput["graphjinToolPolicy"];
   nativeDelegation?: RunAgentBackendInput["nativeDelegation"];
   wantsCards?: boolean;
-  cardSchema?: "rich" | "core" | "none";
+  cardSchema?: "rich" | "core";
   workflowRunId?: string;
   mode?: "live" | "headless";
   networkHosts?: string[];

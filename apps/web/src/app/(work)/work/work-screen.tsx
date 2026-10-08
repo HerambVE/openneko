@@ -4,9 +4,7 @@ import { acknowledgeWorkStartup, markWorkStartup } from "@/lib/work-startup-timi
 
 import "@/a2ui/components";
 import {
-  AlignLeft,
   ArrowUp,
-  ChartNoAxesColumn,
   Check,
   Copy,
   ChevronsDownUp,
@@ -128,6 +126,7 @@ import {
   type WorkMention,
 } from "@/lib/workflow-mention";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button, IconButton } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/field";
 import { Disclosure } from "@/components/ui/disclosure";
@@ -396,32 +395,17 @@ export default function WorkScreen() {
   const endRef = useRef<HTMLDivElement | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const [reasoningExpanded, setReasoningExpanded] = useState(false);
-  const [visualsOff, setVisualsOff] = useState(false);
-  const visualsOffRef = useRef(false);
   useEffect(() => {
     // Read after hydration so the server and first client render agree.
     const id = window.setTimeout(() => {
       try {
         setReasoningExpanded(window.localStorage.getItem(REASONING_STORAGE_KEY) === "expanded");
-        const off = window.localStorage.getItem(VISUALS_STORAGE_KEY) === "text";
-        visualsOffRef.current = off;
-        setVisualsOff(off);
       } catch {
         // Storage can be unavailable; reasoning then starts collapsed.
       }
     }, 0);
     return () => window.clearTimeout(id);
   }, []);
-  const toggleVisuals = () => {
-    const off = !visualsOffRef.current;
-    visualsOffRef.current = off;
-    setVisualsOff(off);
-    try {
-      window.localStorage.setItem(VISUALS_STORAGE_KEY, off ? "text" : "rich");
-    } catch {
-      // The choice still applies to this page.
-    }
-  };
   const toggleReasoning = () => {
     setReasoningExpanded((expanded) => {
       try {
@@ -987,7 +971,7 @@ export default function WorkScreen() {
     // the truncated thread first, and that reload clears `sending` when no
     // earlier run remains in flight.
     setSending(true);
-    const body = JSON.stringify({ message, ...(visualsOffRef.current ? { visuals: "text" } : {}) });
+    const body = JSON.stringify({ message });
     const res = await fetch(`/api/work/threads/${threadId}/runs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1366,7 +1350,6 @@ export default function WorkScreen() {
                     pending={isPending}
                     fallbackContent={message.content}
                     reasoningExpanded={reasoningExpanded}
-                    textOnly={visualsOff}
                   />
                 </div>
               );
@@ -1693,17 +1676,6 @@ export default function WorkScreen() {
                 disabled={sending || files.length >= MAX_ATTACHMENTS}
               >
                 <Paperclip size={15} strokeWidth={2} />
-              </IconButton>
-              <IconButton
-                label={visualsOff ? "Visual answers are off" : "Visual answers are on"}
-                size="icon-sm"
-                variant="ghost"
-                className="work-icon-btn"
-                onClick={toggleVisuals}
-                aria-pressed={!visualsOff}
-                title={visualsOff ? "Answers come as text. Select to turn on charts, maps, and tools." : "Answers can include charts, maps, and tools. Select to answer in text."}
-              >
-                {visualsOff ? <AlignLeft size={15} strokeWidth={2} /> : <ChartNoAxesColumn size={15} strokeWidth={2} />}
               </IconButton>
               <span className="work-composer-hint" aria-live="polite">
                 {sending ? (
@@ -2888,7 +2860,6 @@ export function splitProgressSections(content: string): ProgressSection[] {
 
 const TRAIL_KINDS = new Set<TimelineItem["kind"]>(["progress", "tools", "interim"]);
 const REASONING_STORAGE_KEY = "openneko.work.reasoning";
-const VISUALS_STORAGE_KEY = "openneko.work.visuals";
 
 const INTERNAL_TOOL = /`?\b(?:mcp_{1,2})?neko_{1,2}([a-z]+)_([a-z_]+)\b`?/g;
 
@@ -2959,7 +2930,6 @@ function RunTimeline({
   pending,
   fallbackContent,
   reasoningExpanded,
-  textOnly = false,
 }: {
   threadId: string;
   run: RunRecord | null;
@@ -2968,19 +2938,12 @@ function RunTimeline({
   fallbackContent: string;
   /** Show every reasoning note and tool call in full, in every run. */
   reasoningExpanded: boolean;
-  /** The reader turned visual answers off: leave out the key figures built from the run summary. */
-  textOnly?: boolean;
 }) {
   const { insertComposerRef } = useWorkShell();
-  const presentation = useMemo(() => {
-    const built = buildRunTimeline(events, run?.id ?? "pending");
-    if (!textOnly) return built;
-    const summarySurface = `answer-${run?.id ?? "pending"}`;
-    return {
-      ...built,
-      items: built.items.filter((item) => item.kind !== "surface" || surfaceIdOf(item.messages) !== summarySurface),
-    };
-  }, [events, run?.id, textOnly]);
+  const presentation = useMemo(
+    () => buildRunTimeline(events, run?.id ?? "pending"),
+    [events, run?.id],
+  );
   const hasSurface = presentation.items.some((item) => item.kind === "surface");
   const hasChoice = presentation.items.some((item) =>
     item.kind === "surface" && [...surfaceComponents(item.messages).values()].some((component) => component.component === "Choice"),
@@ -2999,7 +2962,7 @@ function RunTimeline({
       : "";
   const persistedVitals = useMemo(
     () =>
-      !pending && !hasSurface && !textOnly
+      !pending && !hasSurface
         ? fallbackAnswerSurface(
             run?.id ?? "persisted",
             "",
@@ -3011,7 +2974,6 @@ function RunTimeline({
     [
       hasSurface,
       pending,
-      textOnly,
       presentation.items,
       presentation.sources,
       presentation.vitals,
@@ -3130,6 +3092,13 @@ function RunTimeline({
         <SurfaceBlock messages={persistedVitals} />
       ) : null}
 
+      {pending && !hasSurface ? (
+        <AnswerInProgress
+          since={run?.createdAt}
+          step={lastProgress >= 0 ? progressPreview((presentation.items[lastProgress] as Extract<TimelineItem, { kind: "progress" }>).content) : null}
+          sources={presentation.sources}
+        />
+      ) : null}
       {pending ? (
         <div className="work-status-row">
           <Loader2 className="work-status-spin" size={12} />
@@ -3149,6 +3118,46 @@ function RunTimeline({
           onFollowup={(prompt) => insertComposerRef.current?.(prompt)}
         />
       ) : null}
+    </div>
+  );
+}
+
+const ANSWER_CARD_PLACEHOLDER_MS = 60_000;
+
+/**
+ * A long run shows where its answer will appear, with the step it is on and
+ * the data it has read, until the agent sends its card.
+ */
+function AnswerInProgress({ since, step, sources }: { since?: string; step: string | null; sources: string[] }) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const started = since ? Date.parse(since) : Date.now();
+    const wait = Math.max(0, ANSWER_CARD_PLACEHOLDER_MS - (Date.now() - started));
+    const id = window.setTimeout(() => setShown(true), wait);
+    return () => window.clearTimeout(id);
+  }, [since]);
+  if (!shown) return null;
+  return (
+    <div className="work-surface-frame answer-in-progress" role="status" aria-live="polite">
+      <div className="work-surface">
+        <div className="answer-draft-note">
+          <span className="answer-draft-pulse" aria-hidden="true" />
+          Preparing the answer
+        </div>
+        {step ? <div className="answer-in-progress-step">{step}</div> : null}
+        {sources.length > 0 ? (
+          <div className="answer-in-progress-sources">
+            <span>Read so far</span>
+            <strong>{sources.slice(0, 6).join(" · ")}{sources.length > 6 ? ` · ${sources.length - 6} more` : ""}</strong>
+          </div>
+        ) : null}
+        <div className="answer-in-progress-figures" aria-hidden="true">
+          <Skeleton className="h-16" />
+          <Skeleton className="h-16" />
+          <Skeleton className="h-16" />
+        </div>
+        <Skeleton className="mt-3 h-28" />
+      </div>
     </div>
   );
 }

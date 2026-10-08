@@ -38,7 +38,12 @@ function overlaps(a: Rect, b: Rect): boolean {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 }
 
-const TILE_STYLE = "https://tiles.openfreemap.org/styles/positron";
+const DEFAULT_TILE_STYLE = "https://tiles.openfreemap.org/styles/positron";
+
+/** The installation's tile style: "off", a self-hosted style URL, or OpenFreeMap. */
+function tileStyle(): string {
+  return document.documentElement.dataset.mapStyle || DEFAULT_TILE_STYLE;
+}
 const TILE_TIMEOUT_MS = 8_000;
 const MAX_PINS = 5;
 
@@ -109,7 +114,7 @@ function TileMap({ props, ctx, points, active, setActive, onFail }: Shared & { o
       try {
         map = new MapLibre({
           container: container.current,
-          style: TILE_STYLE,
+          style: tileStyle(),
           attributionControl: false,
           cooperativeGestures: true,
           dragRotate: false,
@@ -289,12 +294,12 @@ function TileMap({ props, ctx, points, active, setActive, onFail }: Shared & { o
 
 function AnswerMap({ props, ctx }: { props: AnswerMapProps & { id: string }; ctx: RenderContext }) {
   const [active, setActive] = useState<string | null>(null);
-  const [mode, setMode] = useState<"tiles" | "failed" | null>(null);
+  const [mode, setMode] = useState<"tiles" | "failed" | "off" | null>(null);
   const points = validMapPoints(props.points);
   const peak = Math.max(...points.map((item) => item.v), 1);
   const fail = useCallback(() => setMode("failed"), []);
   useEffect(() => {
-    const id = window.setTimeout(() => setMode(navigator.onLine === false ? "failed" : "tiles"), 0);
+    const id = window.setTimeout(() => setMode(tileStyle() === "off" ? "off" : navigator.onLine === false ? "failed" : "tiles"), 0);
     return () => window.clearTimeout(id);
   }, []);
   const shared: Shared = { props, ctx, points, active, setActive };

@@ -185,9 +185,8 @@ describeIfDb("runChatTurn", () => {
 
   it.each([
     [{ channel: "web" as const }, "rich"],
-    [{ channel: "web" as const, visuals: "text" as const }, "none"],
     [{ channel: "telegram" as const }, "core"],
-  ])("offers the answer card schema per channel and reader choice: %o -> %s", async (options, cardSchema) => {
+  ])("offers the answer card schema per channel: %o -> %s", async (options, cardSchema) => {
     const thread = await insertWorkThread(orgId);
     const run = await insertWorkRun({ orgId, threadId: thread.id });
     const runCore = vi.fn(async () => ({ status: "completed" as const, finalText: "Done." }));
