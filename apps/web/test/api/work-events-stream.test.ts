@@ -122,6 +122,8 @@ describeIfDb("/api/work/threads/[threadId]/runs/[runId]/events GET", () => {
     // 2. The stream should still be open (the reader is pending).
     // Let's insert the "done" event into the DB.
     await db().insert(work_run_event).values({
+      org_id: orgId,
+      thread_id: threadId,
       run_id: runId,
       kind: "done",
       payload: { type: "done", result: { status: "completed", minutesSaved: 1 } },
