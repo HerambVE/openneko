@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentEvent, AgentWorkspace } from "../src/agent-backend";
 import type { RunAgentBackendInput } from "../src/work/agent-core";
 import { GRAPHJIN_DIRECT_GOVERNED_POLICY } from "../src/work/graphjin-tool-policy";
+import { SandboxPool } from "../src/work/sandbox-pool";
 import { KNOWLEDGE_FILES, refreshKnowledgeSnapshot } from "../src/knowledge-cache";
 import type { RunWorkflowAgentBackendInput } from "../src/workflows/agent-core";
 
@@ -34,6 +35,7 @@ const h = vi.hoisted(() => {
     collideOnNextCreate: false,
     failProviderReconcile: false,
     legacyProvider: false,
+    missingProvider: false,
     execLines: undefined as string[] | undefined,
   };
   function spawn(_cmd: string, args: string[]) {
@@ -53,6 +55,8 @@ const h = vi.hoisted(() => {
     const legacyProviderFailure = state.legacyProvider && args.includes("provider") &&
       (args.includes("create") || args.includes("update"));
     if (state.legacyProvider && args.includes("provider") && args.includes("delete")) state.legacyProvider = false;
+    const missingProviderFailure = state.missingProvider && args.includes("provider") && args.includes("update");
+    if (state.missingProvider && args.includes("provider") && args.includes("create")) state.missingProvider = false;
     const reg = (store: Record<string, Array<(...a: unknown[]) => void>>) =>
       (ev: string, cb: (...a: unknown[]) => void) => {
         (store[ev] ??= []).push(cb);
@@ -64,6 +68,7 @@ const h = vi.hoisted(() => {
     ) => (store[ev] ?? []).forEach((cb) => cb(...a));
     const ch: Record<string, Array<(...a: unknown[]) => void>> = {};
     const stderr = Readable.from(
+      missingProviderFailure ? ["provider not found"] :
       legacyProviderFailure ? [args.includes("update") ? "provider update failed (Client specified an invalid argument)" : "provider already exists"] :
       providerFailure ? [`INVALID_ARGUMENT ${args.includes("update") ? "update rejected" : "other failure"}: SECRET-KEY`] :
       missingDelete ? ["sandbox not found"] : createCollision
@@ -82,7 +87,7 @@ const h = vi.hoisted(() => {
     const closeOnce = () => {
       if (closed) return;
       closed = true;
-      fire(ch, "close", providerFailure || legacyProviderFailure || createCollision || failedPolicy || missingDelete ? 1 : 0);
+      fire(ch, "close", providerFailure || legacyProviderFailure || missingProviderFailure || createCollision || failedPolicy || missingDelete ? 1 : 0);
     };
     const stdout = reconciliation < 0 ? Readable.from(lines) : new Readable({ read() {} });
     const stdin = new Writable({
@@ -236,10 +241,16 @@ describe("sandboxLauncherOptionsFromEnv", () => {
 });
 
 describe("sandboxLauncherOptionsFromConfig", () => {
-  it("defaults to one warm slot and allows explicitly disabling it", () => {
+  it("keeps one warm slot on the web, none on the worker, and honors an explicit size", () => {
     vi.stubEnv("OPENNEKO_AGENT_WARM_POOL_SIZE", undefined);
     try {
+      vi.stubEnv("OPENNEKO_SANDBOX_OWNER", "web");
       expect(sandboxLauncherOptionsFromConfig({}).warmPoolSize).toBe(1);
+      vi.stubEnv("OPENNEKO_SANDBOX_OWNER", "openneko-worker");
+      expect(sandboxLauncherOptionsFromConfig({}).warmPoolSize).toBe(0);
+      vi.stubEnv("OPENNEKO_AGENT_WARM_POOL_SIZE", "2");
+      expect(sandboxLauncherOptionsFromConfig({}).warmPoolSize).toBe(2);
+      vi.stubEnv("OPENNEKO_SANDBOX_OWNER", "web");
       vi.stubEnv("OPENNEKO_AGENT_WARM_POOL_SIZE", "0");
       expect(sandboxLauncherOptionsFromConfig({}).warmPoolSize).toBe(0);
     } finally { vi.unstubAllEnvs(); }
@@ -575,6 +586,20 @@ describe("makeSandboxRunCore", () => {
     expect(logs.some(line => line.includes('"phase":"warm_miss"'))).toBe(false);
     for (const phase of ["inputs_reconcile", "workspace_upload", "inputs_sync"]) {
       expect(logs.some(line => line.includes(`"phase":"${phase}"`))).toBe(true);
+    }
+  });
+
+  it("starts a fresh sandbox when no warm spare becomes ready", async () => {
+    const logs: string[] = [];
+    const acquire = vi.spyOn(SandboxPool.prototype, "acquire").mockRejectedValue(new Error("warm sandbox readiness timeout"));
+    try {
+      const core = makeSandboxRunCore({ agentImage: "test", warmPoolSize: 1, onLog: line => logs.push(line) });
+      const result = await core(fakeInput(async () => {}));
+      expect(result.status).toBe("completed");
+      expect(logs.some(line => line.includes("warm sandbox unavailable, starting a fresh one"))).toBe(true);
+      expect(h.calls.some(call => call.args.includes("create") && call.args.includes("infinity"))).toBe(true);
+    } finally {
+      acquire.mockRestore();
     }
   });
 
@@ -1285,6 +1310,7 @@ describe("ensureOpenShellProvider", () => {
     h.calls.length = 0;
     h.state.failProviderReconcile = false;
     h.state.legacyProvider = false;
+    h.state.missingProvider = false;
   });
   afterEach(() => vi.restoreAllMocks());
 
@@ -1293,14 +1319,20 @@ describe("ensureOpenShellProvider", () => {
     await ensureOpenShellProvider({ providerName: "org-x", apiKey: "SECRET-KEY" });
     const lines = h.calls.map((c) => c.args.join(" ")).filter((l) => !l.includes("profile import"));
     expect(lines).toEqual([
-      "provider create --name org-x --type openneko-agent --credential MODEL_API_KEY=SECRET-KEY",
       "provider update org-x --credential MODEL_API_KEY=SECRET-KEY",
       "provider delete org-x",
       "provider create --name org-x --type openneko-agent --credential MODEL_API_KEY=SECRET-KEY",
     ]);
   });
 
+  it("refreshes an existing provider's key without a create attempt", async () => {
+    await ensureOpenShellProvider({ providerName: "org-x", apiKey: "SECRET-KEY" });
+    const lines = h.calls.map((c) => c.args.join(" ")).filter((l) => !l.includes("profile import"));
+    expect(lines).toEqual(["provider update org-x --credential MODEL_API_KEY=SECRET-KEY"]);
+  });
+
   it("registers the generic profile and creates the provider with the key", async () => {
+    h.state.missingProvider = true;
     await ensureOpenShellProvider({ providerName: "org-x", apiKey: "SECRET-KEY" });
     const lines = h.calls.map((c) => c.args.join(" "));
     // generic profile imported (idempotent):

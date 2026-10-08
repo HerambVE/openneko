@@ -40,6 +40,7 @@ export const ACCESS_POLICIES: AccessPolicy[] = [
   { prefix: "/api/pack-accounts", rule: "token", why: "pack OAuth callbacks carry the state cookie" },
 
   { prefix: "/admin", rule: "admin" },
+  { prefix: "/dev", rule: "admin", why: "development previews; the pages return 404 in production" },
   { prefix: "/api/admin", rule: "admin" },
   { prefix: "/api/settings", rule: "admin" },
   { prefix: "/api/policies", rule: "admin" },

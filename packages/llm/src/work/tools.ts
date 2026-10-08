@@ -20,7 +20,7 @@ import type { AgentControlPlane } from "./control-plane";
 import {
   A2UI_RENDER_SERVER_NAME,
   A2UI_RENDER_TOOL_NAME,
-  RENDER_CARDS_INPUT_SCHEMA,
+  renderCardsInputSchema,
   validateRenderCardsInput,
 } from "./a2ui-contract";
 import { OPENNEKO_GRAPHJIN_MCP_SERVER_NAME } from "../graphjin/mcp-names";
@@ -41,7 +41,9 @@ function requireControlPlane(
 
 export function buildRenderCardsServer(
   emit: (event: AgentEvent) => Promise<void> | void,
+  opts: { rich?: boolean } = {},
 ) {
+  const rich = opts.rich ?? false;
   // Raw arguments reach the handler so bridge-shaped calls can be normalized
   // before validation. The advertised schema is still the typed contract.
   return createDynamicMcpServer({
@@ -50,13 +52,13 @@ export function buildRenderCardsServer(
     listTools: async () => [{
       name: A2UI_RENDER_TOOL_NAME,
       description: RENDER_CARDS_DESCRIPTION,
-      inputSchema: RENDER_CARDS_INPUT_SCHEMA as Tool["inputSchema"],
+      inputSchema: renderCardsInputSchema(rich) as Tool["inputSchema"],
     }],
     callTool: async ({ name, arguments: args }) => {
       if (name !== A2UI_RENDER_TOOL_NAME) {
         return { isError: true, content: [{ type: "text", text: `Unknown tool: ${name}` }] };
       }
-      const validated = validateRenderCardsInput(args);
+      const validated = validateRenderCardsInput(args, undefined, { rich });
       if (!validated.success) {
         return {
           isError: true,

@@ -14,6 +14,7 @@ import {
   work_thread,
   workflow_run,
   pool,
+  processing_job,
 } from "@neko/db";
 import { createHash } from "node:crypto";
 import type { AgentBackendId } from "../agent-backend";
@@ -355,6 +356,13 @@ export async function createWorkRun(
     },
   });
   return rows[0];
+}
+
+/** Show the stale-run sweeps that a run waiting for a sandbox slot is alive. */
+export async function touchAgentRun(id: string) {
+  const now = new Date();
+  await db().update(work_run).set({ updated_at: now }).where(eq(work_run.id, id));
+  await db().update(processing_job).set({ updated_at: now }).where(eq(processing_job.id, id));
 }
 
 export async function markWorkRunRunning(runId: string) {

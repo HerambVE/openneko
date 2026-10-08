@@ -397,6 +397,7 @@ async function runChatTurnTraced(
     const customerSurface = dataSurface === "customer";
     const channelWantsCards = RENDERING_CHANNELS.has(opts.channel ?? "web");
     const wantsCards = customerSurface && channelWantsCards;
+    const richCards = wantsCards && (opts.channel ?? "web") === "web";
     const supportsCardTool = customerSurface && backend.capabilities.mcpTools;
     const supportsClarificationTool = backend.capabilities.mcpTools;
     const supportsSkillTool = customerSurface && backend.capabilities.mcpTools;
@@ -514,6 +515,7 @@ async function runChatTurnTraced(
       wantsCards,
       includeUxMetadata: opts.includeUxMetadata,
       supportsCardTool,
+      richCards,
       supportsSkillTool,
       supportsMemoryTool,
       supportsWorkflowTool,
@@ -572,6 +574,7 @@ async function runChatTurnTraced(
       // Work chat, including records-scoped app chat. Generated answer-card
       // vocabulary remains gated separately in the prompt above.
       wantsCards: channelWantsCards,
+      cardSchema: richCards ? "rich" : "core",
       emit: wrappedEmit,
       signal,
     });

@@ -8,6 +8,10 @@
 @import "./styles/_agentic.css";
 @import "./styles/_entry.css";
 @import "./styles/_work.css";
+@import "./styles/_answer-blocks.css";
+@import "./styles/_answer-map.css";
+@import "./styles/_answer-diagram.css";
+@import "./styles/_answer-tool.css";
 @import "./styles/_composer.css";
 @import "./styles/_profile-review.css";
 @import "./styles/_toasts.css";
@@ -19,6 +23,7 @@
 @import "./styles/_records.css";
 @import "./styles/_responsive.css";
 @import "./styles/_dock.css";
+@import "./styles/_print.css";
 @import "tw-animate-css";
 
 @custom-variant data-open {

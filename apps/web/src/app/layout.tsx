@@ -11,6 +11,7 @@ import "@fontsource-variable/manrope/wght.css";
 import "./globals.css";
 import "./styles/_operations.css";
 import "./styles/_library.css";
+import { mapStyleSetting } from "@/lib/map-style";
 
 // Set data-density before paint from the persisted choice (default compact),
 // so the dense layout never flashes the comfortable one on load.
@@ -35,7 +36,7 @@ export default async function RootLayout({
 }>) {
   const initial: RailIdentity | undefined = await railIdentity();
   return (
-    <html lang="en" data-density="compact" suppressHydrationWarning>
+    <html lang="en" data-density="compact" data-map-style={mapStyleSetting()} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: DENSITY_INIT }} />
       </head>

@@ -13,6 +13,9 @@
  * --bridge offers the tool the way Hermes tool search does: a tool_call bridge
  * whose arguments parameter is an open object, with the schema as text.
  *
+ * --rich offers the web schema with comparisons, what-if controls, maps,
+ * diagrams, tools and drill-down, and adds the cases that need them.
+ *
  * --org adds the organization's saved primary provider and model; --models
  * runs other comma-separated models with that saved key.
  */
@@ -22,11 +25,11 @@ import {
   buildCardsSection,
   normalizeRenderCardsInput,
   RENDER_CARDS_DESCRIPTION,
-  RENDER_CARDS_INPUT_SCHEMA,
+  renderCardsInputSchema,
   validateRenderCardsInput,
 } from "@neko/llm/work";
 
-type Kind = "keyFigures" | "chart" | "table" | "callout" | "followUps";
+type Kind = "keyFigures" | "chart" | "table" | "callout" | "followUps" | "compare" | "whatIf" | "map" | "diagram" | "tool" | "drillDown";
 type Case = {
   id: string;
   question: string;
@@ -135,8 +138,67 @@ const CASES: Case[] = [
   },
 ];
 
+const RICH_CASES: Case[] = [
+  {
+    id: "compare-categories",
+    question: "Compare our Mountain, Road and Touring bike categories side by side for the last 90 days: revenue, units sold and gross margin.",
+    result: [
+      { category: "Mountain Bikes", units: 1740, revenue: 2323674.45, gross_margin_pct: 31.32 },
+      { category: "Road Bikes", units: 1822, revenue: 1848406.7, gross_margin_pct: 18.79 },
+      { category: "Touring Bikes", units: 1845, revenue: 2089567.66, gross_margin_pct: 14.13 },
+    ],
+    expect: [{ kinds: ["compare"] }],
+  },
+  {
+    id: "what-if-price",
+    question: "If we had raised Road bike prices by 5% last quarter, what would revenue have been? Give me a control so I can try other percentages myself.",
+    result: { quarter: "2026 Q3", road_bike_revenue: 1496791.67, other_revenue: 4532859.65, road_bike_units: 1519 },
+    expect: [{ kinds: ["whatIf"] }],
+  },
+  {
+    id: "territory-map",
+    question: "Show me sales by sales territory on a map for the last 90 days.",
+    result: [
+      { territory: "Southwest", country: "US", sales: 1121473.37 },
+      { territory: "Northwest", country: "US", sales: 904211.1 },
+      { territory: "Canada", country: "CA", sales: 812004.2 },
+      { territory: "Australia", country: "AU", sales: 701332.9 },
+      { territory: "France", country: "FR", sales: 519114.5 },
+      { territory: "United Kingdom", country: "GB", sales: 512019.0 },
+      { territory: "Germany", country: "DE", sales: 498701.3 },
+    ],
+    expect: [{ kinds: ["map"] }],
+  },
+  {
+    id: "order-flow-diagram",
+    question: "Draw a diagram of how an order flows through our system, from customer order to shipment, with the tables involved.",
+    result: {
+      tables: ["sales.customer", "sales.salesorderheader", "sales.salesorderdetail", "production.transactionhistory", "purchasing.shipmethod"],
+      relations: [
+        "salesorderheader.customerid -> customer.customerid",
+        "salesorderdetail.salesorderid -> salesorderheader.salesorderid",
+        "transactionhistory.referenceorderid -> salesorderheader.salesorderid",
+        "salesorderheader.shipmethodid -> shipmethod.shipmethodid",
+      ],
+    },
+    expect: [{ kinds: ["diagram"] }],
+  },
+  {
+    id: "reorder-tool",
+    question: "Build me a small calculator: I pick a product and a target number of days of cover, and it tells me how many units to reorder.",
+    result: [
+      { product: "HL Road Frame - Black, 58", daily_units: 12.4, on_hand: 96 },
+      { product: "Touring Tire", daily_units: 3.1, on_hand: 210 },
+      { product: "Mountain-200 Black, 38", daily_units: 5.6, on_hand: 41 },
+    ],
+    expect: [{ kinds: ["tool", "whatIf"] }],
+  },
+];
+
 const TOOL_NAME = "render_cards";
 const BRIDGE = process.argv.includes("--bridge");
+const RICH = process.argv.includes("--rich");
+const SCHEMA = renderCardsInputSchema(RICH);
 const TOOL = BRIDGE
   ? {
       name: "tool_call",
@@ -150,14 +212,14 @@ const TOOL = BRIDGE
         required: ["name", "arguments"],
       } as Record<string, unknown>,
     }
-  : { name: TOOL_NAME, description: RENDER_CARDS_DESCRIPTION, parameters: RENDER_CARDS_INPUT_SCHEMA };
+  : { name: TOOL_NAME, description: RENDER_CARDS_DESCRIPTION, parameters: SCHEMA };
 const SYSTEM = [
   "You are OpenNeko, an operations analyst. The data query for this turn has already run;",
   "its result is in the operator's message. Answer the operator's question.",
   "",
-  buildCardsSection(false),
+  buildCardsSection(false, RICH),
   ...(BRIDGE
-    ? ["", `tool_describe result: ${JSON.stringify({ name: TOOL_NAME, description: RENDER_CARDS_DESCRIPTION, parameters: RENDER_CARDS_INPUT_SCHEMA })}`]
+    ? ["", `tool_describe result: ${JSON.stringify({ name: TOOL_NAME, description: RENDER_CARDS_DESCRIPTION, parameters: SCHEMA })}`]
     : []),
 ].join("\n");
 
@@ -287,12 +349,17 @@ function score(testCase: Case, call: Call) {
   if (!call.called) {
     return { outcome: testCase.cardsOptional ? "pass" : "no_cards", detail: (call.text ?? "").slice(0, 120) };
   }
-  const validation = validateRenderCardsInput(call.args, "eval");
+  const validation = validateRenderCardsInput(call.args, "eval", { rich: RICH });
   if (!validation.success) {
     return { outcome: "invalid", detail: validation.issues.map((issue) => issue.message).join("; ").slice(0, 300) };
   }
-  const answer = normalizeRenderCardsInput(call.args) as Record<string, any>;
-  const kinds = (["keyFigures", "chart", "table", "callout", "followUps"] as Kind[]).filter((kind) => answer[kind] !== undefined);
+  const answer = normalizeRenderCardsInput(call.args, { rich: RICH }) as Record<string, any>;
+  const present: Record<Kind, unknown> = {
+    keyFigures: answer.keyFigures, chart: answer.chart, table: answer.table, callout: answer.callout,
+    followUps: answer.followUps, compare: answer.layout === "compare" || undefined, whatIf: answer.computed,
+    map: answer.map, diagram: answer.diagram, tool: answer.tool, drillDown: answer.drillDown,
+  };
+  const kinds = (Object.keys(present) as Kind[]).filter((kind) => present[kind] !== undefined);
   const missed = testCase.expect.filter((condition) => {
     if (condition.callout) return !answer.callout || !condition.callout.includes(answer.mood ?? "watch");
     if (!condition.kinds!.some((kind) => kinds.includes(kind))) return true;
@@ -343,7 +410,10 @@ async function main() {
 
   const results: Array<Record<string, unknown>> = [];
   for (const run of runs) {
-    for (const testCase of CASES) {
+    const only = option("--only")?.split(",").map((value) => value.trim());
+    const repeat = Math.max(1, Number(option("--repeat") ?? 1));
+    const cases = (RICH ? [...CASES, ...RICH_CASES] : CASES).filter((testCase) => !only || only.includes(testCase.id));
+    for (const testCase of cases.flatMap((testCase) => Array.from({ length: repeat }, () => testCase))) {
       let call: Call;
       try {
         call = await PROVIDERS[run.provider]!(run.model, run.key, testCase);

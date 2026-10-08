@@ -1,7 +1,7 @@
 // Live validation of the agentic knowledge layer against a REAL
-// graphjin sources-mode server (auth: jwt). Skips unless one is
-// reachable at OPENNEKO_TEST_GJ_SOURCES_URL (default the local
-// validation server from /tmp/gj-sources-live on :8090).
+// graphjin sources-mode server (auth: jwt). Runs only when
+// OPENNEKO_TEST_GJ_SOURCES_URL names one: the dev stack serves a different
+// GraphJin on :8090, so a default address would test the wrong server.
 
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -14,12 +14,12 @@ import {
 } from "../../src/knowledge-pack";
 import { mintGraphjinToken } from "../../src/graphjin/token";
 
-const BASE =
-  process.env.OPENNEKO_TEST_GJ_SOURCES_URL ?? "http://127.0.0.1:8090";
+const BASE = process.env.OPENNEKO_TEST_GJ_SOURCES_URL?.trim() ?? "";
 const GRAPHQL_URL = `${BASE}/api/v1/graphql`;
 const ORG_ID = "org-gj4-live";
 
 async function serverReachable(): Promise<boolean> {
+  if (!BASE) return false;
   // Probe the GraphQL endpoint itself — /health in this fork build can
   // 500 (health-check deadline) while queries serve fine.
   try {
@@ -40,7 +40,7 @@ const describeIfLive = reachable ? describe : describe.skip;
 
 if (!reachable) {
   console.warn(
-    `[agentic-knowledge-live] skipping: no sources-mode GraphJin at ${BASE}`,
+    `[agentic-knowledge-live] skipping: ${BASE ? `no sources-mode GraphJin at ${BASE}` : "OPENNEKO_TEST_GJ_SOURCES_URL is not set"}`,
   );
 }
 

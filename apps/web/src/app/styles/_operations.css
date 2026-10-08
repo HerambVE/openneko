@@ -1849,9 +1849,12 @@ html[data-density="compact"] .operations-root .operations-layout {
   font-weight: 800;
   letter-spacing: -0.025em;
   line-height: var(--leading-page);
-  overflow-wrap: anywhere;
-  text-overflow: clip;
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: break-word;
   white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .work-command-head p {
@@ -2085,8 +2088,19 @@ html[data-density="compact"] .operations-root .operations-layout {
   }
 
   .work-command-action {
+    width: var(--control-touch);
     min-height: var(--control-touch);
-    padding-inline: 10px;
+    padding: 0;
+  }
+
+  .work-command-action span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .work-transcript,

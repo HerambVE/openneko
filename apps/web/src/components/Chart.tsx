@@ -63,6 +63,8 @@ export default function Chart({
   centerLabel,
   valueLabel,
   baselineLabel,
+  maxBarSize = 16,
+  onSelect,
 }: {
   type: string;
   accent?: string;
@@ -71,9 +73,20 @@ export default function Chart({
   centerLabel?: string;
   valueLabel?: string;
   baselineLabel?: string;
+  maxBarSize?: number;
+  /** Called with a point's label when the reader clicks it. */
+  onSelect?: (label: string) => void;
 }) {
   const chartId = useId();
   if (!data || data.length === 0) return null;
+  const selectable = onSelect
+    ? {
+        onClick: (state: { activeLabel?: string | number } | null) => {
+          if (state?.activeLabel !== undefined) onSelect(String(state.activeLabel));
+        },
+        style: { cursor: "pointer" },
+      }
+    : {};
 
   // Defensive: agents sometimes mis-classify chartType. Coerce to a sensible
   // shape based on the actual data.
@@ -124,6 +137,7 @@ export default function Chart({
             outerRadius={h * 0.4}
             paddingAngle={2}
             strokeWidth={0}
+            {...(onSelect ? { onClick: (entry: { d?: string }) => entry?.d && onSelect(entry.d), style: { cursor: "pointer" } } : {})}
           >
             {data.map((_, i) => (
               <Cell key={i} fill={colors[i % colors.length]} />
@@ -167,7 +181,7 @@ export default function Chart({
         style={{ height: h }}
         initialDimension={{ width: 320, height: h }}
       >
-        <AreaChart data={data}>
+        <AreaChart data={data} {...selectable}>
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={accent} stopOpacity={0.25} />
@@ -200,7 +214,7 @@ export default function Chart({
         style={{ height: h }}
         initialDimension={{ width: 320, height: h }}
       >
-        <BarChart data={data} barSize={16} barGap={3}>
+        <BarChart data={data} maxBarSize={maxBarSize} barGap={3} {...selectable}>
           <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
           <XAxis dataKey="d" {...axisProps} />
           <YAxis {...axisProps} width={32} tickFormatter={yTickFormatter} />
@@ -229,7 +243,7 @@ export default function Chart({
       style={{ height: h }}
       initialDimension={{ width: 320, height: h }}
     >
-      <LineChart data={data}>
+      <LineChart data={data} {...selectable}>
         <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
         <XAxis dataKey="d" {...axisProps} />
         <YAxis {...axisProps} width={32} tickFormatter={yTickFormatter} />

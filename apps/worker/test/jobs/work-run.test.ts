@@ -183,6 +183,19 @@ describeIfDb("runChatTurn", () => {
     }
   });
 
+  it.each([
+    [{ channel: "web" as const }, "rich"],
+    [{ channel: "telegram" as const }, "core"],
+  ])("offers the answer card schema per channel: %o -> %s", async (options, cardSchema) => {
+    const thread = await insertWorkThread(orgId);
+    const run = await insertWorkRun({ orgId, threadId: thread.id });
+    const runCore = vi.fn(async () => ({ status: "completed" as const, finalText: "Done." }));
+    await runChatTurn({
+      orgId, threadId: thread.id, runId: run.id, message: "Hello", emit: async () => {}, ...options,
+    }, makeDeps({ runCore }));
+    expect(runCore).toHaveBeenCalledWith(expect.objectContaining({ cardSchema }));
+  });
+
   it("happy path: writes events in id-monotonic order, finalizes work_run completed, emits done", async () => {
     const thread = await insertWorkThread(orgId);
     const run = await insertWorkRun({ orgId, threadId: thread.id });

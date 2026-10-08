@@ -14,6 +14,7 @@ import {
   Paperclip,
   Pencil,
   Plus,
+  Printer,
   RefreshCw,
   ShieldCheck,
   Square,
@@ -126,6 +127,8 @@ import {
   type WorkMention,
 } from "@/lib/workflow-mention";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { printThread } from "@/lib/print-thread";
 import { Button, IconButton } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/field";
 import { Disclosure } from "@/components/ui/disclosure";
@@ -1286,6 +1289,17 @@ export default function WorkScreen() {
               <span>{reasoningExpanded ? "Collapse reasoning" : "Expand reasoning"}</span>
             </Button>
           ) : null}
+          {bundle?.messages.length ? (
+            <Button
+              variant="secondary"
+              className="work-command-action"
+              onClick={() => void printThread()}
+              title="Save this thread as a PDF"
+            >
+              <Printer aria-hidden="true" strokeWidth={1.9} />
+              <span>Save as PDF</span>
+            </Button>
+          ) : null}
           <Button
             variant="secondary"
             className="work-command-action"
@@ -1315,6 +1329,15 @@ export default function WorkScreen() {
       />
 
       <div className="work-transcript" ref={transcriptRef}>
+        {bundle?.messages.length ? (
+          <header className="work-print-head" aria-hidden="true">
+            <span>OpenNeko · Ask</span>
+            <h1>{threadTitle}</h1>
+            {bundle.thread?.lastMessageAt ?? bundle.thread?.updatedAt ? (
+              <LocalDateTime value={(bundle.thread.lastMessageAt ?? bundle.thread.updatedAt)!} />
+            ) : null}
+          </header>
+        ) : null}
         {loadingThread ? (
           <div className="work-loading-state" role="status">
             <span />
@@ -2754,7 +2777,7 @@ export function ProviderProgress({
       <Disclosure title={<span className="font-normal text-text2">{progressPreview(content)}</span>} meta="Progress" className="work-progress-disclosure">
         <div className="work-markdown px-3.5 pb-3">
           <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
-            {linkifyWorkspacePaths(content)}
+            {linkifyWorkspacePaths(readableTrace(content))}
           </ReactMarkdown>
         </div>
       </Disclosure>
@@ -2772,7 +2795,7 @@ export function ProviderProgress({
         <span className="work-progress-summary-label">Progress</span>
         <div className="work-markdown">
           <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
-            {linkifyWorkspacePaths(content)}
+            {linkifyWorkspacePaths(readableTrace(content))}
           </ReactMarkdown>
         </div>
       </div>
@@ -2860,9 +2883,19 @@ export function splitProgressSections(content: string): ProgressSection[] {
 const TRAIL_KINDS = new Set<TimelineItem["kind"]>(["progress", "tools", "interim"]);
 const REASONING_STORAGE_KEY = "openneko.work.reasoning";
 
+const INTERNAL_TOOL = /`?\b(?:mcp_{1,2})?neko_{1,2}([a-z]+)_([a-z_]+)\b`?/g;
+
+/** Reasoning notes name tools by their internal ids; show readers plain names. */
+export function readableTrace(content: string): string {
+  return content
+    .replace(/`?\b(?:mcp_{1,2}neko_{1,2}ui_)?render_cards\b`?/g, "the answer card")
+    .replace(INTERNAL_TOOL, (_match, _server: string, tool: string) => `the ${tool.replaceAll("_", " ")} tool`)
+    .replace(/`?"?\bminutes_saved\b"?`?/g, "the time-saved estimate");
+}
+
 /** The first line of a reasoning note, without markdown markers, for its collapsed row. */
 export function progressPreview(content: string): string {
-  const line = content
+  const line = readableTrace(content)
     .split("\n")
     .map((text) => text.replace(/^[#>\-\s]+/, "").replace(/[*_`]+/g, "").trim())
     .find(Boolean) ?? "Progress";
@@ -2934,6 +2967,9 @@ function RunTimeline({
     [events, run?.id],
   );
   const hasSurface = presentation.items.some((item) => item.kind === "surface");
+  const hasChoice = presentation.items.some((item) =>
+    item.kind === "surface" && [...surfaceComponents(item.messages).values()].some((component) => component.component === "Choice"),
+  );
   const hasText = presentation.items.some((item) => item.kind === "text");
   const hasError = presentation.items.some((item) => item.kind === "error");
   const fallbackFailure = presentWorkFailure(fallbackContent);
@@ -3045,9 +3081,8 @@ function RunTimeline({
     }
     return <WorkFailureNotice key={`error-${index}`} message={item.message} />;
   };
-  // A finished answer folds its working trail (reasoning, tool calls and
-  // interim notes) into one row, so the answer leads. Its last reasoning note
-  // stays open beside the answer.
+  // A finished answer folds its whole working trail (reasoning, tool calls
+  // and interim notes) into one row, so the answer leads.
   const trail = presentation.items
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => TRAIL_KINDS.has(item.kind));
@@ -3057,11 +3092,9 @@ function RunTimeline({
     <div className="work-timeline flex flex-col gap-2.5 mt-1">
       {foldTrail ? (
         <WorkTrail run={run} items={trail.map(({ item }) => item)}>
-          {trail.filter(({ index }) => index !== lastProgress).map(({ item, index }) => renderItem(item, index))}
+          {trail.map(({ item, index }) => renderItem(item, index))}
         </WorkTrail>
       ) : null}
-      {/* The last reasoning note stays open above the answer. */}
-      {foldTrail && lastProgress >= 0 ? renderItem(presentation.items[lastProgress]!, lastProgress) : null}
       {presentation.items.map((item, index) =>
         foldTrail && TRAIL_KINDS.has(item.kind) ? null : renderItem(item, index),
       )}
@@ -3081,6 +3114,13 @@ function RunTimeline({
         <SurfaceBlock messages={persistedVitals} />
       ) : null}
 
+      {pending && !hasSurface ? (
+        <AnswerInProgress
+          since={run?.createdAt}
+          step={lastProgress >= 0 ? progressPreview((presentation.items[lastProgress] as Extract<TimelineItem, { kind: "progress" }>).content) : null}
+          sources={presentation.sources}
+        />
+      ) : null}
       {pending ? (
         <div className="work-status-row">
           <Loader2 className="work-status-spin" size={12} />
@@ -3096,10 +3136,50 @@ function RunTimeline({
           run={run}
           sources={presentation.sources}
           artifacts={presentation.artifacts}
-          followups={presentation.followups}
+          followups={hasChoice ? [] : presentation.followups}
           onFollowup={(prompt) => insertComposerRef.current?.(prompt)}
         />
       ) : null}
+    </div>
+  );
+}
+
+const ANSWER_CARD_PLACEHOLDER_MS = 60_000;
+
+/**
+ * A long run shows where its answer will appear, with the step it is on and
+ * the data it has read, until the agent sends its card.
+ */
+function AnswerInProgress({ since, step, sources }: { since?: string; step: string | null; sources: string[] }) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const started = since ? Date.parse(since) : Date.now();
+    const wait = Math.max(0, ANSWER_CARD_PLACEHOLDER_MS - (Date.now() - started));
+    const id = window.setTimeout(() => setShown(true), wait);
+    return () => window.clearTimeout(id);
+  }, [since]);
+  if (!shown) return null;
+  return (
+    <div className="work-surface-frame answer-in-progress" role="status" aria-live="polite">
+      <div className="work-surface">
+        <div className="answer-draft-note">
+          <span className="answer-draft-pulse" aria-hidden="true" />
+          Preparing the answer
+        </div>
+        {step ? <div className="answer-in-progress-step">{step}</div> : null}
+        {sources.length > 0 ? (
+          <div className="answer-in-progress-sources">
+            <span>Read so far</span>
+            <strong>{sources.slice(0, 6).join(" · ")}{sources.length > 6 ? ` · ${sources.length - 6} more` : ""}</strong>
+          </div>
+        ) : null}
+        <div className="answer-in-progress-figures" aria-hidden="true">
+          <Skeleton className="h-16" />
+          <Skeleton className="h-16" />
+          <Skeleton className="h-16" />
+        </div>
+        <Skeleton className="mt-3 h-28" />
+      </div>
     </div>
   );
 }

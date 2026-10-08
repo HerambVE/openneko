@@ -72,6 +72,7 @@ export type BridgeServerContext = {
   triggeredByObservationId?: string | null;
   recordScope?: { appId: string; objectApiName: string };
   wantsCards?: boolean;
+  cardSchema?: string;
   graphjinToolPolicy?: GraphjinMcpToolPolicy;
 };
 
@@ -94,7 +95,7 @@ export function buildBridgeServer(
         emit,
       });
     case "neko_ui":
-      return buildRenderCardsServer(emit);
+      return buildRenderCardsServer(emit, { rich: ctx.cardSchema === "rich" });
     case "neko_graphjin":
       return buildGraphjinMcpServer({
         orgId,
@@ -387,6 +388,7 @@ async function main(): Promise<void> {
         })
       : undefined,
     wantsCards: process.env.OPENNEKO_MCP_WANTS_CARDS === "1",
+    cardSchema: process.env.OPENNEKO_MCP_CARD_SCHEMA,
     graphjinToolPolicy: parseGraphjinMcpToolPolicy(
       process.env[GRAPHJIN_TOOL_POLICY_ENV],
     ),

@@ -4,6 +4,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { RECONCILE_COMMAND, syncSandboxDirectories } from "./sandbox-sync";
 import { acquireStableSandboxInputs, clearStableSandboxInputs, type StableWorkspace } from "./sandbox-staging-cache";
 import { SandboxPool, type WarmSlot } from "./sandbox-pool";
+import { acquireAgentSlot } from "./agent-slots";
+import { retryWhileDatabaseUnavailable } from "@neko/db";
+import { touchAgentRun } from "./store";
 import { spawn } from "node:child_process";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -653,10 +656,10 @@ function makeSandboxCore(
     throw new Error("Invalid warm sandbox limits");
   }
 
-  return async function sandboxRunCore(
+  const runInSandbox = async function (
     input: SandboxRunInput,
   ): Promise<AgentRunResult> {
-    const pool = kind === "work" ? getSandboxPool(opts, input.workspace) : undefined;
+    let pool = kind === "work" ? getSandboxPool(opts, input.workspace) : undefined;
     const isJob = kind === "agent-job";
     const jobInput = isJob ? (input as RunJobAgentBackendInput) : null;
     const signal = isJob
@@ -757,6 +760,7 @@ function makeSandboxCore(
             // Channel render intent — gates the in-box render tool (see
             // docs/PER_CHANNEL_RENDERING.md). Default true if absent.
             wantsCards: (input as RunAgentBackendInput).wantsCards ?? true,
+            cardSchema: (input as RunAgentBackendInput).cardSchema ?? "core",
           }
         : kind === "workflow"
           ? {
@@ -878,11 +882,12 @@ function makeSandboxCore(
         SANDBOX_RUNTIME_DIR,
         "job.json",
       );
-      const sandboxHermesHome = pool ? "/sandbox/.hermes-warm/home" : path.posix.join(
+      const coldHermesHome = path.posix.join(
         boxWorkspace.runRoot,
         SANDBOX_RUNTIME_DIR,
         "hermes-home",
       );
+      let sandboxHermesHome = pool ? "/sandbox/.hermes-warm/home" : coldHermesHome;
 
       await input.emit({
         type: "status",
@@ -906,7 +911,17 @@ function makeSandboxCore(
             hermesStage ? await readFile(path.join(hermesStage, "config.yaml"), "utf8") : null,
           ])).digest("hex"),
         } : undefined;
-        lease = await startupPhase("sandbox.acquire", () => pool!.acquire(session, signal));
+        try {
+          lease = await startupPhase("sandbox.acquire", () => pool!.acquire(session, signal));
+        } catch (error) {
+          // A warm spare that never became ready must not fail the question.
+          if (signal?.aborted) throw error;
+          log(`warm sandbox unavailable, starting a fresh one: ${describeError(error)}`);
+          pool = undefined;
+          sandboxHermesHome = coldHermesHome;
+        }
+      }
+      if (pool && lease) {
         warmSlot = lease.slot;
         if (!warmSlot) throw new Error("Warm sandbox admission returned no slot");
         name = warmSlot.name;
@@ -1135,6 +1150,23 @@ function makeSandboxCore(
       }));
     }
   };
+
+  return async function sandboxRunCore(
+    input: SandboxRunInput,
+  ): Promise<AgentRunResult> {
+    const emit = (input as { emit?: (event: AgentEvent) => Promise<void> }).emit;
+    const signal = (input as { signal?: AbortSignal }).signal;
+    const release = await acquireAgentSlot({
+      signal,
+      onWait: () => emit?.({ type: "status", message: "Waiting for another question to finish…" }),
+      heartbeat: () => touchAgentRun(input.runId),
+    });
+    try {
+      return await runInSandbox(input);
+    } finally {
+      release();
+    }
+  };
 }
 
 /** Script steps, then the first turn and every continuation, back to back. */
@@ -1234,6 +1266,11 @@ export function workflowRuntimeDepsFromConfig(
   };
 }
 
+/** One warm box serves Ask on the web. Worker runs are background work and start cold. */
+function defaultWarmPoolSize(): number {
+  return sandboxOwner().includes("worker") ? 0 : 1;
+}
+
 export function sandboxLauncherOptionsFromConfig(
   config: AgentRuntimeLaunchConfig,
   broker?: SandboxBrokerHandle,
@@ -1245,7 +1282,7 @@ export function sandboxLauncherOptionsFromConfig(
     gatewayEndpoint: process.env.OPENSHELL_GATEWAY_ENDPOINT || undefined,
     cpu: process.env.OPENNEKO_AGENT_CPUS || undefined,
     memory: process.env.OPENNEKO_AGENT_MEMORY || undefined,
-    warmPoolSize: Number(process.env.OPENNEKO_AGENT_WARM_POOL_SIZE ?? 1),
+    warmPoolSize: Number(process.env.OPENNEKO_AGENT_WARM_POOL_SIZE ?? defaultWarmPoolSize()),
     warmIdleMs: Number(process.env.OPENNEKO_AGENT_WARM_IDLE_MS ?? 180_000),
     ...config,
     brokerUrl: broker?.url,
@@ -1356,34 +1393,24 @@ export async function ensureOpenShellProvider(opts: {
     opts.apiKey
       ? describeError(error).replaceAll(opts.apiKey, "[REDACTED_SECRET]")
       : describeError(error);
-  // create on first run; update (refresh key) when it already exists.
+  const create = () => run([
+    "provider", "create", "--name", opts.providerName,
+    "--type", OPENNEKO_AGENT_PROFILE_ID, "--credential", credential,
+  ]);
+  // The provider exists after the first run, so refresh its key first. A
+  // create-first order wrote a failed duplicate insert to the gateway's
+  // database on every sync.
   try {
-    await run([
-      "provider",
-      "create",
-      "--name",
-      opts.providerName,
-      "--type",
-      OPENNEKO_AGENT_PROFILE_ID,
-      "--credential",
-      credential,
-    ]);
-  } catch (createError) {
+    await run(["provider", "update", opts.providerName, "--credential", credential]);
+  } catch (updateError) {
     try {
-      await run(["provider", "update", opts.providerName, "--credential", credential]).catch(async (updateError) => {
-        // A provider created before OpenShell 0.1.2 stores the legacy
-        // `api_key` credential key, which 0.1.2 cannot update. Recreate it.
-        if (!describeError(updateError).includes("invalid argument")) throw updateError;
+      // A provider created before OpenShell 0.1.2 stores the legacy `api_key`
+      // credential key, which 0.1.2 cannot update. Recreate it.
+      if (describeError(updateError).includes("invalid argument")) {
         await run(["provider", "delete", opts.providerName]);
-        await run([
-          "provider", "create", "--name", opts.providerName,
-          "--type", OPENNEKO_AGENT_PROFILE_ID, "--credential", credential,
-        ]);
-      });
-    } catch (updateError) {
-      // A profile may already exist, so an import failure is not necessarily
-      // the cause. Preserve the decisive update validation error and both
-      // earlier attempts without exposing the credential in an exception.
+      }
+      await create();
+    } catch (createError) {
       throw new Error(
         `OpenShell provider ${opts.providerName} reconciliation failed: ` +
         `update: ${safeError(updateError)}; ` +
@@ -1641,7 +1668,9 @@ function execAndStream(
           // overtake message persistence or reorder streamed deltas.
           eventQueue = eventQueue.then(async () => {
             try {
-              await emit(event);
+              // A short Postgres restart must not fail an answer that is
+              // nearly done; hold the event until the database is back.
+              await retryWhileDatabaseUnavailable(() => emit(event));
             } catch (error) {
               eventError ??=
                 error instanceof Error ? error : new Error(String(error));

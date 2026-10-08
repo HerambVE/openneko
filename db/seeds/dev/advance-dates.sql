@@ -8,10 +8,9 @@
 -- purchasing tables stay frozen and metric agents end up computing TTMs
 -- against year-old data.
 --
--- Sales is shifted in two pieces: the historical block (orderdate older
--- than a protected sim window) gets pulled forward so its max lands flush
--- against where the sim begins producing. The protected window (recent
--- N days) is left untouched so sim-generated current rows survive.
+-- Sales is shifted in two pieces: the historical block gets pulled forward
+-- so its max lands flush against where the sim begins producing, and the
+-- sim-written rows are left untouched.
 --
 -- HR, product lifecycle, BOM, cost/listprice history, currency rate, and
 -- product reviews are intentionally left alone — they are real historical
@@ -24,10 +23,7 @@ DECLARE
   last_at      timestamptz;
   shift_d      int;
   today        date := CURRENT_DATE;
-  -- Window the sales sim is allowed to own. Historical sales rows older
-  -- than this get shifted; rows inside the window are presumed sim-written
-  -- and left alone.
-  sim_window_d int  := 30;
+  -- Orders whose modifieddate falls inside this window are sim-written.
   sim_cutoff   date := CURRENT_DATE - 30;
 BEGIN
   SELECT advance_dates_at INTO last_at FROM trial_sim.state;
@@ -61,19 +57,22 @@ BEGIN
        SET transactiondate = transactiondate + (shift_d || ' days')::interval;
   END IF;
 
-  -- Group 3: sales historical block (skip rows newer than sim_cutoff —
-  -- those belong to the live sim). Shift is computed so the most recent
-  -- *historical* orderdate lands at sim_cutoff, leaving a clean handoff
-  -- to whatever the sim has been writing.
-  SELECT GREATEST(0, sim_cutoff - MAX(orderdate)::date) INTO shift_d
-  FROM sales.salesorderheader WHERE orderdate < sim_cutoff;
+  -- Group 3: sales historical block. The sim stamps modifieddate with the
+  -- order time; historical rows keep their original modifieddate. The most
+  -- recent historical order lands the day before the sim's first order, or
+  -- yesterday when the sim has written nothing yet, so live data follows the
+  -- history without a gap.
+  SELECT GREATEST(0, (COALESCE(
+           (SELECT MIN(orderdate)::date FROM sales.salesorderheader WHERE modifieddate >= sim_cutoff),
+           today) - 1) - MAX(orderdate)::date) INTO shift_d
+  FROM sales.salesorderheader WHERE modifieddate < sim_cutoff;
   IF shift_d > 0 THEN
-    RAISE NOTICE '[advance-dates] sales.salesorderheader (historical, %-day sim window) +% days', sim_window_d, shift_d;
+    RAISE NOTICE '[advance-dates] sales.salesorderheader (historical) +% days', shift_d;
     UPDATE sales.salesorderheader
        SET orderdate = orderdate + (shift_d || ' days')::interval,
            shipdate  = shipdate  + (shift_d || ' days')::interval,
            duedate   = duedate   + (shift_d || ' days')::interval
-     WHERE orderdate < sim_cutoff;
+     WHERE modifieddate < sim_cutoff;
   END IF;
 
   -- Group 4: purchasing (header + detail + productvendor.lastreceiptdate, one shift).

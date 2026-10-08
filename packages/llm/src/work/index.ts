@@ -5,9 +5,11 @@ export * from "./behavior-monitor";
 export * from "./deployment-profile";
 export * from "./data-surface";
 export { buildCardsSection, buildWorkPrompt } from "./prompt";
+export { acquireAgentSlot, agentSlotUsage, ASK_DEFAULT_CONCURRENCY, setAgentSlotLimit } from "./agent-slots";
 export {
   normalizeRenderCardsInput,
   RENDER_CARDS_INPUT_SCHEMA,
+  renderCardsInputSchema,
   validateRenderCardsInput,
 } from "./a2ui-contract";
 export { RENDER_CARDS_DESCRIPTION } from "./render-catalog";
