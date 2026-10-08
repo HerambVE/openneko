@@ -4,6 +4,7 @@ import type { ActionRequestRecord } from "@neko/llm/workflows";
 import {
   buildRecordImportPlan,
   recordIdentifier,
+  recordImportActionPayload,
   type AppRegistrySnapshot,
   type RecordRegistry,
 } from "@neko/records";
@@ -160,6 +161,34 @@ describe("records import worker adapters", () => {
         warnings: ["Notes is not mapped and will be ignored"],
       },
     });
+  });
+
+  it("accepts the web start payload and rebuilds the same plan", async () => {
+    const bytes = Buffer.from("id,name,Notes\nloan-1,Laptop,\n");
+    const plan = buildRecordImportPlan({
+      snapshot: snapshot(),
+      objectApiName: "loan",
+      sourcePath: "uploads/thread-1/loans.csv",
+      sourceName: "loans.csv",
+      bytes,
+      mapping: { id: "id", name: "name", Notes: null },
+      emptyTextColumns: ["name"],
+      batchSize: 50,
+    });
+    const hook = createRecordImportPreflightHook({
+      pool: {} as Pool,
+      registry: { loadApp: vi.fn().mockResolvedValue(snapshot()) } as unknown as RecordRegistry,
+      readSource: vi.fn().mockResolvedValue(bytes),
+      updatePayload: vi.fn(async (input: { payload: Record<string, unknown> }) =>
+        actionRequest("records_import_start", input.payload),
+      ) as never,
+    });
+
+    const prepared = await hook(
+      actionRequest("records_import_start", recordImportActionPayload(plan)),
+    );
+
+    expect((prepared?.payload.import_plan as { planHash: string }).planHash).toBe(plan.planHash);
   });
 
   it("creates one durable run and queues it after approval", async () => {
